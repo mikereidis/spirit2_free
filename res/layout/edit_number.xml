@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+android:layout_width="match_parent"
+android:layout_height="wrap_content"
+android:orientation="vertical">
+
+  <EditText
+  android:id="@+id/edit_number"
+  android:contentDescription="Frequency"
+  android:layout_height="wrap_content"
+  android:layout_width="match_parent"
+  android:scrollHorizontally="true"
+  android:hint = "eg 1079"
+  android:singleLine="true"
+  android:inputType="numberDecimal"
+  android:autoText="false"
+  android:capitalize="none"
+  android:textAppearance="?android:attr/textAppearanceMedium"
+  android:saveEnabled="false"/>
+
+</LinearLayout>

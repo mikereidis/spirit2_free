@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="utf-8"?>
+
+
+<!--
+-->
+<!--
+ android:background="#202020"
+-->
+<LinearLayout android:orientation="vertical" android:background="#303030" android:layout_width="match_parent" android:layout_height="match_parent"
+  xmlns:android="http://schemas.android.com/apk/res/android">
+
+<!--
+                    @ 360
+41 sxp:    360      4+          widthPixels: 540  heightPixels:  960  density: 1.5
+
+cm gs1:    320      4.0 presets widthPixels: 480  heightPixels:  800  density: 1.5      dial too large and shifted right and down
+42 oxl:    320      4.5 presets widthPixels: 480  heightPixels:  800  density: 1.5      dial OK
+cm gs2:    320      4.0 presets widthPixels: 480  heightPixels:  800  density: 1.5      dial too large and shifted right and down
+43 gs3:    360      4.5 presets widthPixels: 720  heightPixels: 1280  density: 2.0      dial OK
+cm no1:    400      5.0 presets widthPixels: 800  heightPixels: 1280  density: 2.0      dial OK
+
+43 n7a:    600      7.5 presets widthPixels: 800  heightPixels: 1205  density: 1.331..  dial shifted right              Main part about 60% of screen
+44 n7b:    600      7.5 presets widthPixels:1200  heightPixels: 1824  density: 2.0      ?dial small due to high DPI     Main part about 60% of screen
+
+
+Main upper part of screen (without presets):
+-->
+  <HorizontalScrollView android:id="@+id/main_hsv" android:layout_width="match_parent" android:scrollbars="none" android:fadingEdge="none" android:layout_weight="7" android:layout_height="0dip"
+    android:layout_marginLeft="0.0dip" android:layout_marginTop="0.0dip" android:layout_marginRight="0.0dip" android:layout_marginBottom="0.0dip" android:layout_alignParentBottom="true" android:overScrollMode="ifContentScrolls">
+    <LinearLayout android:id="@+id/main_hll" android:layout_width="match_parent" android:background="#00000000" android:orientation="horizontal" android:layout_height="match_parent">
+      <FrameLayout android:id="@+id/new_fl" android:layout_width="400dip" android:layout_height="match_parent">
+        <include layout="@layout/gui_pg1_layout"/>
+      </FrameLayout>
+    </LinearLayout>
+  </HorizontalScrollView>
+
+<!--
+-->
+<!--
+-->
+  <View android:background="#000000" android:layout_width="match_parent" android:layout_height="1dip" />
+
+<!--
+Presets:
+-->
+  <HorizontalScrollView android:scrollbars="none" android:fadingEdge="none" android:layout_width="match_parent" android:layout_weight="1" android:layout_height="0dip"
+  android:layout_marginLeft="0.0dip" android:layout_marginTop="0.0dip" android:layout_marginRight="0.0dip" android:layout_marginBottom="0.0dip" android:layout_alignParentBottom="true" android:overScrollMode="ifContentScrolls">
+    <LinearLayout android:visibility="invisible" android:background="#00000000" android:orientation="horizontal" android:layoutAnimation="@anim/ani_preset_layout" android:layout_width="match_parent" android:layout_height="56.0dip">
+                    <FrameLayout android:id="@+id/fr_preset_0" android:contentDescription="Preset 0" android:layout_width="80.0dip" android:layout_height="match_parent" >
+                        <TextView android:textSize="15.0dip" android:gravity="center" android:text="" android:id="@+id/tv_preset_0" android:layout_width="80.0dip" android:layout_height="match_parent" />
+                        <ImageButton android:background="#00000000" android:src="@drawable/btn_preset" android:id="@+id/ib_preset_0" android:layout_width="80.0dip" android:layout_height="match_parent" />
+                    </FrameLayout>
+                    <FrameLayout android:id="@+id/fr_preset_1" android:contentDescription="Preset 1" android:layout_width="80.0dip" android:layout_height="match_parent" >
+                        <TextView android:textSize="15.0dip" android:gravity="center" android:text="" android:id="@+id/tv_preset_1" android:layout_width="80.0dip" android:layout_height="match_parent" />
+                        <ImageButton android:background="#00000000" android:src="@drawable/btn_preset" android:id="@+id/ib_preset_1" android:layout_width="80.0dip" android:layout_height="match_parent" />
+                    </FrameLayout>
+                    <FrameLayout android:id="@+id/fr_preset_2" android:contentDescription="Preset 2" android:layout_width="80.0dip" android:layout_height="match_parent" >
+                        <TextView android:textSize="15.0dip" android:gravity="center" android:text="" android:id="@+id/tv_preset_2" android:layout_width="80.0dip" android:layout_height="match_parent" />
+                        <ImageButton android:background="#00000000" android:src="@drawable/btn_preset" android:id="@+id/ib_preset_2" android:layout_width="80.0dip" android:layout_height="match_parent" />
+                    </FrameLayout>
+                    <FrameLayout android:id="@+id/fr_preset_3" android:contentDescription="Preset 3" android:layout_width="80.0dip" android:layout_height="match_parent" >
+                        <TextView android:textSize="15.0dip" android:gravity="center" android:text="" android:id="@+id/tv_preset_3" android:layout_width="80.0dip" android:layout_height="match_parent" />
+                        <ImageButton android:background="#00000000" android:src="@drawable/btn_preset" android:id="@+id/ib_preset_3" android:layout_width="80.0dip" android:layout_height="match_parent"  />
+                    </FrameLayout>
+    </LinearLayout>
+  </HorizontalScrollView>
+
+
+</LinearLayout>
+

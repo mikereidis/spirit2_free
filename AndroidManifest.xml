@@ -1,0 +1,164 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    package="fm.a2d.sf"
+    android:versionCode="75"
+    android:versionName="2014_11_28_free" >
+
+<!-- 
+!! See to add android.intent.action.BUG_REPORT
+
+%Sales:
+Germany         19.96
+United States   13.43
+UnitedKingdom   6.06
+Italy           5.92
+France          5.27
+Brazil          4.67
+Spain           4.34
+Australia       3.71
+Netherlands     2.66
+
+android:targetSdkVersion="17"
+
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>
+    <uses-permission android:name="com.google.android.gms.permission.ACTIVITY_RECOGNITION"/>
+    <uses-permission android:name="com.android.vending.CHECK_LICENSE"/>
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"/>
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
+
+ -->
+
+    <uses-sdk
+        android:minSdkVersion="16"
+        android:targetSdkVersion="21" />
+
+
+    <uses-permission android:name="android.permission.ACCESS_SUPERUSER"/>
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.READ_PHONE_STATE"/>
+    <uses-permission android:name="android.permission.BROADCAST_STICKY"/>
+    <uses-permission android:name="android.permission.BLUETOOTH"/>
+    <uses-permission android:name="android.permission.BLUETOOTH_ADMIN"/>
+    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"/>
+    <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS"/>
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <uses-permission android:name="android.permission.WRITE_SETTINGS" />
+    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
+
+
+-->
+<!--
+-->
+<!-- 
+    android:clearTaskOnLaunch="true"
+
+    android:launchMode="singleInstance"
+ -->
+
+<!-- 
+App drawer name for all unless locally over-ridden:
+ -->
+    <application
+        android:allowBackup="true"
+        android:icon="@drawable/img_icon"
+        android:label="Spirit2 Free"
+        android:theme="@android:style/Theme.Holo" >
+
+
+<!-- 
+<uses-library android:name="qcom.fmradio" />
+ -->
+
+<!-- 
+ -->
+<!-- 
+getWindow().setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_HIDDEN);
+ -->
+<!-- 
+App drawer name for app:
+
+android:windowSoftInputMode="adjustResize"
+
+
+android:windowSoftInputMode="stateHidden"
+ -->
+        <activity
+            android:name="fm.a2d.sf.gui_act"
+    android:launchMode="singleInstance"
+            android:screenOrientation="portrait" >
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+<!-- 
+Don't Need this:
+            <intent-filter>
+                <action android:name="fm.a2d.sf.result.get" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+ -->
+        </activity>
+
+<!-- 
+    android:launchMode="singleInstance"
+ if the activity you are launching uses the singleTask launch mode, it will not run in your task and thus you will immediately receive a cancel result. -->
+
+
+<!-- 
+Could be used with App Inventor API aia_act
+android:theme="@android:style/Theme.Translucent.NoTitleBar"
+ -->
+
+<!-- 
+
+! Need separate process or get fg/bg problems !!!
+ -->
+    <service
+      android:name="fm.a2d.sf.svc_svc"
+android:process=":s"
+      android:label="Spirit2 Free FM Service"
+      android:enabled="true"
+      android:exported="true"
+      >
+      <intent-filter>
+                <action android:name="fm.a2d.sf.action.set" />
+      </intent-filter>
+    </service>
+<!-- 
+Intent API
+ -->
+
+
+<!-- Widget
+        <action android:name="android.appwidget.action.APPWIDGET_DELETED" />
+        <action android:name="android.appwidget.action.APPWIDGET_ENABLED" />
+        <action android:name="android.appwidget.action.APPWIDGET_DISABLED" />
+
+        <action android:name="fm.a2d.sf.widget_update_timer" />
+
+receiver section:
+            android:exported="true"
+ -->
+
+<!-- Spirit2 Free Service has media button & headset unplug receiver that deals with standard Android media button Intents . JB needs initial Intent filter AND registration
+            <intent-filter>
+                <action android:name="fm.a2d.sf.result.get" />
+            </intent-filter>
+-->
+        <receiver android:name="fm.a2d.sf.svc_bcr">
+            <intent-filter android:priority="2147483647">
+                <action android:name="android.intent.action.MEDIA_BUTTON" />
+            </intent-filter>
+<!-- 
+            <intent-filter>
+                <action android:name="android.media.AUDIO_BECOMING_NOISY" />
+            </intent-filter>
+-->
+        </receiver>
+
+    </application>
+
+</manifest>
+<!-- 
+-->
+

@@ -1,0 +1,42 @@
+#!/sbin/sh
+#
+# /system/addon.d/99-spirit.sh (root:root 755)
+# During an upgrade, this script backs up Spirit-related files,
+# /system is formatted and reinstalled, then the files are restored.
+#
+
+. /tmp/backuptool.functions
+
+FILE=lib/hw/audio.primary.smdk4x12.so
+#S1_SO=/data/data/com.mikersmicros.fm_unlock/lib/libbt-hci.so
+#S2_SO=/data/data/fm.a2d.s2/lib/libbt-hci.so
+
+NORM_SO=lib/libbt-hci.so
+ORIG_SO=lib/libbt-hcio.so
+
+
+case "$1" in
+  backup)
+    backup_file $S/"$NORM_SO"
+  ;;
+  restore)
+    [ -f "$C/$S/$NORM_SO" ] && mv $S/"$NORM_SO" $S/"$ORIG_SO"
+    [ -f "$C/$S/$NORM_SO" ] && restore_file $S/"$NORM_SO" ""
+    #[ -f "$S1_SO" ] || [ -f "$S2_SO" ] && [ -f "$C/$S/$NORM_SO" ] && mv $S/"$NORM_SO" $S/"$ORIG_SO"
+    #[ -f "$S1_SO" ] || [ -f "$S2_SO" ] && [ -f "$C/$S/$NORM_SO" ] && restore_file $S/"$NORM_SO" ""
+    #[ -f "$S1_SO" ]                    && [ -f "$C/$S/$NORM_SO" ] && cp "$S1_SO" $S/"$NORM_SO"
+    #[ -f "$S2_SO" ]                    && [ -f "$C/$S/$NORM_SO" ] && cp "$S2_SO" $S/"$NORM_SO"
+  ;;
+  pre-backup)
+    # Stub
+  ;;
+  post-backup)
+    # Stub
+  ;;
+  pre-restore)
+    # Stub
+  ;;
+  post-restore)
+    # Stub
+  ;;
+esac

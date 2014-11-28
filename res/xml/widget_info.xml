@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8"?>
+<appwidget-provider 
+      xmlns:android="http://schemas.android.com/apk/res/android"
+
+    android:widgetCategory="keyguard|home_screen"
+    android:initialLayout="@layout/widget_layout"
+    android:minHeight="110dip"
+    android:minWidth="294dip"
+    android:minResizeHeight="32dip"
+    android:minResizeWidth="72dip"
+    android:updatePeriodMillis="30000"
+    android:resizeMode="horizontal|vertical"
+    android:previewImage="@drawable/widget"
+
+    >
+</appwidget-provider>
+
+<!-- 
+    android:minHeight="66dp"
+
+
+    android:initialKeyguardLayout="@layout/widget_layout"
+ -->
+<!-- 
+ -->
+

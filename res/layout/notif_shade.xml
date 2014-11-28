@@ -1,0 +1,114 @@
+<?xml version="1.0" encoding="utf-8"?>
+
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+android:layout_width="match_parent"
+android:layout_height="match_parent"
+>
+
+
+  <ImageView android:id="@+id/notif_shade_not_used"
+  android:src="@drawable/img_icon_64"
+  android:layout_width="0dip"
+  android:layout_height="match_parent"
+  android:layout_weight="3"
+  />
+
+<!--
+  android:padding="4dip"
+android:layout_width="wrap_content"
+android:layout_height="wrap_content"
+  android:src="@drawable/img_notif_shade"
+  android:padding="4dip"
+  android:layout_width="match_parent"
+  android:layout_height="wrap_content"
+
+  android:layout_width="wrap_content"
+  android:textAppearance="?android:attr/textAppearanceLargeInverse"
+
+  android:textAppearance="?android:attr/textAppearanceMediumInverse"
+
+? ICS friendly white, not good w/ GB
+  android:textColor="#ffffff"
+cyan not good:
+  android:textColor="#00ffff"
+blue good:
+  android:textColor="#0000ff"
+green Not good:
+  android:textColor="#00ff00"
+red good:
+  android:textColor="#ff0000"
+grey OK on some but not others (bad on stock i5500)
+  android:textColor="#7f7f7f"
+yellow not good:
+  android:textColor="#ffff00"
+pinkish purple OK:
+  android:textColor="#ff00ff"
+
+
+  android:textStyle="bold"
+  android:textAppearance="?android:attr/textAppearanceMedium"
+  android:layout_width="match_parent"
+  android:layout_height="wrap_content"
+-->
+<!--
+-->
+<!--
+  <LinearLayout
+  android:layout_width="0dip"
+  android:layout_height="match_parent"
+  android:layout_weight="10"
+  android:orientation="vertical"
+  android:gravity="center_vertical"
+  >
+-->
+
+<!--
+android:layout_margin="2dip"
+android:padding="2dip"
+-->
+<!--
+-->
+<!--
+    <LinearLayout
+    android:layout_width="match_parent"
+    android:layout_height="0dp"
+    android:layout_weight="8"
+    android:gravity="center_vertical"
+    >
+-->
+
+      <TextView android:id="@+id/not_freq"
+      android:contentDescription="Frequency"
+      android:textStyle="bold"
+      android:layout_width="0dip"
+      android:layout_height="match_parent"
+      android:layout_weight="8"
+      android:textAppearance="?android:attr/textAppearanceMedium"
+      />
+      <TextView android:id="@+id/not_ps"
+      android:contentDescription="RDS PS"
+      android:textStyle="bold"
+      android:layout_width="0dip"
+      android:layout_height="match_parent"
+      android:layout_weight="8"
+      android:textAppearance="?android:attr/textAppearanceMedium"
+      android:gravity="right|center_vertical"
+      />
+<!--
+    </LinearLayout>
+-->
+
+    <TextView android:id="@+id/not_rt"
+    android:contentDescription="RDS RT"
+    android:layout_width="match_parent"
+    android:layout_height="0dp"
+    android:layout_weight="16"
+    android:textAppearance="?android:attr/textAppearanceSmall"
+    android:gravity="center_horizontal|center_vertical"
+    />
+
+<!--
+  </LinearLayout>
+-->
+</LinearLayout>
+
