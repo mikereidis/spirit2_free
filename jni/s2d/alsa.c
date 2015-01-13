@@ -14,7 +14,7 @@ control_hw.c
 #ifndef __force
 #define __force
 #endif
-#include "asound.h"
+#include "alsa.h"
 
 /*
     struct snd_ctl_elem_info cei = {0};

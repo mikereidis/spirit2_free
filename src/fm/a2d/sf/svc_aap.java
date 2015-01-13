@@ -13,6 +13,8 @@ public interface svc_aap {
 
   public abstract String audio_stereo_set (String new_audio_stereo);
 
+  public abstract String audio_record_state_set (String state);
+
   public abstract boolean audio_blank_get ();
   public abstract boolean audio_blank_set (boolean blank);
 

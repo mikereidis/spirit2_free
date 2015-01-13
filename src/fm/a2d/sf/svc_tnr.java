@@ -49,13 +49,13 @@ public class svc_tnr implements svc_tap {
       return ("");
 
     else if (key.equalsIgnoreCase ("test"))
-      return (com_uti.s2d_get (key));
+      return (com_uti.daemon_get (key));
 
     else if (key.equalsIgnoreCase ("tuner_state"))
       return (m_com_api.tuner_state);
 
     else if (m_com_api.tuner_state.equalsIgnoreCase ("start"))
-      return (com_uti.s2d_get (key));
+      return (com_uti.daemon_get (key));
 
         // Else if not on, use cached info:
     else if (key.equalsIgnoreCase ("tuner_band"))
@@ -129,13 +129,13 @@ public class svc_tnr implements svc_tap {
       return (tuner_state_set (val));
 
     else if (key.equalsIgnoreCase ("radio_nop"))                        // If radio_nop...
-      return (com_uti.s2d_set (key, val));                              // Set via s2d
+      return (com_uti.daemon_set (key, val));                              // Set via s2d
 
     //else if (key.equalsIgnoreCase ("tuner_band"))
     //  return (tuner_band_set (val));
 
     else if (m_com_api.tuner_state.equalsIgnoreCase ("start"))          // If tuner_state = Start...
-      return (com_uti.s2d_set (key, val));                                // Set via s2d
+      return (com_uti.daemon_set (key, val));                                // Set via s2d
 
         // Else if not on:
     else if (key.equalsIgnoreCase ("tuner_band"))
@@ -192,10 +192,7 @@ com_uti.logd ("FREQ CODE freq: " + freq + "  hci: " + hci + "  port: " + port);
 
         int ret = 0;
         //com_uti.file_delete ("s2d_stop");
-        if (com_uti.file_get ("/mnt/sdcard/sf/sys_bin"))
-          ret = com_uti.sys_run ("killall    s2d    1>/dev/null 2>/dev/null ;                 /system/bin/s2d "    + com_uti.device + "  1>/dev/null 2>/dev/null", true);//  &", true);
-        else
-          ret = com_uti.sys_run ("killall libs2d.so 1>/dev/null 2>/dev/null ; /data/data/fm.a2d.sf/lib/libs2d.so " + com_uti.device + "  1>/dev/null 2>/dev/null", true);//  &", true);
+        ret = com_uti.sys_run ("killall libs2d.so 1>/dev/null 2>/dev/null ; /data/data/fm.a2d.sf/lib/libs2d.so " + com_uti.device + "  1>/dev/null 2>/dev/null", true);//  &", true);
 
         com_uti.logd ("daemon kill/start ret: " + ret);
 
@@ -203,7 +200,7 @@ com_uti.logd ("FREQ CODE freq: " + freq + "  hci: " + hci + "  port: " + port);
         com_uti.loge ("800 ms delay starting..., fix later");
         com_uti.ms_sleep (800);    // Extra stock HTC One M7 ?
 
-        String res = com_uti.s2d_set ("tuner_state", "Start");
+        String res = com_uti.daemon_set ("tuner_state", "Start");
         com_uti.logd ("res: " + res);
 
         m_com_api.tuner_state = res;//"Start";         // State = Start
@@ -217,7 +214,7 @@ com_uti.logd ("FREQ CODE freq: " + freq + "  hci: " + hci + "  port: " + port);
         poll_stop ();                                                     // Stop polling for changes
         m_com_api.tuner_state = "Stopping";
 
-        String res = com_uti.s2d_set ("tuner_state", "Stop");
+        String res = com_uti.daemon_set ("tuner_state", "Stop");
         com_uti.logd ("res: " + res);
 
         com_uti.ms_sleep (500);                                         // Wait 500 ms for s2d daemon to stop, before killing (which may kill network socket or tuner access)
@@ -226,13 +223,8 @@ com_uti.logd ("FREQ CODE freq: " + freq + "  hci: " + hci + "  port: " + port);
 
         //com_uti.file_create ("s2d_stop");
         //com_uti.sys_run ();
-/*
-//com_uti.loge ("!!!! Should run killall libs2d.so here, after waiting a bit. But killing may kill UDP port !!!!");
-        if (com_uti.file_get ("/mnt/sdcard/sf/sys_bin"))
-          com_uti.sys_run ("killall s2d", true);  // To be sure
-        else
-          com_uti.sys_run ("killall libs2d.so", true);  // To be sure
-*/
+        //com_uti.loge ("!!!! Should run killall libs2d.so here, after waiting a bit. But killing may kill UDP port !!!!");
+        //com_uti.sys_run ("killall libs2d.so", true);  // To be sure
       }
     }
 
@@ -269,9 +261,12 @@ com_uti.logd ("FREQ CODE freq: " + freq + "  hci: " + hci + "  port: " + port);
       if (! m_com_api.tuner_state.equalsIgnoreCase ("start"))                                             // Done if state not started
         return;
 
+      //if (com_uti.file_get ("/sdcard/spirit/tnr_pof"))
+      //  return;
+
         // Freq:
       int min_freq = 65000; //50000;    // !! Broadcom sometimes returns 64000, so suppress this as it writes frequency to settings
-      String temp_freq_str = com_uti.s2d_get ("tuner_freq");
+      String temp_freq_str = com_uti.daemon_get ("tuner_freq");
       int    temp_freq_int = com_uti.int_get (temp_freq_str);
       if (temp_freq_int >= min_freq) {
         m_com_api.tuner_freq = temp_freq_str;
@@ -283,27 +278,27 @@ com_uti.logd ("FREQ CODE freq: " + freq + "  hci: " + hci + "  port: " + port);
       }
 
         // RSSI:
-      m_com_api.tuner_rssi = com_uti.s2d_get ("tuner_rssi");
+      m_com_api.tuner_rssi = com_uti.daemon_get ("tuner_rssi");
       if (last_poll_rssi != (last_poll_rssi = com_uti.int_get (m_com_api.tuner_rssi)))
         m_svc_tcb.cb_tuner_key ("tuner_rssi", m_com_api.tuner_rssi);                        // Inform change
 
         // MOST:
-      m_com_api.tuner_most = com_uti.s2d_get ("tuner_most");
+      m_com_api.tuner_most = com_uti.daemon_get ("tuner_most");
       if (! last_poll_most.equals (m_com_api.tuner_most))
         m_svc_tcb.cb_tuner_key ("tuner_most", last_poll_most = m_com_api.tuner_most);       // Inform change
 
         // RDS ps:
-      m_com_api.tuner_rds_ps = com_uti.s2d_get ("tuner_rds_ps");
+      m_com_api.tuner_rds_ps = com_uti.daemon_get ("tuner_rds_ps");
       if (! last_poll_rds_ps.equals (m_com_api.tuner_rds_ps))
         m_svc_tcb.cb_tuner_key ("tuner_rds_ps", last_poll_rds_ps = m_com_api.tuner_rds_ps); // Inform change
 
         // RDS rt:
-      m_com_api.tuner_rds_rt = com_uti.s2d_get ("tuner_rds_rt                                                                    ").trim ();    // !!!! Must have ~ 64 characters due to s2d design.
+      m_com_api.tuner_rds_rt = com_uti.daemon_get ("tuner_rds_rt                                                                    ").trim ();    // !!!! Must have ~ 64 characters due to s2d design.
       if (! last_poll_rds_rt.equals (m_com_api.tuner_rds_rt))
         m_svc_tcb.cb_tuner_key ("tuner_rds_rt", last_poll_rds_rt = m_com_api.tuner_rds_rt); // Inform change
 
         // RDS pi:
-      m_com_api.tuner_rds_pi = com_uti.s2d_get ("tuner_rds_pi");
+      m_com_api.tuner_rds_pi = com_uti.daemon_get ("tuner_rds_pi");
       int rds_pi = com_uti.int_get (m_com_api.tuner_rds_pi);
       if (last_poll_rds_pi != rds_pi) {
         last_poll_rds_pi = rds_pi;
@@ -312,7 +307,7 @@ com_uti.logd ("FREQ CODE freq: " + freq + "  hci: " + hci + "  port: " + port);
       }
 
         // RDS pt:
-      m_com_api.tuner_rds_pt = com_uti.s2d_get ("tuner_rds_pt");
+      m_com_api.tuner_rds_pt = com_uti.daemon_get ("tuner_rds_pt");
       int rds_pt = com_uti.int_get (m_com_api.tuner_rds_pt);
       if (last_poll_rds_pt != rds_pt) {
         last_poll_rds_pt = rds_pt;

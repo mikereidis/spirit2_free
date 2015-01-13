@@ -13,10 +13,10 @@ import android.view.KeyEvent;
     //      android.intent.action.MEDIA_BUTTON:     Headphone Media button pressed
     // Declared as receiver in AndroidManifest.xml and passed to (un)registerMediaButtonEventReceiver
 
-public class svc_bcr extends BroadcastReceiver {
+public class svc_bcr extends BroadcastReceiver {                        // !! Operates in same process as gui_act !!
 
   private static int    stat_constrs = 1;
-  //private static com_api gui_act.m_com_api = null;                              // Static: Need to maintain state across broadcasts !!
+  //private static com_api gui_act.m_com_api = null;                    // Static: Need to maintain state across broadcasts !!
 
   private static final boolean extra_log = true;//false;
 
@@ -36,7 +36,7 @@ public class svc_bcr extends BroadcastReceiver {
         com_uti.logd ("gui_act.m_com_api: " + gui_act.m_com_api);
 
       if (gui_act.m_com_api == null) {
-        gui_act.m_com_api = new com_api (context);
+        gui_act.m_com_api = new com_api (context);                      // !! Operates in same process as gui_act !!
         com_uti.logd ("gui_act.m_com_api: " + gui_act.m_com_api);
       }
 
@@ -93,6 +93,40 @@ public class svc_bcr extends BroadcastReceiver {
 */
 
   private void handle_key_event (Context context, KeyEvent key_event) {
+    com_uti.logd ("context: " + context + "  key_event: " + key_event);
+
+    int key_event_action = key_event.getAction ();
+    if (key_event_action != KeyEvent.ACTION_DOWN) {
+      if (key_event_action == KeyEvent.ACTION_UP)
+        com_uti.logd ("Key event action UP: " + key_event_action);
+      else
+        com_uti.loge ("Key event action not down or up: " + key_event_action);
+      return;
+    }
+
+    switch (key_event.getKeyCode ()) {
+
+      case KeyEvent.KEYCODE_HEADSETHOOK:
+      case KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE:
+        gui_act.m_com_api.key_set ("audio_state", "toggle");
+        break;
+      case KeyEvent.KEYCODE_MEDIA_PLAY:
+        gui_act.m_com_api.key_set ("audio_state", "start");
+        break;
+      case KeyEvent.KEYCODE_MEDIA_PAUSE:
+        gui_act.m_com_api.key_set ("audio_state", "pause");
+        break;
+      case KeyEvent.KEYCODE_MEDIA_STOP:
+        gui_act.m_com_api.key_set ("audio_state", "stop");             // Shut down FM entirely (could pause)
+        break;
+
+      case KeyEvent.KEYCODE_MEDIA_PREVIOUS:
+        gui_act.m_com_api.key_set ("radio_freq", "down");
+        break;
+      case KeyEvent.KEYCODE_MEDIA_NEXT:
+        gui_act.m_com_api.key_set ("radio_freq", "up");
+        break;
+    }
   }
 
 }

@@ -14,6 +14,11 @@
 #include <sys/system_properties.h>
 #define PROPERTY_VALUE_MAX  PROP_VALUE_MAX
 
+// Debug:
+int hci_dbg      = 0;//1;
+//int reg_dbg      = 0;//1;
+//int evt_dbg      = 0;//1;
+
 //int init_baudrate = 115200;               // Motorola DroidX2 uses a startup baudrate of 3.5 MHz
 //int new_baudrate  = 0;//3000000;//0;
 
@@ -140,6 +145,222 @@ drwxrwxr-x    2 root     net_raw        220 May 16 05:04 socket
 
 
 #define MAX_HCI  264   // 8 prepended bytes + 255 max bytes HCI data/parameters + 1 trailing byte to align
+
+
+// Unix datagrams requires other write permission for /dev/socket, or somewhere else (ext, not FAT) writable.
+
+//#define CS_AF_UNIX        // Use network sockets to avoid filesystem permission issues.
+#define CS_DGRAM
+
+#ifdef  CS_AF_UNIX
+#define DEF_API_SRVSOCK    "/dev/socket/srv_sprt"
+#define DEF_API_CLISOCK    "/dev/socket/cli_sprt"
+char api_srvsock[DEF_BUF] =DEF_API_SRVSOCK;
+char api_clisock[DEF_BUF] =DEF_API_CLISOCK;
+#endif
+
+#ifdef  CS_AF_UNIX
+#include <sys/un.h>
+#define CS_FAM   AF_UNIX
+#else
+#include <netinet/in.h>
+#include <netdb.h> 
+#define CS_PORT    2112
+#define CS_FAM   AF_INET
+#endif
+
+#ifdef  CS_DGRAM
+#define CS_SOCK_TYPE    SOCK_DGRAM
+#else
+#define CS_SOCK_TYPE    SOCK_STREAM
+#endif
+
+//unsigned char res_buf [MAX_HCI] = {0};
+
+int do_daemon_hci ( char *cmd_buf, int cmd_len, char *res_buf, int res_max ) {
+  if (cmd_len==1 && cmd_buf [0] == 0x73) {
+    logd ("do_daemon_hci got ready inquiry");
+    res_buf [0] = cmd_buf [0];
+    return (1);
+  }
+  else if (cmd_len==1 && cmd_buf [0] == 0x7f) {
+    logd ("do_daemon_hci got stop");
+    res_buf [0] = cmd_buf [0];
+    exiting = 1;
+    return (1);
+  }
+
+  int hx_ret = hci_xact (cmd_buf, cmd_len);                     // Do HCI transaction
+  if (hx_ret < 8 || hx_ret > 270) {
+    hci_recv_buf [0] = 0xff; // Error
+    return (8);
+  }
+  hci_recv_buf [0] = 0;
+  memcpy (res_buf, hci_recv_buf, hx_ret);
+  //hex_dump ("aaaa", 32, hci_recv_buf, hx_ret);
+  //hex_dump ("bbbb", 32, res_buf, hx_ret);
+  
+  if (res_buf [7])
+    loge ("do_daemon_hci hci err: %d %s", res_buf [7], hci_err_get (res_buf [7]));
+  
+  return (hx_ret);
+}
+
+//char stop_resp[] ={2, 0xff, 0, 0, 0, 0, 0, 0};
+//char err_resp[] = {2, 0xfe, 0, 0, 0, 0, 0, 0};
+
+int do_server () {
+  int sockfd = -1, newsockfd = -1, cmd_len = 0, ctr = 0;
+  socklen_t cli_len = 0, srv_len = 0;
+#ifdef  CS_AF_UNIX
+  struct sockaddr_un  cli_addr = {0}, srv_addr = {0};
+  srv_len = strlen (srv_addr.sun_path) + sizeof (srv_addr.sun_family);
+#else
+  struct sockaddr_in  cli_addr = {0}, srv_addr = {0};
+  //struct hostent *hp;
+#endif
+  char cmd_buf [DEF_BUF] ={0};
+
+  //system("chmod 666 /dev");            // !! Need su if in JNI
+  //system("chmod 666 /dev/socket");
+
+#ifdef  CS_AF_UNIX
+  unlink (api_srvsock);
+#endif
+  if ((sockfd = socket (CS_FAM,CS_SOCK_TYPE, 0)) < 0) {
+    loge ("do_server socket  errno: %d", errno);
+    return (-1);
+  }
+
+  bzero((char *) &srv_addr, sizeof (srv_addr));
+#ifdef  CS_AF_UNIX
+  srv_addr.sun_family = AF_UNIX;
+  strncpy (srv_addr.sun_path, api_srvsock, sizeof (srv_addr.sun_path));
+  srv_len = strlen (srv_addr.sun_path) + sizeof (srv_addr.sun_family);
+#else
+  srv_addr.sin_family=AF_INET;
+  srv_addr.sin_addr.s_addr = htonl (INADDR_LOOPBACK); //INADDR_ANY;
+  //hp = gethostbyname("localhost");
+  //if (hp== 0) {
+  //  loge ("Error gethostbyname  errno: %d", errno);
+  //  return (-2);
+  //}
+  //bcopy((char *)hp->h_addr, (char *)&srv_addr.sin_addr, hp->h_length);
+  srv_addr.sin_port = htons (CS_PORT);
+  srv_len = sizeof (struct sockaddr_in);
+#endif
+
+#ifdef  CS_AF_UNIX
+logd ("srv_len: %d  fam: %d  path: %s", srv_len, srv_addr.sun_family, srv_addr.sun_path);
+#else
+logd ("srv_len: %d  fam: %d  addr: 0x%x  port: %d", srv_len, srv_addr.sin_family, ntohl (srv_addr.sin_addr.s_addr), ntohs (srv_addr.sin_port));
+#endif
+  if (bind (sockfd,(struct sockaddr *)&srv_addr, srv_len) < 0) {
+    loge ("Error bind  errno: %d", errno);
+#ifdef  CS_AF_UNIX
+    return (-3);
+#endif
+#ifdef CS_DGRAM
+    return (-3);
+#endif
+    loge ("Inet stream continuing despite bind error");      // OK to continue w/ Internet Stream
+  }
+
+// Get command from client
+#ifndef CS_DGRAM
+  if (listen(sockfd, 5)) {                           // Backlog= 5; likely don't need this
+    loge ("Error listen  errno: %d", errno);
+    return (-4);
+  }
+#endif
+
+  logd ("do_server Ready");
+
+  while (!exiting) {
+    bzero((char *) &cli_addr, sizeof (cli_addr));                        // ?? Don't need this ?
+    //cli_addr.sun_family = CS_FAM;                                     // ""
+    cli_len = sizeof (cli_addr);
+
+    //logd ("ms_get: %d",ms_get ());
+#ifdef  CS_DGRAM
+    cmd_len = recvfrom(sockfd, cmd_buf, sizeof (cmd_buf), 0,(struct sockaddr *)&cli_addr,&cli_len);
+    if (cmd_len <= 0) {
+      loge ("Error recvfrom  errno: %d", errno);
+      ms_sleep (100);   // Sleep 0.1 second
+      continue;
+    }
+  #ifndef CS_AF_UNIX
+// !! 
+    if ( cli_addr.sin_addr.s_addr != htonl (INADDR_LOOPBACK) ) {
+      loge ("Unexpected suspicious packet from host");// %s",inet_ntoa(cli_addr.sin_addr.s_addr));//inet_ntop(cli_addr.sin_addr.s_addr)); //
+    }
+  #endif
+#else
+    newsockfd = accept(sockfd,(struct sockaddr *)&cli_addr,&cli_len);
+    if (newsockfd < 0) {
+      loge ("Error accept  errno: %d", errno);
+      ms_sleep (100);   // Sleep 0.1 second
+      continue;
+    }
+  #ifndef  CS_AF_UNIX
+// !! 
+    if ( cli_addr.sin_addr.s_addr != htonl (INADDR_LOOPBACK) ) {
+      loge ("Unexpected suspicious packet from host");// %s",inet_ntoa(cli_addr.sin_addr.s_addr));//inet_ntop(cli_addr.sin_addr.s_addr)); //
+    }
+  #endif
+    cmd_len = read (newsockfd, cmd_buf, sizeof (cmd_buf));
+    if (cmd_len <= 0) {
+      loge ("Error read  errno: %d", errno);
+      ms_sleep (100);   // Sleep 0.1 second
+      close (newsockfd);
+      ms_sleep (100);   // Sleep 0.1 second
+      continue;
+    }
+#endif
+
+#ifdef  CS_AF_UNIX
+//logd ("cli_len: %d  fam: %d  path: %s",cli_len,cli_addr.sun_family,cli_addr.sun_path);
+#else
+//logd ("cli_len: %d  fam: %d  addr: 0x%x  port: %d",cli_len,cli_addr.sin_family, ntohl (cli_addr.sin_addr.s_addr), ntohs (cli_addr.sin_port));
+#endif
+    //hex_dump ("", 32, cmd_buf, n);
+
+    unsigned char res_buf [MAX_HCI] = {0};
+    int res_len= 0;
+      res_len = do_daemon_hci ( cmd_buf, cmd_len, res_buf, sizeof (res_buf));    // Do HCI (or other) function
+      //logd ("do_server do_daemon_hci res_len: %d", res_len);
+      if (res_len < 0) {  // If error
+        res_len = 2;
+        res_buf [0] = 0xff;
+        res_buf [1] = 0xff;
+      }
+      //hex_dump ("", 32, res_buf, res_len);
+//    }
+
+// Send response
+#ifdef  CS_DGRAM
+    if (sendto(sockfd, res_buf, res_len, 0,(struct sockaddr *)&cli_addr,cli_len) != res_len) {
+      loge ("Error sendto  errno: %d", errno);
+      ms_sleep (100);   // Sleep 0.1 second
+    }
+#else
+    if (write (newsockfd, res_buf, res_len) != res_len) {
+      loge ("Error write  errno: %d", errno);
+      ms_sleep (100);   // Sleep 0.1 second
+    }
+    close (newsockfd);
+#endif
+  }
+  close (sockfd);
+#ifdef  CS_AF_UNIX
+  unlink (api_srvsock);
+#endif
+
+  //acc_hci_stop ();
+
+  return (0);//stop_resp);//"server finished end");
+}
+
 
 
 typedef struct {
@@ -303,8 +524,7 @@ int reset_start () {
   return (0);
 }
 
-int hcd_main_set_done = 0;
-char hcd_main [DEF_BUF] = "/mnt/sdcard/sf/broadcomp.hcd";
+char hcd_main [DEF_BUF] = "/sdcard/spirit/broadcomp.hcd";
 
 char * hcd_list [] = {
   hcd_main,
@@ -316,18 +536,6 @@ char * hcd_get () {
   char *hcd = NULL;
 
   hcd_buf [0] = 0;
-
-  if (hcd_main_set_done == 0) {
-    hcd_main_set_done = 1;
-    char * ext_storage = getenv ("EXTERNAL_STORAGE");
-    if (ext_storage) {
-      strlcpy (hcd_main, ext_storage, sizeof (hcd_main));
-      strlcat (hcd_main, "/sf/broadcomp.hcd", sizeof (hcd_main));
-    }
-    else {
-      strlcpy (hcd_main, "/mnt/sdcard/sf/broadcomp.hcd", sizeof (hcd_main));
-    }
-  }
 
   for (ctr = 0; ctr < (sizeof (hcd_list) / sizeof (char *)); ctr ++) {  // For all entries in hcd file list
     hcd = hcd_list [ctr];
@@ -357,7 +565,7 @@ char * hcd_get () {
   return (NULL);
 }
 
-#include "hcd.c"
+#include "bch_hcd.c"
 
 int tmo_read (int fd, unsigned char * buf, int buf_len, int tmo_ms, int single_read);
 
@@ -516,8 +724,8 @@ unsigned char * hci_cmds[] = {
 int bulk_hci_xact () {
   int idx = 0;
   int num_cmds = sizeof (hci_lens) / sizeof (int);
-  int num_cmds2 = sizeof (hci_cmds) / sizeof (int);
-  if (num_cmds2 != num_cmds) {
+  int num_cmdsb = sizeof (hci_cmds) / sizeof (int);
+  if (num_cmdsb != num_cmds) {
     return (-1);
   }
   for (idx = 0; idx < num_cmds; idx++) {
@@ -627,7 +835,7 @@ int rfkill_state_get (char * rfkill_state_file, size_t rsf_size, const char * ty
     //strlcat (rfk_cmd, " 2>/dev/null", sizeof (rfk_cmd));
 
     logd ("rfkill_state_set about to run: %s", rfk_cmd);
-                                                                        // Previously done in s2svc_svc : hci_init
+                                                                        // Previously done in svc_svc : hci_init
     system (rfk_cmd);                                                   // Run the shell command as SU
     system (rfk_cmd);                                                   // Repeat to ensure
 
@@ -641,8 +849,11 @@ typedef struct {    // BD Address
 #define SOL_HCI        0
 #define BTPROTO_HCI     1
 
-#include "inc/hci.h"
-#include "inc/hci_lib.h"
+#ifdef  HCI_MAX_FRAME_SIZE
+#undef  HCI_MAX_FRAME_SIZE
+#endif
+
+//#include "inc/hci.h"
 
     
 int ba2str_size (const bdaddr_t *btaddr, char *straddr, int straddr_size) {
@@ -800,8 +1011,76 @@ int uart_send (unsigned char * buf, int len) {
 
 typedef void * TRANSAC;
 TRANSAC bfm_send (char * buf, int len);
-static int   hcib_dealloc_mem_cb       (TRANSAC transac, char *p_buf);
+static void   hcib_dealloc_mem_cb       (TRANSAC transac);//, char *p_buf);
 
+/*
+Good UART ONE:
+
+12-13 02:15:30.859 D/stnr_bch(32312): hci_cmd ogf: 0x3f  ocf: 0x0  cmd_len: 13  res_max: 264
+12-13 02:15:30.859 D/stnr_bch(32312): 00 00 00 00 00 00 00 00 f3 88 01 02 05 
+12-13 02:15:30.859 D/stnr_bch(32312): hci_xact cmd_len: 13
+12-13 02:15:30.859 D/stnr_bch(32312): 00 00 00 00 01 00 fc 05 f3 88 01 02 05 
+
+12-13 02:15:30.869 D/stnr_bch(32312): hci_xact rret: 8
+12-13 02:15:30.869 D/stnr_bch(32312): ff 04 0f 04 00 01 00 fc 
+12-13 02:15:30.869 E/stnr_bch(32312): do_acc_hci hci err: 252 Unknown HCI Error
+12-13 02:15:30.869 D/stnr_bch(32312): hci_cmd hci_err: 252 Unknown HCI Error  res_len: 8
+
+
+12-13 02:15:30.871 D/stnr_bch(32312): hci_cmd ogf: 0x3f  ocf: 0x15  cmd_len: 11  res_max: 264
+12-13 02:15:30.871 D/stnr_bch(32312): 00 00 00 00 00 00 00 00 0a 01 02 
+12-13 02:15:30.871 D/stnr_bch(32312): hci_xact cmd_len: 11
+12-13 02:15:30.871 D/stnr_bch(32312): 00 00 00 00 01 15 fc 03 0a 01 02 
+
+12-13 02:15:30.871 E/stnr_bch(32312): uart_send rret: 7
+12-13 02:15:30.871 D/stnr_bch(32312): 04 ff 04 f3 00 88 03 
+12-13 02:15:30.882 D/stnr_bch(32312): hci_xact rret: 12
+12-13 02:15:30.882 D/stnr_bch(32312): 04 04 0e 08 01 15 fc 00 0a 01 b4 5f 
+12-13 02:15:30.882 D/stnr_bch(32312): hci_cmd hci_err: 0 Success   res_len: 12  first data byte: 0xa  last data byte: 0x5f
+
+Bluedroid ONE:
+
+12-13 04:15:12.223 D/stnr_bch( 6858): bc_g2_pcm_set 1
+12-13 04:15:12.223 D/stnr_bch( 6858): hci_cmd ogf: 0x3f  ocf: 0x0  cmd_len: 13  res_max: 264
+12-13 04:15:12.223 D/stnr_bch( 6858): 00 00 00 00 00 00 00 00 f3 88 01 02 05 
+12-13 04:15:12.223 D/sven   ( 6641): bfm_send buf: 0xa2df3b71  len: 8
+12-13 04:15:12.223 D/sven   ( 6641): bfm_send ogf: 0x3f  ocf: 0x0  opcode: 0xfc00  hci_data: 0xa2df3b74  hci_len: 5
+12-13 04:15:12.223 D/sven   ( 6641): TXB 00 20 08 00 00 00 00 fc 00 fc 05 f3 88 01 02 05 
+12-13 04:15:12.223 D/sven   ( 6641): bfm_send ret: 1
+
+
+12-13 04:08:56.796 D/stnr_bch( 6858): chip_imp_freq_set: 88500
+12-13 04:08:56.796 D/stnr_bch( 6858): hci_cmd ogf: 0x3f  ocf: 0x15  cmd_len: 12  res_max: 264
+12-13 04:08:56.796 D/stnr_bch( 6858): 00 00 00 00 00 00 00 00 0a 00 b4 5f 
+12-13 04:08:56.796 D/sven   ( 6641): bfm_send buf: 0xa2df3b71  len: 7
+12-13 04:08:56.796 D/sven   ( 6641): bfm_send ogf: 0x3f  ocf: 0x15  opcode: 0xfc15  hci_data: 0xa2df3b74  hci_len: 4
+12-13 04:08:56.796 D/sven   ( 6641): TXB 00 20 07 00 00 00 15 fc 15 fc 04 0a 00 b4 5f 
+12-13 04:08:56.797 D/sven   ( 6641): bfm_send ret: 1
+
+12-13 04:08:56.800 D/sven   ( 6641): bfm_cback p_mem: 0xaf258690
+12-13 04:08:56.801 D/sven   ( 6641): bfm_ 00 10 08 00 00 00 00 00 0e 06 01 15 fc 00 0a 00 
+12-13 04:08:56.801 D/sven   ( 6641): bfm_cback p_buf: 0xaf258690  len: 16  bfm_rx_len: 0
+12-13 04:08:56.801 D/sven   ( 6641): bfm_cback p_buf: 0xaf258690  len: 16
+12-13 04:08:56.801 D/sven   ( 6641): bfm_cback done
+12-13 04:08:56.801 D/stnr_bch( 6858): hci_cmd hci_err: 0 Success   res_len: 10  first data byte: 0xa  last data byte: 0x0
+
+
+12-13 04:08:56.801 D/stnr_bch( 6858): hci_cmd ogf: 0x3f  ocf: 0x15  cmd_len: 11  res_max: 264
+12-13 04:08:56.801 D/stnr_bch( 6858): 00 00 00 00 00 00 00 00 09 00 01 
+12-13 04:08:56.801 D/sven   ( 6641): bfm_send buf: 0xa2df3b71  len: 6
+12-13 04:08:56.801 D/sven   ( 6641): bfm_send ogf: 0x3f  ocf: 0x15  opcode: 0xfc15  hci_data: 0xa2df3b74  hci_len: 3
+12-13 04:08:56.801 D/sven   ( 6641): TXB 00 20 06 00 00 00 15 fc 15 fc 03 09 00 01 
+12-13 04:08:56.802 D/sven   ( 6641): bfm_send ret: 1
+
+12-13 04:08:56.805 D/sven   ( 6641): bfm_cback p_mem: 0xaf25880c
+12-13 04:08:56.805 D/sven   ( 6641): bfm_ 00 10 08 00 00 00 00 00 0e 06 01 15 fc 00 09 00 
+12-13 04:08:56.805 D/sven   ( 6641): bfm_cback p_buf: 0xaf25880c  len: 16  bfm_rx_len: 0
+12-13 04:08:56.805 D/sven   ( 6641): bfm_cback p_buf: 0xaf25880c  len: 16
+12-13 04:08:56.805 D/sven   ( 6641): bfm_cback done
+12-13 04:08:56.806 D/stnr_bch( 6858): hci_cmd hci_err: 0 Success   res_len: 10  first data byte: 0x9  last data byte: 0x0
+
+
+*/
 int bluedroid_cmd (unsigned char * cmd, int cmd_len) {                           // Do bluedroid mode command
 
 //Tx:
@@ -815,14 +1094,36 @@ int bluedroid_cmd (unsigned char * cmd, int cmd_len) {                          
   unsigned char * hci_data = & cmd [8];
   int hci_len = cmd_len - 8; // cmd [7]
 
-  logd ("bluedroid_cmd ogf: 0x%x  ocf: 0x%x  hci_data: %p  hci_len: %d", ogf, ocf, hci_data, hci_len);
+  //logd ("bluedroid_cmd ogf: 0x%x  ocf: 0x%x  hci_data: %p  hci_len: %d", ogf, ocf, hci_data, hci_len);
 
 #ifdef  HCI_BLUEDROID
   bfm_rx_len = 0;
-
+// NO gv_mem
+//bfm_rx_
   TRANSAC tx_mem = bfm_send (& cmd [5], hci_len + 3);
-//#endif
-//uart_cmd
+
+// ff 04 0f 04 00 01 00 fc
+// 00  
+///* Doesn't help:
+  if (ogf == 0x3f && ocf == 0) {
+    hci_recv_buf [0] = 0;
+    hci_recv_buf [1] = 1;
+    hci_recv_buf [2] = 0x0e;
+    hci_recv_buf [3] = 4;
+    hci_recv_buf [4] = 0;
+    hci_recv_buf [5] = 1;
+    hci_recv_buf [6] = 0;
+    hci_recv_buf [7] = 0;
+    hci_recv_buf [8] = 0;
+    ms_sleep (1);
+
+loge ("bluedroid_cmd LG G2 BC intercept before ms_sleep(700)");
+ms_sleep (700);
+loge ("bluedroid_cmd LG G2 BC intercept after ms_sleep(700)");
+
+    return (9);
+  }
+//*/
 
   int tmo_ctr = 0;
   while (tx_mem && tmo_ctr ++ < 2000) {   // 2 seconds
@@ -833,8 +1134,6 @@ int bluedroid_cmd (unsigned char * cmd, int cmd_len) {                          
         hci_recv_buf [1] = 1;
         memcpy (& hci_recv_buf [2], bfm_rx_buf, bfm_rx_len);
       }
-      //if (tx_mem)
-      //  hcib_dealloc_mem_cb (tx_mem, (char *) & ((char *)tx_mem) [8]);
       int rret1 = bfm_rx_len - 6;
       int rret2 = bfm_rx_buf [1] + 4;
       if (rret1 != rret2)
@@ -843,9 +1142,6 @@ int bluedroid_cmd (unsigned char * cmd, int cmd_len) {                          
     }
     ms_sleep (1);
   }
-
-  //if (tx_mem)
-  //  hcib_dealloc_mem_cb (tx_mem, (char *) & ((char *)tx_mem) [8]);
 
   if (tmo_ctr >= 2000)
     return (-1);
@@ -870,14 +1166,24 @@ int uart_recv (int fd, unsigned char * buf, int flush) {
       loge ("uart_recv error 1 rret: %d  flush: %d", rret, flush);
     return (-1);
   }
-                                                                        // Else 3 bytes read OK...
-  // buf [1] = 1 for HCI Event
-  // buf [2] = Event Code: Should be 0x0e (Command Complete)
-  int read_remain = (0xff & buf [3]);                                   // Set remaining length to read        "Parameter Total Length"
-  // buf [4]         Num_HCI_Command_Packets (1 on BC)
-  // buf [5],buf [6]  Command_Opcode (That caused this event)
-  // buf [7]         HCI Error code (or length on Tx)
-  // buf [8]...      Return_Parameter(s) (Optional)
+
+  if (buf [2] == 0x0f) {
+    loge ("LG G2 BC detected, return success buf [0] buf [7]"); // ????
+    buf [0] = 0;
+    buf [7] = 0;
+  }
+// ff 04 0f 04 00 01 00 fc
+// 00  
+        // Else 3 bytes read OK...
+  // buf [1]        = 1 for HCI Command packet, 4 for HCI Event packet, ff for HCI Vendor packet
+  // buf [2]        = Event Code: 0x0e = Command Complete HCI_EV_CMD_COMPLETE, 0x0f = HCI_EV_CMD_STATUS 
+  // buf [3]        = Remaining length to read        "Parameter Total Length"
+  int read_remain = (0xff & buf [3]);
+
+  // buf [4]        = Num_HCI_Command_Packets (1 on BC)
+  // buf [5],buf [6]= Command_Opcode (That caused this event)
+  // buf [7]        = HCI Error code (or length on Tx)
+  // buf [8]...     = Return_Parameter(s) (Optional)
       
   rret = tmo_read (fd, & buf [4], read_remain, 800, 0);                 // W/ timeout 0.8 (1) s, Read remaining bytes, doing multiple reads if needed
   if (rret != read_remain) {                                            // If read error or partial read...
@@ -952,17 +1258,17 @@ int hci_xact (unsigned char * cmd, int cmd_len) {                       // Do HC
   return (rret);
 }
 
-const char * uart_list [] = {
+char * uart_list [] = {
   "/dev/ttyHS0",                                                        // Most
   "/dev/ttyHS99",                                                       // LG G2
 };
 char uart_buf [DEF_BUF] = {0};
 
 #define AID_BLUETOOTH     1002  /* bluetooth subsystem */
-const char * uart_get () {
+char * uart_get () {
   int ctr = 0;
-  const char * uart;// = uart_buf;                                      // /dev/ttyHS0...
-  const char * uart_check;// = NULL;
+  char * uart;// = uart_buf;                                      // /dev/ttyHS0...
+  char * uart_check;// = NULL;
 
   for (ctr = 0; ctr < (sizeof (uart_list) / sizeof (char *)); ctr ++) {
     uart = uart_list [ctr];
@@ -1120,17 +1426,12 @@ int uart_start () {
 
                                                                         // UART HCI start:
   int uart_hci_start () {
-    if (pid_get ("btld", 0)) {                                          // If Broadcom BT is running...
-      loge ("acc_hci_start btld is running; will not start UART");
-      return (-1);                                                      // Done w/ error
-    }
     if (uart_start ()) {                                                // Start UART mode, if error...
       loge ("acc_hci_start error no uart mode");
       //uart_hci_stop (); // !!
-      return (-2);                                                      // Done w/ error
+      return (-1);                                                      // Done w/ error
     }
     logd ("acc_hci_start success uart mode");
     return (0);
   }
-
 

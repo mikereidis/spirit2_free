@@ -1,6 +1,8 @@
 
     // FM Chip non-specific generic code, #include'd in tnr_bch.cpp, tnr_ssl.cpp, tnr_qcv.cpp
 
+  const char * copyright = "Copyright (c) 2011-2015 Michael A. Reid. All rights reserved.";
+
 #include <dlfcn.h>
 #include <string.h>
 #include <stdlib.h>
@@ -21,7 +23,7 @@
 #include <android/log.h>
 #include "jni.h"
 
-#include "inc/android_fmradio.h"
+#include "tnr_tnr.h"
 
 
   #define  loge(...)  fm_log_print(ANDROID_LOG_ERROR, LOGTAG,__VA_ARGS__)
@@ -184,14 +186,10 @@
   }
 
   int chip_api_events_process  (unsigned char * rds_grpd) {
-//  #define LOGTAG "s2tnr_qcv"
-//if (strcmp (LOGTAG, "s2tnr_qvc"))
 
     if (chip_lock_get ("chip_api_events_process"))
       return (-1);
     int ret = chip_imp_events_process (rds_grpd);
-
-//if (strcmp (LOGTAG, "s2tnr_qcv"))
 
     chip_lock_ret ();
 
@@ -217,8 +215,6 @@
 
 
     // Generic utilities:
-
-  const char * copyright = "Copyright (c) 2011-2014 Michael A. Reid. All rights reserved.";
 
   #define  loge(...)  fm_log_print(ANDROID_LOG_ERROR, LOGTAG,__VA_ARGS__)
   #define  logd(...)  fm_log_print(ANDROID_LOG_DEBUG, LOGTAG,__VA_ARGS__)
@@ -254,56 +250,7 @@
     do_log (prio, tag, fmt, ap);
   }
 
-/* Creates problems: (how why ?? Extra long delays ??)
-  void alt_usleep (uint32_t us) {
-    struct timespec delay;
-    int err;
-    //if (us == 0)
-    //  return;
-    delay.tv_sec = us / 1000000;
-    delay.tv_nsec = 1000 * 1000 * (us % 1000000);
-        // usleep can't be used because it uses SIGALRM
-    do {
-      err = nanosleep (& delay, & delay);
-    } while (err < 0 && errno == EINTR);
-  }
-*/
-  int ms_sleep (int ms) {
-    if (ms > 10 && ms != 101)
-      loge ("ms_sleep ms: %d", ms);
-    usleep (ms * 1000);                                                 // ?? Use nanosleep to avoid SIGALRM ??
-    return (0);
-  }
-
-
-  long ms_get () {
-    struct timespec tspec = {0, 0};
-    int res = clock_gettime (CLOCK_MONOTONIC, & tspec);
-    //logd ("sec": %3.3d  nsec: %3.3d,tspec.tv_sec,tspec.tv_nsec);
-
-    long millisecs = (tspec.tv_nsec / 1000000);
-    millisecs += (tspec.tv_sec * 1000);                                 // Remaining 22 bits good for monotonic time up to 4 million seconds =~ 46 days.
-
-    return (millisecs);
-  }
-
-
-  int file_get (const char * file) {                                    // Return 1 if file, or directory, or device node etc. exists
-    struct stat sb;
-    if (stat (file, & sb) == 0)                                         // If file exists...
-      return (1);                                                       // Return 1
-    return (0);                                                         // Else if no file return 0
-  }
-
-  int flags_file_get (const char * file, int flags) {                   // Return 1 if file, or directory, or device node etc. exists and we can open it
-    if (! file_get (file))
-      return (0);
-    int fd = open (file, flags);
-    if (fd < 0)
-      return (0);
-    close (fd);
-    return (1);                                                         // File is accessible
-  }
+  #include "utils.c"
 
   int noblock_set (int fd) {
     //#define IOCTL_METH
@@ -336,34 +283,6 @@
     return (0);
   }
 
-
-
-  //static void hex_dump (const char * prefix, int width, unsigned char * buf, int len);
-
-  #define HD_MW   256
-  static void hex_dump (const char * prefix, int width, unsigned char * buf, int len) {
-    char tmp  [3 * HD_MW + 8] = "";     // Handle line widths up to HD_MW
-    char line [3 * HD_MW + 8] = "";
-    if (width > HD_MW)
-      width = HD_MW;
-    int i, n;
-    line [0] = 0;
-    if (prefix)
-      strlcpy (line, prefix, sizeof (line));
-    for (i = 0, n = 1; i < len; i ++, n ++) {
-      snprintf (tmp, sizeof (tmp), "%2.2x ", buf [i]);
-      strncat (line, tmp, sizeof (line));
-      if (n == width) {
-        n = 0;
-        logd (line);
-        line [0] = 0;
-        if (prefix)
-          strlcpy (line, prefix, sizeof (line));
-      }
-      else if (i == len - 1 && n)
-        logd (line);
-    }
-  }
 
 
 
@@ -417,13 +336,7 @@
 
 
 
-    // RDS:
-
     // Debug:
-  int rds_dbg                 = 1;  // RT                                              // 1 = But do log counts every 10, 000 blocks
-  int rds_ok_dbg              = 1;  // PS, PT
-  int rds_ok_extra_dbg        = 0;
-
   int evt_dbg                 = 0;
 
   int af_ok_debug             = 0;
@@ -508,9 +421,82 @@ int freq_dn_get (int freq) {                                            // Calle
 }
 
 
-
-
   int RSSI_FACTOR = 16;//20; // 62.5/50 -> 1000  (See 60)     Highest seen locally = 57, 1000 / 62.5 = 16
+
+  int cfg_af_mode = 0;                                                    // 0 = Disabled, 1 = Manual, 2 = RDS, 3 = Allow Regional  !! > 1 means need RDS so leave on even if screen off
+
+  int last_af_count_get_s = 0;
+  int af_regional_count = 0;
+
+  char g1 [256] = "";
+  unsigned char rds_grpd [8] = {0};
+  char g2 [256] = "";
+
+  int curr_af_num = 0;                                                    // Current number of AF table entries
+
+    // Debug:
+  int rds_dbg                 = 1;  // RT                                              // 1 = But do log counts every 10, 000 blocks
+  int rds_ok_dbg              = 1;  // PS, PT
+  int rds_ok_extra_dbg        = 0;
+
+    // Values: Current (under construction), Candidate (complete, but must be repeated before confirmed), Confirmed (Displayable, with few if any visual/logical defects.)
+int curr_pi = 0;         // Program ID. Canada non-national = 0xCxxx.   // 88.5: 0x163e, 106.1: 0xc448, 105.3: 0xc87d, 106.9: 0xdc09, 91.5: 0xb102, 89.1: 0, 89.9: 0x15d6, 93.9: 0xccb6
+int cand_pi = 0;
+int conf_pi = 0;
+
+int curr_pt = -1;         // 88.5: 5 = Rock   106.1: 6 = Classic Rock
+int cand_pt = -1;
+int conf_pt = -1;
+
+
+char g3 [256] = "";
+char curr_ps [9] = "        ";  // Current PS: Assembled here to start.
+
+char g14a [256] = "";
+char cand_ps [9] = "        ";  // Candidate PS: When all bytes are set, curr_ps is copied to cand_ps.
+
+char g2a [256] = "";
+char conf_ps [9] = "        ";  // Confirmed PS: When a new Current PS matches Candidate PS, the candidate is considered confirmed and copied here where the App can retrieve it.
+
+
+char g5 [256] = "";
+char curr_rt [65] = "                                                                ";     // Current RT.
+
+char g15 [256] = "";
+char cand_rt [65] = "                                                                ";     // Candidate RT.
+
+char g4 [256] = "";
+char conf_rt [65] = "                                                                ";     // Confirmed RT.
+
+char g6 [256] = "";
+char conf_rt_fix [65] = {0};                                              // Confirmed RT with no trailing spaces.
+char g7 [256] = "";
+
+char g16 [256] = "";
+
+
+
+//#define  SUPPORT_RDS
+#ifdef  SUPPORT_RDS
+  #include "tnr_rds.c"
+#else
+  int rds_reset () {
+    return (-1);
+  }
+  int af_count_get () {
+    return (0);
+  }
+  int rds_group_process (unsigned char * grp) { // For tnr_bch only
+    return (-1);
+  }
+  void af_switch_if_needed () {
+  }
+  void rds_callback () {
+  }
+#endif
+
+    //
+
   int prev_freq = 0;
   int stro_evt_enable = 0;//1;
   int rssi_evt_enable = 0;//1;
@@ -531,6 +517,8 @@ int freq_dn_get (int freq) {                                            // Calle
       return (0);                                                       // Return w/ no event
 
     int curr_s = ms_get () / 1000;
+    if (last_af_count_get_s + 60 < curr_s)
+      af_count_get ();                                                  // Ensure at least one AF aging every 60 seconds
 
     if (! low_pwr_mode) {                                               // If normal / not low power mode w/ no RDS...
 // stro_get() before events_process() to avoid si4709 problem ?
@@ -551,6 +539,19 @@ int freq_dn_get (int freq) {                                            // Calle
         pre2_stro_sig = prev_stro_sig;                                  // Age
         prev_stro_sig = curr_stro_sig;                                  // Age
         curr_stro_sig = stro_sig;                                       // Previous = current
+      }
+
+      if (pwr_rds) {                                                    // If RDS power is on..
+        int ret = 0;
+
+        while (ret == 0) {                                              // While we have 8 byte RDS groups available...
+                                                                        // (Only one is processed per call to events_process(), except QCV which blocks and handles it's own low level processing)
+          //loge ("evt_get pre  chip_api_events_process");
+          ret = chip_api_events_process (rds_grpd);                     // RDS Process/get (except during low power mode or no rds mode)
+          //loge ("evt_get post chip_api_events_process ret: %d", ret);
+          if (ret == 0)                                                 // If have new raw RDS data...
+            rds_group_process (rds_grpd);                               // Pass ptr to 8 bytes of group data, most significant byte first (big endian)
+        }
       }
 
     }
@@ -631,7 +632,6 @@ int freq_dn_get (int freq) {                                            // Calle
 }
 
 
-
     // Rx thread:
 
   int spirit2_light     = 0;
@@ -646,6 +646,7 @@ int freq_dn_get (int freq) {                                            // Calle
     while (rx_thread_running) {                                         // Loop while running
       int ctr = 0;
       int evt = 1;
+
       while (! seek_in_progress && evt > 0 && ctr ++ < 8) {             // While NOT seeking with Broadcom HCI API AND starting or had an event AND less than 8 events processed...
         if (! rx_thread_running) {
           logd ("rx_thread done 1 rx_thread_ctr: %d", rx_thread_ctr);
@@ -660,12 +661,22 @@ int freq_dn_get (int freq) {                                            // Calle
         int mod_factor = seconds_disp * (1010 / sleep_ms);
         if (rx_thread_ctr % mod_factor == 0)                            // Every seconds_disp seconds...
           logd ("rx_thread: %3.3d  evt: %3.3d", rx_thread_ctr, evt);
+        if (evt >= 3 && evt <= 6) {                                     // If RDS
+          //if (rx_thread_ctr % mod_factor != 0)
+          //  logd ("rx_thread: %3.3d  evt: %3.3d", rx_thread_ctr, evt);
+          if (spirit2_light == 0 || rx_thread_ctr < 607)                // If full version or less than 60 seconds after start...
+            rds_callback ();                                            // RDS Callback
+        }
       }
 
       if (! rx_thread_running) {
         logd ("rx_thread done 3 rx_thread_ctr: %d", rx_thread_ctr);
         return (NULL);
       }
+
+      if (! seek_in_progress && curr_af_num)                            // If NOT seeking with Broadcom HCI API AND we have AFs...
+        if (rx_thread_ctr % 10 == 0)                                    // Every 1 seconds...
+          af_switch_if_needed ();                                       // Check RSSI and switch to AF if needed
 
       if (! rx_thread_running) {
         logd ("rx_thread done 4 rx_thread_ctr: %d", rx_thread_ctr);
@@ -821,6 +832,7 @@ int freq_dn_get (int freq) {                                            // Calle
   int set_frequency (void ** session_data, int frequency) {
     logd ("set_frequency: %d", frequency);
     int ret = chip_api_freq_set (frequency);
+    rds_reset ();
     return (ret);
   }
   int get_frequency (void ** session_data) {
@@ -852,6 +864,7 @@ int freq_dn_get (int freq) {                                            // Calle
     need_seek_cmplt = 1;                                                // Seek is complete
     if (ret > 0)
       curr_freq_val = ret;
+    rds_reset ();
     return (ret);
   }
 
@@ -883,6 +896,10 @@ int freq_dn_get (int freq) {                                            // Calle
   }
   int set_automatic_af_switching (void ** session_data, int automatic) {// Alternate Frequency
     logd ("set_automatic_af_switching: %d", automatic);
+    if (automatic == 0)
+      cfg_af_mode = 0;                                                  // 0 = Disabled, 1 = Manual, 2 = RDS, 3 = Allow Regional  !! > 1 means need RDS so leave on even if screen off
+    else
+      cfg_af_mode = 3;
     return (0);
   }
   int set_automatic_ta_switching (void ** session_data, int automatic) {

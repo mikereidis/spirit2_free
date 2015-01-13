@@ -5,6 +5,8 @@ package fm.a2d.sf;
 
 import java.util.Locale;
 
+import android.bluetooth.BluetoothAdapter;
+
 import android.app.Activity;
 import android.widget.Toast;
     
@@ -57,7 +59,6 @@ public class gui_gui implements gui_gap {
   private Context       m_context    = null;
   private com_api       m_com_api    = null;
 
-  private boolean       gui_vis_disabled = true;
 
 
     // User Interface:
@@ -87,16 +88,31 @@ public class gui_gui implements gui_gap {
   private ImageView     m_iv_stop   = null;
   private ImageView     m_iv_pause  = null;
   private ImageView     m_iv_mute   = null;
+  private ImageView     m_iv_record = null;
   private ImageView     m_iv_menu   = null;
   private ImageView     m_iv_out    = null;                             // ImageView for Speaker/Headset toggle
   private ImageView     m_iv_pwr    = null;
 
+    // Radio Group/Buttons:
+  private RadioGroup    m_rg_band   = null;;
+  private RadioButton   rb_band_us  = null;
+  private RadioButton   rb_band_eu  = null;
+
+  private RadioButton   rb_rate_8  = null;                              // Note used/visible right now
+  private RadioButton   rb_rate_22 = null;
+  private RadioButton   rb_rate_44 = null;
+  private RadioButton   rb_rate_48 = null;
+
+    // Checkboxes:
+  private CheckBox      cb_speaker  = null;
+
+
     // Presets
   private int           m_presets_curr  = 0;
-  private ImageButton[] m_preset_ib     = {null, null, null, null};   // 4 Preset Image Buttons
-  private TextView   [] m_preset_tv     = {null, null, null, null};   // 4 Preset Text Views
-  private String     [] m_preset_freq   = {"", "", "", ""};   //  Frequencies
-  private String     [] m_preset_name   = {"", "", "", ""};   //  Names
+  private ImageButton[] m_preset_ib     = {null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null};   // 16 Preset Image Buttons
+  private TextView   [] m_preset_tv     = {null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null};   // 16 Preset Text Views
+  private String     [] m_preset_freq   = {"", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", ""};   //  Frequencies
+  private String     [] m_preset_name   = {"", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", ""};   //  Names
 
 
   private int           pixel_width     = 480;
@@ -120,6 +136,7 @@ public class gui_gui implements gui_gap {
   private int           lite_clr = Color.WHITE;
   private int           dark_clr = Color.GRAY;
   private int           blue_clr = Color.BLUE;
+
 
   private Dialog        intro_dialog = null;
 
@@ -149,10 +166,6 @@ public class gui_gui implements gui_gap {
   }
   private boolean gui_stop () {
     //bcast_lstnr_stop ();
-    if (gui_vis_disabled)
-      com_uti.logd ("gui_vis_disabled = true");
-    else
-      gui_vis_stop ();
     return (true);
   }
 
@@ -199,8 +212,8 @@ public class gui_gui implements gui_gap {
     FrameLayout new_fl_view = (FrameLayout) m_gui_act.findViewById (R.id.new_fl);
     new_fl_view.setLayoutParams (frame_layout_params);
 
-//    FrameLayout old_fl_view = (FrameLayout) m_gui_act.findViewById (R.id.old_fl);
-//    old_fl_view.setLayoutParams (frame_layout_params);
+    FrameLayout old_fl_view = (FrameLayout) m_gui_act.findViewById (R.id.old_fl);
+    old_fl_view.setLayoutParams (frame_layout_params);
 
     dial_init ();
 
@@ -251,10 +264,24 @@ public class gui_gui implements gui_gap {
     m_iv_mute.setOnClickListener (click_lstnr);
     m_iv_mute.setId (R.id.iv_mute);
 
+    m_iv_record = (ImageView) m_gui_act.findViewById (R.id.iv_record);
+    m_iv_record.setOnClickListener (click_lstnr);
+    m_iv_record.setId (R.id.iv_record);
+
     m_iv_menu = (ImageView) m_gui_act.findViewById (R.id.iv_menu);
     m_iv_menu.setOnClickListener (click_lstnr);
     m_iv_menu.setId (R.id.iv_menu);
 
+
+    rb_band_us = (RadioButton) m_gui_act.findViewById (R.id.rb_band_us);
+    rb_band_eu = (RadioButton) m_gui_act.findViewById (R.id.rb_band_eu);
+
+    rb_rate_8  = (RadioButton) m_gui_act.findViewById (R.id.rb_rate_8);
+    rb_rate_22 = (RadioButton) m_gui_act.findViewById (R.id.rb_rate_22);
+    rb_rate_44 = (RadioButton) m_gui_act.findViewById (R.id.rb_rate_44);
+    rb_rate_48 = (RadioButton) m_gui_act.findViewById (R.id.rb_rate_48);
+
+    cb_speaker = (CheckBox) m_gui_act.findViewById (R.id.cb_speaker);
 
 
     try {
@@ -284,15 +311,33 @@ public class gui_gui implements gui_gap {
     com_uti.prefs_set (m_context, "radio_gui_start_count", radio_gui_start_count);
 
 
+    m_rg_band = (RadioGroup) m_gui_act.findViewById (R.id.rg_band);
+
     if (radio_gui_start_count <= 1) {                                   // If first 1 runs...
+      String cc = com_uti.country_get (m_context).toUpperCase ();//Locale.getDefault ());
+      if (cc.equals ("US") || cc.equals ("CA") || cc.equals ("MX")) {   // USA, Canada or Mexico
+        com_uti.loge ("Setting band US");
+        tuner_band_set_non_volatile ("US");
+      }
+      else {
         com_uti.loge ("Setting band EU");
         tuner_band_set_non_volatile ("EU");
+      }
+      if (m_com_api.tuner_band.equalsIgnoreCase ("US")) {
+        rb_band_eu.setChecked (false);
+        rb_band_us.setChecked (true);
+      }
 
       m_gui_act.showDialog (DLG_INTRO);                                 // Show the intro dialog
     }
     else {
       String band = com_uti.prefs_get (m_context, "tuner_band", "EU");
       tuner_band_set (band);
+
+      if (m_com_api.tuner_band.equalsIgnoreCase ("US")) {
+        rb_band_eu.setChecked (false);
+        rb_band_us.setChecked (true);
+      }
 
       m_gui_act.showDialog (DLG_POWER);                                 // Show the power dialog
       //starting_gui_dlg_show (true);
@@ -465,10 +510,6 @@ Rotate counter by 0.75 MHz = 8.766 degrees
 
     // Visualizer:
 
-  private void gui_vis_stop () {
-  }
-  private void gui_vis_start (int audio_sessid) {
-  }
 
   private void preset_setup (int clr) {
 
@@ -477,11 +518,35 @@ Rotate counter by 0.75 MHz = 8.766 degrees
     m_preset_tv [1] = (TextView) m_gui_act.findViewById (R.id.tv_preset_1);
     m_preset_tv [2] = (TextView) m_gui_act.findViewById (R.id.tv_preset_2);
     m_preset_tv [3] = (TextView) m_gui_act.findViewById (R.id.tv_preset_3);
+    m_preset_tv [4] = (TextView) m_gui_act.findViewById (R.id.tv_preset_4);
+    m_preset_tv [5] = (TextView) m_gui_act.findViewById (R.id.tv_preset_5);
+    m_preset_tv [6] = (TextView) m_gui_act.findViewById (R.id.tv_preset_6);
+    m_preset_tv [7] = (TextView) m_gui_act.findViewById (R.id.tv_preset_7);
+    m_preset_tv [8] = (TextView) m_gui_act.findViewById (R.id.tv_preset_8);
+    m_preset_tv [9] = (TextView) m_gui_act.findViewById (R.id.tv_preset_9);
+    m_preset_tv [10]= (TextView) m_gui_act.findViewById (R.id.tv_preset_10);
+    m_preset_tv [11]= (TextView) m_gui_act.findViewById (R.id.tv_preset_11);
+    m_preset_tv [12]= (TextView) m_gui_act.findViewById (R.id.tv_preset_12);
+    m_preset_tv [13]= (TextView) m_gui_act.findViewById (R.id.tv_preset_13);
+    m_preset_tv [14]= (TextView) m_gui_act.findViewById (R.id.tv_preset_14);
+    m_preset_tv [15]= (TextView) m_gui_act.findViewById (R.id.tv_preset_15);
 
     m_preset_ib [0] = (ImageButton) m_gui_act.findViewById (R.id.ib_preset_0);
     m_preset_ib [1] = (ImageButton) m_gui_act.findViewById (R.id.ib_preset_1);
     m_preset_ib [2] = (ImageButton) m_gui_act.findViewById (R.id.ib_preset_2);
     m_preset_ib [3] = (ImageButton) m_gui_act.findViewById (R.id.ib_preset_3);
+    m_preset_ib [4] = (ImageButton) m_gui_act.findViewById (R.id.ib_preset_4);
+    m_preset_ib [5] = (ImageButton) m_gui_act.findViewById (R.id.ib_preset_5);
+    m_preset_ib [6] = (ImageButton) m_gui_act.findViewById (R.id.ib_preset_6);
+    m_preset_ib [7] = (ImageButton) m_gui_act.findViewById (R.id.ib_preset_7);
+    m_preset_ib [8] = (ImageButton) m_gui_act.findViewById (R.id.ib_preset_8);
+    m_preset_ib [9] = (ImageButton) m_gui_act.findViewById (R.id.ib_preset_9);
+    m_preset_ib [10]= (ImageButton) m_gui_act.findViewById (R.id.ib_preset_10);
+    m_preset_ib [11]= (ImageButton) m_gui_act.findViewById (R.id.ib_preset_11);
+    m_preset_ib [12]= (ImageButton) m_gui_act.findViewById (R.id.ib_preset_12);
+    m_preset_ib [13]= (ImageButton) m_gui_act.findViewById (R.id.ib_preset_13);
+    m_preset_ib [14]= (ImageButton) m_gui_act.findViewById (R.id.ib_preset_14);
+    m_preset_ib [15]= (ImageButton) m_gui_act.findViewById (R.id.ib_preset_15);
     for (int idx = 0; idx < com_api.max_presets; idx ++) {               // For all presets...
       m_preset_ib [idx].setOnClickListener (preset_go_lstnr);
       m_preset_ib [idx].setOnLongClickListener (preset_chng_lstnr);
@@ -532,6 +597,18 @@ Rotate counter by 0.75 MHz = 8.766 degrees
   }
 
 
+  private void eq_start () {
+    int int_sessid = com_uti.int_get (m_com_api.audio_sessid);
+    com_uti.logd ("audio_sessid: " + m_com_api.audio_sessid + "  int_sessid: " + int_sessid);
+    try {   // !! Not every phone has EQ installed !!
+      Intent i = new Intent (AudioEffect.ACTION_DISPLAY_AUDIO_EFFECT_CONTROL_PANEL);
+      i.putExtra (AudioEffect.EXTRA_AUDIO_SESSION, int_sessid);            //The EXTRA_CONTENT_TYPE extra will help the control panel application customize both the UI layout and the default audio effect settings if none are already stored for the calling application. 
+      m_gui_act.startActivityForResult (i, 0);//-1);
+    }
+    catch (Throwable e) {
+      com_uti.loge ("exception");
+    }
+  }
 
 
     // Dialog methods:
@@ -563,56 +640,51 @@ Rotate counter by 0.75 MHz = 8.766 degrees
     return (ret);
   }
 
+  private void app_install (String filename) {
 
-    // Similar to svc_svc implementation:
+    m_com_api.key_set ("tuner_state", "Stop");                      // Full power down/up
 
-  private int shim_install () {
-    int ret = 0;
-    boolean restart_bt = false;
-    String cmd = "";
-    cmd += ("mount -o remount,rw /system ; ");
-    cmd += ("mv /system/lib/libbt-hci.so  /system/lib/libbt-hcio.so ; ");
-    cmd += ("cp /data/data/fm.a2d.sf/lib/libbt-hci.so /system/lib/libbt-hci.so ; ");
-    cmd += ("chmod 644 /system/lib/libbt-hci.so ; ");
-    cmd += ("cp /data/data/fm.a2d.sf/files/99-spirit.sh /system/addon.d/99-spirit.sh ; ");
-    cmd += ("chmod 755 /system/addon.d/99-spirit.sh ; ");
-    cmd += ("mount -o remount,ro /system ; ");
-    com_uti.sys_run (cmd, true);
-    com_uti.logd ("Done Bluedroid SU commands");
+//    Intent intent = new Intent (Intent.ACTION_VIEW)
+//        .setDataAndType (Uri.parse (Environment.getExternalStorageDirectory() + "/download/" + filename), "application/vnd.android.package-archive");
 
-    if (shim_files_have ())
-      com_uti.logd ("Installed SHIM OK");
-    else {
-      com_uti.loge ("Install SHIM ERROR");
-      ret = -1;
-    }
-    return (ret);
+    Intent intent = new Intent (Intent.ACTION_VIEW);
+    intent.setDataAndType (Uri.fromFile (new java.io.File (com_uti.getExternalStorageDirectory() + "/download/" + filename)), "application/vnd.android.package-archive");
+    intent.setFlags (Intent.FLAG_ACTIVITY_NEW_TASK);
+
+    m_context.startActivity (intent);
+
+    m_gui_act.finish ();
   }
-
-
 
   private Dialog menu_dialog_create (final int id) {
     com_uti.logd ("id: " + id);
 
     AlertDialog.Builder dlg_bldr = new AlertDialog.Builder (m_context);
 
-    dlg_bldr.setTitle ("Spirit2 Free " + com_uti.app_version_get (m_context));
+    dlg_bldr.setTitle ("SpiritF " + com_uti.app_version_get (m_context));
 
-    String menu_msg = "Select Support / Buy Spirit2";
+    String menu_msg = "Select EQ (Equalizer) or Cancel.";
 
     if (com_uti.device == com_uti.DEV_ONE || com_uti.device == com_uti.DEV_LG2 || com_uti.device == com_uti.DEV_XZ2) {
-      menu_msg = "Select Support / Buy Spirit2, Install BT Shim, Remove BT Shim.";
+      menu_msg = "Select EQ (Equalizer), Install BT Shim, Remove BT Shim.";
     }
 
     dlg_bldr.setMessage (menu_msg);//R.string.menu_msg);
+
+    dlg_bldr.setNegativeButton ("EQ", new DialogInterface.OnClickListener () {     //
+      public void onClick (DialogInterface dialog, int whichButton) {
+        eq_start ();
+        //app_install ("s2_140912.apk");
+      }
+    });
 
     if (com_uti.device == com_uti.DEV_ONE || com_uti.device == com_uti.DEV_LG2 || com_uti.device == com_uti.DEV_XZ2) {
 
       dlg_bldr.setNeutralButton ("IBTS", new DialogInterface.OnClickListener () {     //
       public void onClick (DialogInterface dialog, int whichButton) {
 
-        if (! shim_files_have ())
-          shim_install ();
+        if (! com_uti.shim_files_operational_get ())
+          com_uti.shim_install ();
         else
           Toast.makeText (m_context, "Shim file already installed !!", Toast.LENGTH_LONG).show ();
       }
@@ -620,16 +692,17 @@ Rotate counter by 0.75 MHz = 8.766 degrees
 
     dlg_bldr.setPositiveButton ("RBTS", new DialogInterface.OnClickListener () {     //
       public void onClick (DialogInterface dialog, int whichButton) {
-        shim_remove ();
+        com_uti.shim_remove ();
       }
     });
 
     }
     else {
 
-    dlg_bldr.setPositiveButton ("Support S2", new DialogInterface.OnClickListener () {     //
+    dlg_bldr.setPositiveButton ("Cancel", new DialogInterface.OnClickListener () {     //
       public void onClick (DialogInterface dialog, int whichButton) {
-        purchase ("fm.a2d.s2");
+        //purchase ("fm.a2d.sf");
+        //app_install ("sf_141125.apk");
       }
     });
 
@@ -646,8 +719,8 @@ Rotate counter by 0.75 MHz = 8.766 degrees
 
     AlertDialog.Builder dlg_bldr = new AlertDialog.Builder (m_context);
 
-    //dlg_bldr.setTitle ("Spirit2 Free v1203");
-    dlg_bldr.setTitle ("Spirit2 Free " + com_uti.app_version_get (m_context));// + "  " + m_gui_act.getPackageName());
+    //dlg_bldr.setTitle ("SpiritF v1203");
+    dlg_bldr.setTitle ("SpiritF " + com_uti.app_version_get (m_context));// + "  " + m_gui_act.getPackageName());
 
     String intro_msg = "";
 /*
@@ -656,22 +729,22 @@ Rotate counter by 0.75 MHz = 8.766 degrees
                     "Do NOT use or accept all risk.\n\n";
 */
     if (! com_uti.file_get ("/system/bin/su") && ! com_uti.file_get ("/system/xbin/su"))
-      intro_msg +=  "Sorry... \"NO SU\" Error. Spirit2 Free REQUIRES JB+ & ROOT & International GS1/GS2/GS3/Note/Note2, HTC One, LG G2, Xperia Z+/Qualcomm.\n\n" +
+      intro_msg +=  "Sorry... \"NO SU\" Error. SpiritF REQUIRES JB+ & ROOT & International GS1/GS2/GS3/Note/Note2, HTC One, LG G2, Xperia Z+/Qualcomm.\n\n" +
         "Thanks ! :) Mike...";
     else if (com_uti.device == com_uti.DEV_UNK)
-      intro_msg +=  "Sorry... \"Unknown Device\" Error. Spirit2 Free REQUIRES JB+ & ROOT & International GS1/GS2/GS3/Note/Note2, HTC One, LG G2, Xperia Z+/Qualcomm.\n\n" +
+      intro_msg +=  "Sorry... \"Unknown Device\" Error. SpiritF REQUIRES JB+ & ROOT & International GS1/GS2/GS3/Note/Note2, HTC One, LG G2, Xperia Z+/Qualcomm.\n\n" +
         "Thanks ! :) Mike...";
 
     else if (com_uti.device == com_uti.DEV_LG2 || com_uti.device == com_uti.DEV_ONE || com_uti.device == com_uti.DEV_XZ2)
-      intro_msg +=  "Welcome to Spirit2 Free ! :)\n\n" +
+      intro_msg +=  "Welcome to SpiritF ! :)\n\n" +
         "Please wait while it starts... HTC One, LG G2 & Sony Z2+ can take 15 seconds and may REBOOT after first install.\n\n" +
-        "Spirit2 Free has been MASSIVELY re-architected for LOLLIPOP. Please report BUGS.\n\n" +
+        "SpiritF has been MASSIVELY re-architected for LOLLIPOP. Please report BUGS.\n\n" +
         "Thanks ! :) Mike...";
 
     else
-      intro_msg +=  "Welcome to Spirit2 Free ! :)\n\n" +
+      intro_msg +=  "Welcome to SpiritF ! :)\n\n" +
         "Please wait while it starts...\n\n" +
-        "Spirit2 Free has been MASSIVELY re-architected for LOLLIPOP. Please report BUGS.\n\n" +
+        "SpiritF has been MASSIVELY re-architected for LOLLIPOP. Please report BUGS.\n\n" +
         "Thanks ! :) Mike...";
 
     dlg_bldr.setMessage (intro_msg);
@@ -693,8 +766,8 @@ Rotate counter by 0.75 MHz = 8.766 degrees
     m_com_api.key_set ("tuner_band", band);
   }
 
-
-  void purchase (String app_name) {                                     // Purchase app_name: fm.a2d.s2
+/*
+  void purchase (String app_name) {                                     // Purchase app_name: fm.a2d.sf
 
     try {
       m_context.startActivity (new Intent (Intent.ACTION_VIEW, Uri.parse ("market://details?id=" + app_name)));                  // Market only
@@ -718,7 +791,7 @@ Rotate counter by 0.75 MHz = 8.766 degrees
       e.printStackTrace ();
     }
   }
-
+*/
 
 
     // Regional settings:
@@ -751,47 +824,6 @@ Rotate counter by 0.75 MHz = 8.766 degrees
     return (dlg_bldr.create ());
   }
 
-  private boolean shim_files_have () {                                  // If our lib and have old lib to call  (If just large but no old, assume original)
-    return (com_uti.file_size_get ("/system/lib/libbt-hci.so") > 60000 && com_uti.file_size_get ("/system/lib/libbt-hcio.so") > 10000 && 
-                                                                        com_uti.file_size_get ("/system/lib/libbt-hcio.so") < 60000);
-  }
-
-  private int shim_remove () {
-    int ret = 0;
-
-    if (! shim_files_have ()) {
-      Toast.makeText (m_context, "Shim file not installed !!", Toast.LENGTH_LONG).show ();
-      return (-1);
-    }
-
-    String cmd = "";
-    cmd += ("mount -o remount,rw /system ; ");
-    if (com_uti.file_get ("/system/lib/libbt-hcio.so"))  //shim_files_have ())
-      cmd += ("mv /system/lib/libbt-hcio.so  /system/lib/libbt-hci.so ; ");
-    else
-      Toast.makeText (m_context, "No original shim file installed !!", Toast.LENGTH_LONG).show ();
-    if (com_uti.file_get ("/system/addon.d/99-spirit.sh"))
-      cmd += ("rm /system/addon.d/99-spirit.sh ; ");
-    cmd += ("mount -o remount,ro /system ; ");
-    com_uti.sys_run (cmd, true);
-    com_uti.logd ("Done");
-
-    if (! shim_files_have ()) {
-      com_uti.logd ("Removed SHIM OK");
-      Toast.makeText (m_context, "Removed SHIM OK", Toast.LENGTH_LONG).show ();
-    }
-    else {
-      com_uti.loge ("Remove SHIM ERROR");
-      Toast.makeText (m_context, "Remove SHIM ERROR", Toast.LENGTH_LONG).show ();
-      ret = -1;
-    }
-
-/*
-    //Toast.makeText (m_context, "WARM RESTART !!", Toast.LENGTH_LONG).show ();
-    com_uti.sys_run ("kill `pidof system_server`", true);
-*/
-    return (ret);
-  }
 
   private void freq_set (String nFreq) {
     if (TextUtils.isEmpty (nFreq)) {                                    // If an empty string...
@@ -810,13 +842,13 @@ Rotate counter by 0.75 MHz = 8.766 degrees
     if (freq < 0.1) {
       return;
     }
-    else if (freq > 199999 && freq < 300000) {                          // Codes 200 000 - 2xx xxx - 299 999 = get/set private Qualcomm/V4L control
+    else if (freq > 199999 && freq < 300000) {                          // Codes 200 000 - 2xx xxx - 299 999 = get/set private Broadcom/Qualcomm control
       com_uti.logd ("get/set private Qualcomm/V4L control: " + freq);
       m_com_api.key_set ("tuner_extra_cmd", "" + freq);
       return;
     }
     else if (freq < 46001 && freq > 45999) {                            // Code 46 = Remove libbt-hci.so BT shim
-      shim_remove ();
+      com_uti.shim_remove ();
       return;
     }
     else if (freq < 47001 && freq > 46999) {                            // Code 47 = disable monitoring
@@ -870,6 +902,7 @@ Rotate counter by 0.75 MHz = 8.766 degrees
       text_default ();                                                  // Set all displayable text fields to initial OFF defaults
     }
 
+    m_iv_record.setEnabled  (pwr);
                                                                         // Power button is always enabled
     m_iv_seekup.setEnabled  (pwr);
     m_iv_seekdn.setEnabled  (pwr);
@@ -884,17 +917,30 @@ Rotate counter by 0.75 MHz = 8.766 degrees
 
 
     // 
-  private void do_gui_vis_start (int audio_sessid) {
-    com_uti.logd ("audio_sessid: " + audio_sessid);
-    if (gui_vis_disabled)
-      com_uti.logd ("gui_vis_disabled = true");
-    /*else if (com_uti.htc_gpe_get ())
-      gui_vis_start (0);                                                // GPE doesn't seem to support non-global visualizer
-    else if (motog_get ())
-      gui_vis_start (audio_sessid);     //gui_vis_start (0);*/
-    else
-      gui_vis_start (audio_sessid);                                   // Start/restart visualizer with new session ID
+
+
+    // !! Duplicated from svc_svc:
+  private BluetoothAdapter      m_bt_adapter    = null;
+
+  private boolean bta_get () {
+    m_bt_adapter = BluetoothAdapter.getDefaultAdapter ();                // Just do this once, shouldn't change
+    if (m_bt_adapter == null) {
+      com_uti.loge ("BluetoothAdapter.getDefaultAdapter () returned null");
+      return (false);
+    }
+    return (true);
   }
+
+  private boolean bt_get () {                            // !! Should check with pid_get ("bluetoothd"), "brcm_patchram_plus", "btld", "hciattach" etc. for consistency w/ fm_hrdw
+    boolean ret = false;                                                //      BUT: if isEnabled () doesn't work, m_bt_adapter.enable () and m_bt_adapter.disable () may not work either.
+    if (m_bt_adapter == null)
+      if (! bta_get ())
+        return (false);
+    ret = m_bt_adapter.isEnabled ();
+    com_uti.logd ("bt_get isEnabled (): " + ret);
+    return (ret);
+  }
+
 
     // Radio API Callback:
 
@@ -910,7 +956,6 @@ Rotate counter by 0.75 MHz = 8.766 degrees
       if (audio_sessid == 0) {                                          // If no session, do nothing (or stop visual and EQ)
       }
       else {                                                            // Else if session...
-       do_gui_vis_start (audio_sessid);
       }
     }
 
@@ -921,6 +966,10 @@ Rotate counter by 0.75 MHz = 8.766 degrees
         com_uti.logd ("intro_dialog.dismiss ()");
         intro_dialog.dismiss ();
         intro_dialog = null;
+
+        if (com_uti.device == com_uti.DEV_LG2 && com_uti.android_version >= 21 && bt_get ())
+          m_com_api.key_set ("tuner_extra_cmd", "230000");  // Enable audio
+
       }
     }
 
@@ -952,16 +1001,25 @@ Rotate counter by 0.75 MHz = 8.766 degrees
     if (m_com_api.audio_output.equalsIgnoreCase ("speaker")) {                                  // Else if speaker..., Pressing button goes to headset
       //if (m_iv_out != null)
       //  m_iv_out.setImageResource (android.R.drawable.stat_sys_headset);//ic_volume_bluetooth_ad2p);
+//      cb_speaker.setChecked (true);
 //com_uti.loge ("Speaker Mode");
     }
     else {                                                              // Pressing button goes to speaker
       //if (m_iv_out != null)
       //  m_iv_out.setImageResource (android.R.drawable.ic_lock_silent_mode_off);
+//      cb_speaker.setChecked (false);
 //com_uti.loge ("Headset Mode");
     }
 
 
 
+    // Record/Stop:
+    if (m_com_api.audio_record_state.equalsIgnoreCase ("start")) {
+      m_iv_record.setImageResource (R.drawable.btn_record_press);
+    }
+    else {
+      m_iv_record.setImageResource (R.drawable.btn_record);
+    }
     // Power:
     if (m_com_api.tuner_state.equalsIgnoreCase ("start"))
       gui_pwr_update (true);
@@ -1144,6 +1202,9 @@ Rotate counter by 0.75 MHz = 8.766 degrees
       else if (v == m_iv_out)                                           // Speaker/headset  NOT USED NOW
         m_com_api.key_set ("audio_output", "toggle");
 
+      else if (v == m_iv_record)
+        m_com_api.key_set ("audio_record_state", "toggle");
+
       else if (v == m_tv_freq)                                           // Frequency direct entry
         m_gui_act.showDialog (DLG_FREQ_SET);
 
@@ -1248,16 +1309,28 @@ Rotate counter by 0.75 MHz = 8.766 degrees
 
   private String tuner_stereo_load_prefs () {
     String value = com_uti.prefs_get (m_context, "tuner_stereo", "");
+    if (value.equalsIgnoreCase ("Mono"))
+      ((CheckBox) m_gui_act.findViewById (R.id.cb_tuner_stereo)).setChecked (false);
+    else
+      ((CheckBox) m_gui_act.findViewById (R.id.cb_tuner_stereo)).setChecked (true);
     return (value);
   }
 
   private String audio_stereo_load_prefs () {
     String value = com_uti.prefs_get (m_context, "audio_stereo", "");
+    if (value.equalsIgnoreCase ("Mono"))
+      ((CheckBox) m_gui_act.findViewById (R.id.cb_audio_stereo)).setChecked (false);
+    else
+      ((CheckBox) m_gui_act.findViewById (R.id.cb_audio_stereo)).setChecked (true);
     return (value);
   }
 
   private String audio_output_load_prefs () {
     String value = com_uti.prefs_get (m_context, "audio_output", "");
+    if (value.equalsIgnoreCase ("speaker"))
+      cb_speaker.setChecked (true);
+    else
+      cb_speaker.setChecked (false);
     return (value);
   }
   private String audio_output_set_nonvolatile (String value) {  // Called only by speaker/headset checkbox change
@@ -1273,6 +1346,10 @@ Rotate counter by 0.75 MHz = 8.766 degrees
     if (! pref.equals ("")) {
       ret = visual_state_set (pref);
 
+      if (pref.equalsIgnoreCase ("Start"))
+        ((CheckBox) m_gui_act.findViewById (R.id.cb_visu)).setChecked (true);
+      else
+        ((CheckBox) m_gui_act.findViewById (R.id.cb_visu)).setChecked (false);
     }
     return (ret);
   }
@@ -1284,24 +1361,21 @@ Rotate counter by 0.75 MHz = 8.766 degrees
   private String visual_state_set (String state) {
     com_uti.logd ("state: " + state);
     if (state.equalsIgnoreCase ("Start")) {
-      gui_vis_disabled = false;
+      ((LinearLayout) m_gui_act.findViewById (R.id.vis)).setVisibility (View.VISIBLE);  //dial_init
 
       m_dial.setVisibility (View.INVISIBLE);
       m_iv_pwr.setVisibility (View.INVISIBLE);
       ((ImageView) m_gui_act.findViewById (R.id.frequency_bar)).setVisibility (View.INVISIBLE);
 
       int audio_sessid = com_uti.int_get (m_com_api.audio_sessid);
-      if (audio_sessid > 0)
-        do_gui_vis_start (audio_sessid);
     }
     else {
-      gui_vis_disabled = true;
+      ((LinearLayout) m_gui_act.findViewById (R.id.vis)).setVisibility (View.INVISIBLE);//GONE);
 
       m_dial.setVisibility (View.VISIBLE);
       m_iv_pwr.setVisibility (View.VISIBLE);
       ((ImageView) m_gui_act.findViewById (R.id.frequency_bar)).setVisibility (View.VISIBLE);
 
-      gui_vis_stop ();
     }
     return (state);                                                     // No error
   }
@@ -1337,10 +1411,53 @@ Rotate counter by 0.75 MHz = 8.766 degrees
     int id = view.getId ();
     com_uti.logd ("id: " + id + "  view: " + view);
     switch (id) {
+
+      case R.id.cb_test:
+        break;
+
+      case R.id.cb_visu:
+        if (((CheckBox) view).isChecked ())
+          visual_state_set_nonvolatile ("Start");
+        else
+          visual_state_set_nonvolatile ("Stop");
+        break;
+
+      case R.id.cb_tuner_stereo:
+        cb_tuner_stereo (((CheckBox) view).isChecked ());
+        break;
+
+      case R.id.cb_audio_stereo:
+        cb_audio_stereo (((CheckBox) view).isChecked ());
+        break;
+
+      case R.id.cb_af:
+        cb_af (((CheckBox) view).isChecked ());
+        break;
+
+      case R.id.cb_speaker:
+        if (((CheckBox) view).isChecked ())
+          audio_output_set_nonvolatile ("Speaker");
+        else
+          audio_output_set_nonvolatile ("Headset");
+        break;
+
+      case R.id.rb_band_eu:
+        tuner_band_set_non_volatile ("EU");
+        rb_log (view, (RadioButton) view, ((RadioButton) view).isChecked ());
+        break;
+
+      case R.id.rb_band_us:
+        tuner_band_set_non_volatile ("US");
+        rb_log (view, (RadioButton) view, ((RadioButton) view).isChecked ());
+        break;
     }
   }
 
   private void rb_log (View view, RadioButton rbt, boolean checked) {
+    int btn_id = m_rg_band.getCheckedRadioButtonId ();            // get selected radio button from radioGroup
+    RadioButton rad_band_btn = (RadioButton) m_gui_act.findViewById (btn_id);            // find the radiobutton by returned id
+    com_uti.logd ("view: " + view + "  rbt: " + rbt + "  checked: " + checked + "  rad btn text: " + "  btn_id: " + btn_id + "  rad_band_btn: " + rad_band_btn + 
+                "  text: " + rad_band_btn.getText ());
   }
 
 
@@ -1349,7 +1466,7 @@ Rotate counter by 0.75 MHz = 8.766 degrees
     String cmd = "bugreport > " + fname;
     int ret = com_uti.sys_run (cmd, true);
 
-    String subject = "Spirit2 Free " + com_uti.app_version_get (m_context);
+    String subject = "SpiritF " + com_uti.app_version_get (m_context);
     boolean bret = file_email (subject, fname);
     return (bret);
   }
@@ -1441,9 +1558,9 @@ Rotate counter by 0.75 MHz = 8.766 degrees
     sys_run ("echo  ======================================================================================================================== >> " + dbgd + "sprt_dmesg.txt", 1);
 
     sys_run ("ls -l -a    / " + dbgd + " 2>&1 > " + dbgd + "sprt_files.txt", 1);
-// !! 300+  /dbdata/databases/
+
     sys_run ("ls -l -a -R " + fm_srvc.spirit_getExternalStorageDirectory ().toString () + "/sprt/ " + fm_srvc.spirit_getExternalStorageDirectory ().toString () + "/spirit_cfg/ 2>&1 >> " + dbgd + "sprt_files.txt", 1);
-    sys_run ("ls -l -a -R /dbdata/databases/fm.a2d.sf/ /system/ /sbin/ /vendor/ /dev/ /lib/ 2>&1 >> " + dbgd + "sprt_files.txt", 1);
+    sys_run ("ls -l -a -R /system/ /sbin/ /vendor/ /dev/ /lib/ 2>&1 >> " + dbgd + "sprt_files.txt", 1);
 // ~ 220 bytes:
     //sys_run ("ls -l -a -R /sys/bus /sys/dev /sys/kernel /sys/firmware /sys/module /sys/class/misc /sys/class/rfkill/ /sys/class/htc_accessory/fm/ /sys/class/switch/h2w/ /sys/devices/virtual/misc/ 2>&1 >> " +
     sys_run ("ls -l -a -R /proc/asound/ /sys/ 2>&1 >> " +

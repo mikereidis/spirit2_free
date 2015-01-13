@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     package="fm.a2d.sf"
-    android:versionCode="75"
-    android:versionName="2014_11_28_free" >
+    android:versionCode="78"
+    android:versionName="2015_01_12_beta" >
 
 <!-- 
 !! See to add android.intent.action.BUG_REPORT
@@ -33,7 +33,6 @@ android:targetSdkVersion="17"
         android:targetSdkVersion="21" />
 
 
-    <uses-permission android:name="android.permission.ACCESS_SUPERUSER"/>
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.READ_PHONE_STATE"/>
     <uses-permission android:name="android.permission.BROADCAST_STICKY"/>
@@ -61,7 +60,7 @@ App drawer name for all unless locally over-ridden:
     <application
         android:allowBackup="true"
         android:icon="@drawable/img_icon"
-        android:label="Spirit2 Free"
+        android:label="SpiritF"
         android:theme="@android:style/Theme.Holo" >
 
 
@@ -116,7 +115,7 @@ android:theme="@android:style/Theme.Translucent.NoTitleBar"
     <service
       android:name="fm.a2d.sf.svc_svc"
 android:process=":s"
-      android:label="Spirit2 Free FM Service"
+      android:label="SpiritF FM Service"
       android:enabled="true"
       android:exported="true"
       >
@@ -129,18 +128,8 @@ Intent API
  -->
 
 
-<!-- Widget
-        <action android:name="android.appwidget.action.APPWIDGET_DELETED" />
-        <action android:name="android.appwidget.action.APPWIDGET_ENABLED" />
-        <action android:name="android.appwidget.action.APPWIDGET_DISABLED" />
 
-        <action android:name="fm.a2d.sf.widget_update_timer" />
-
-receiver section:
-            android:exported="true"
- -->
-
-<!-- Spirit2 Free Service has media button & headset unplug receiver that deals with standard Android media button Intents . JB needs initial Intent filter AND registration
+<!-- SpiritF Service has media button & headset unplug receiver that deals with standard Android media button Intents . JB needs initial Intent filter AND registration
             <intent-filter>
                 <action android:name="fm.a2d.sf.result.get" />
             </intent-filter>

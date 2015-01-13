@@ -1,0 +1,285 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+-->
+<!-- -->
+<!-- Layout gravity not needed; only for positioning a view within a parent, not for text
+android:layout_gravity="left|center_vertical"
+android:gravity="center_horizontal"
+
+android:gravity="center_vertical|center_horizontal"
+android:layout_gravity="center_vertical|center_horizontal"
+
+android:layout_gravity="top"
+
+Default:
+    android:focusable="true"
+-->
+
+<!-- Top Level: -->
+<LinearLayout
+xmlns:android="http://schemas.android.com/apk/res/android"
+android:id="@+id/gui_pg2_layout"
+android:orientation="vertical"
+android:layout_width="match_parent"
+android:layout_height="match_parent"
+
+android:gravity="center_vertical|center_horizontal"
+android:layout_gravity="center_vertical|center_horizontal"
+
+>
+<!-- Vertical Overall layout weights total: ?
+...
+-->
+  <LinearLayout android:id="@+id/noref_ui_cbs"
+  android:layout_width="match_parent"
+  android:layout_height="0dip"
+  android:layout_weight="0.3"
+  >
+
+    <TextView android:id="@+id/noref_ui_text"
+    android:text="UI: "
+    android:textColor="#ff33b5e5" 
+    android:singleLine="true"
+    android:textStyle="normal"
+    android:layout_weight="1"
+    android:layout_width="0dip"
+    android:layout_height="match_parent"
+    android:textAppearance="?android:attr/textAppearanceMedium"
+    android:gravity="center"
+    />
+
+    <CheckBox
+    android:id="@+id/cb_visu"
+    android:contentDescription="Visualizer"
+    android:text="Visual"
+    android:layout_weight="1"
+    android:layout_width="0dip"
+    android:layout_height="match_parent"
+    android:checked="false"
+    android:onClick="gap_gui_clicked"
+    />
+
+    <CheckBox
+    android:id="@+id/cb_test"
+    android:contentDescription="Test"
+    android:text=""
+    android:layout_weight="1"
+    android:layout_width="0dip"
+    android:layout_height="match_parent"
+    android:checked="false"
+    android:onClick="gap_gui_clicked"
+    />
+
+  </LinearLayout>
+
+
+  <LinearLayout
+  android:layout_width="match_parent"
+  android:layout_height="0dip"
+  android:orientation="horizontal"
+  android:layout_weight="0.3"
+  >
+
+    <TextView android:id="@+id/noref_band_text"
+    android:text="Band: "
+    android:textColor="#ff33b5e5" 
+    android:singleLine="true"
+    android:textStyle="normal"
+    android:layout_weight="1"
+    android:layout_width="0dip"
+    android:layout_height="match_parent"
+    android:textAppearance="?android:attr/textAppearanceMedium"
+    android:gravity="center"
+    />
+
+    <RadioGroup
+    android:id="@+id/rg_band"
+    android:orientation="horizontal"
+    android:layout_weight="2"
+    android:layout_width="0dip"
+    android:layout_height="match_parent"
+    >
+
+      <RadioButton
+      android:id="@+id/rb_band_eu"
+      android:contentDescription="Band EU+"
+      android:layout_weight="1"
+      android:layout_width="0dip"
+      android:layout_height="match_parent"
+      android:text="EU+"
+      android:onClick="gap_gui_clicked"
+      android:checked="true"
+      />
+
+      <RadioButton
+      android:id="@+id/rb_band_us"
+      android:contentDescription="Band USA"
+      android:layout_weight="1"
+      android:layout_width="0dip"
+      android:layout_height="match_parent"
+      android:text="USA"
+      android:onClick="gap_gui_clicked"
+      android:checked="false"
+      />
+
+    </RadioGroup>
+
+  </LinearLayout>
+
+  <LinearLayout
+  android:layout_width="match_parent"
+  android:layout_height="0dip"
+  android:layout_weight="0.3"
+  >
+
+    <TextView android:id="@+id/noref_tuner_text"
+    android:text="Tuner: "
+    android:textColor="#ff33b5e5" 
+    android:singleLine="true"
+    android:textStyle="normal"
+    android:layout_weight="1"
+    android:layout_width="0dip"
+    android:layout_height="match_parent"
+    android:textAppearance="?android:attr/textAppearanceMedium"
+    android:gravity="center"
+    />
+    <CheckBox
+    android:id="@+id/cb_tuner_stereo"
+    android:contentDescription="Tuner Stereo"
+    android:text="Stereo"
+    android:layout_weight="1"
+    android:layout_width="0dip"
+    android:layout_height="match_parent"
+    android:checked="false"
+    android:onClick="gap_gui_clicked" />
+
+    <CheckBox
+    android:id="@+id/cb_af"
+    android:contentDescription="Tuner AF"
+    android:text="AF"
+    android:layout_weight="1"
+    android:layout_width="0dip"
+    android:layout_height="match_parent"
+    android:checked="false"
+    android:onClick="gap_gui_clicked" />
+
+  </LinearLayout>
+
+
+  <LinearLayout
+  android:layout_width="match_parent"
+  android:layout_height="0dip"
+  android:layout_weight="0.3"
+  >
+
+    <TextView android:id="@+id/noref_audio_text"
+    android:text="Audio: "
+    android:textColor="#ff33b5e5" 
+    android:singleLine="true"
+    android:textStyle="normal"
+    android:layout_weight="1"
+    android:layout_width="0dip"
+    android:layout_height="match_parent"
+    android:textAppearance="?android:attr/textAppearanceMedium"
+    android:gravity="center"
+    />
+    <CheckBox
+    android:id="@+id/cb_audio_stereo"
+    android:contentDescription="Audio Test"
+    android:text=""
+    android:layout_weight="1"
+    android:layout_width="0dip"
+    android:layout_height="match_parent"
+    android:checked="true"
+    android:onClick="gap_gui_clicked" />
+
+    <CheckBox
+    android:id="@+id/cb_speaker"
+    android:contentDescription="Audio Speaker"
+    android:text="Speaker"
+    android:layout_weight="1"
+    android:layout_width="0dip"
+    android:layout_height="match_parent"
+    android:checked="false"
+    android:onClick="gap_gui_clicked" />
+
+  </LinearLayout>
+
+  <LinearLayout
+  android:layout_width="match_parent"
+  android:layout_height="0dip"
+  android:orientation="horizontal"
+  android:layout_weight="0"
+  >
+
+    <TextView android:id="@+id/noref_rate_text"
+    android:text="Rate: "
+    android:textColor="#ff33b5e5" 
+    android:singleLine="true"
+    android:textStyle="normal"
+    android:layout_weight="1"
+    android:layout_width="0dip"
+    android:layout_height="match_parent"
+    android:textAppearance="?android:attr/textAppearanceMedium"
+    android:gravity="center"
+    />
+
+    <RadioGroup
+    android:id="@+id/rg_rate"
+    android:orientation="horizontal"
+    android:layout_weight="0"
+    android:layout_width="0dip"
+    android:layout_height="match_parent"
+    >
+
+      <RadioButton
+      android:id="@+id/rb_rate_8"
+      android:contentDescription="Sample Rate 8 KHz"
+      android:layout_weight="1"
+      android:layout_width="0dip"
+      android:layout_height="match_parent"
+      android:text="8"
+      android:onClick="gap_gui_clicked"
+      android:checked="false"
+      />
+
+      <RadioButton
+      android:id="@+id/rb_rate_22"
+      android:contentDescription="Sample Rate 22 KHz"
+      android:layout_weight="1"
+      android:layout_width="0dip"
+      android:layout_height="match_parent"
+      android:text="22"
+      android:onClick="gap_gui_clicked"
+      android:checked="false"
+      />
+
+      <RadioButton
+      android:id="@+id/rb_rate_44"
+      android:contentDescription="Sample Rate 44 KHz"
+      android:layout_weight="1"
+      android:layout_width="0dip"
+      android:layout_height="match_parent"
+      android:text="44"
+      android:onClick="gap_gui_clicked"
+      android:checked="true"
+      />
+
+      <RadioButton
+      android:id="@+id/rb_rate_48"
+      android:contentDescription="Sample Rate 48 KHz"
+      android:layout_weight="1"
+      android:layout_width="0dip"
+      android:layout_height="match_parent"
+      android:text="48"
+      android:onClick="gap_gui_clicked"
+      android:checked="false"
+      />
+
+    </RadioGroup>
+
+  </LinearLayout>
+
+
+</LinearLayout>
+

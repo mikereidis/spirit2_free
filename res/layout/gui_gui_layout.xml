@@ -31,6 +31,9 @@ Main upper part of screen (without presets):
       <FrameLayout android:id="@+id/new_fl" android:layout_width="400dip" android:layout_height="match_parent">
         <include layout="@layout/gui_pg1_layout"/>
       </FrameLayout>
+      <FrameLayout android:id="@+id/old_fl" android:layout_width="400dip" android:layout_height="match_parent">
+        <include layout="@layout/gui_pg2_layout"/>
+      </FrameLayout>
     </LinearLayout>
   </HorizontalScrollView>
 
@@ -45,7 +48,7 @@ Presets:
 -->
   <HorizontalScrollView android:scrollbars="none" android:fadingEdge="none" android:layout_width="match_parent" android:layout_weight="1" android:layout_height="0dip"
   android:layout_marginLeft="0.0dip" android:layout_marginTop="0.0dip" android:layout_marginRight="0.0dip" android:layout_marginBottom="0.0dip" android:layout_alignParentBottom="true" android:overScrollMode="ifContentScrolls">
-    <LinearLayout android:visibility="invisible" android:background="#00000000" android:orientation="horizontal" android:layoutAnimation="@anim/ani_preset_layout" android:layout_width="match_parent" android:layout_height="56.0dip">
+    <LinearLayout android:background="#00000000" android:orientation="horizontal" android:layoutAnimation="@anim/ani_preset_layout" android:layout_width="match_parent" android:layout_height="56.0dip">
                     <FrameLayout android:id="@+id/fr_preset_0" android:contentDescription="Preset 0" android:layout_width="80.0dip" android:layout_height="match_parent" >
                         <TextView android:textSize="15.0dip" android:gravity="center" android:text="" android:id="@+id/tv_preset_0" android:layout_width="80.0dip" android:layout_height="match_parent" />
                         <ImageButton android:background="#00000000" android:src="@drawable/btn_preset" android:id="@+id/ib_preset_0" android:layout_width="80.0dip" android:layout_height="match_parent" />
@@ -61,6 +64,54 @@ Presets:
                     <FrameLayout android:id="@+id/fr_preset_3" android:contentDescription="Preset 3" android:layout_width="80.0dip" android:layout_height="match_parent" >
                         <TextView android:textSize="15.0dip" android:gravity="center" android:text="" android:id="@+id/tv_preset_3" android:layout_width="80.0dip" android:layout_height="match_parent" />
                         <ImageButton android:background="#00000000" android:src="@drawable/btn_preset" android:id="@+id/ib_preset_3" android:layout_width="80.0dip" android:layout_height="match_parent"  />
+                    </FrameLayout>
+                    <FrameLayout android:id="@+id/fr_preset_4" android:contentDescription="Preset 4" android:layout_width="80.0dip" android:layout_height="match_parent" >
+                        <TextView android:textSize="15.0dip" android:gravity="center" android:text="" android:id="@+id/tv_preset_4" android:layout_width="80.0dip" android:layout_height="match_parent" />
+                        <ImageButton android:background="#00000000" android:src="@drawable/btn_preset" android:id="@+id/ib_preset_4" android:layout_width="80.0dip" android:layout_height="match_parent" />
+                    </FrameLayout>
+                    <FrameLayout android:id="@+id/fr_preset_5" android:contentDescription="Preset 5" android:layout_width="80.0dip" android:layout_height="match_parent" >
+                        <TextView android:textSize="15.0dip" android:gravity="center" android:text="" android:id="@+id/tv_preset_5" android:layout_width="80.0dip" android:layout_height="match_parent" />
+                        <ImageButton android:background="#00000000" android:src="@drawable/btn_preset" android:id="@+id/ib_preset_5" android:layout_width="80.0dip" android:layout_height="match_parent" />
+                    </FrameLayout>
+                    <FrameLayout android:id="@+id/fr_preset_6" android:contentDescription="Preset 6" android:layout_width="80.0dip" android:layout_height="match_parent" >
+                        <TextView android:textSize="15.0dip" android:gravity="center" android:text="" android:id="@+id/tv_preset_6" android:layout_width="80.0dip" android:layout_height="match_parent" />
+                        <ImageButton android:background="#00000000" android:src="@drawable/btn_preset" android:id="@+id/ib_preset_6" android:layout_width="80.0dip" android:layout_height="match_parent" />
+                    </FrameLayout>
+                    <FrameLayout android:id="@+id/fr_preset_7" android:contentDescription="Preset 7" android:layout_width="80.0dip" android:layout_height="match_parent" >
+                        <TextView android:textSize="15.0dip" android:gravity="center" android:text="" android:id="@+id/tv_preset_7" android:layout_width="80.0dip" android:layout_height="match_parent" />
+                        <ImageButton android:background="#00000000" android:src="@drawable/btn_preset" android:id="@+id/ib_preset_7" android:layout_width="80.0dip" android:layout_height="match_parent" />
+                    </FrameLayout>
+                    <FrameLayout android:id="@+id/fr_preset_8" android:contentDescription="Preset 8" android:layout_width="80.0dip" android:layout_height="match_parent" >
+                        <TextView android:textSize="15.0dip" android:gravity="center" android:text="" android:id="@+id/tv_preset_8" android:layout_width="80.0dip" android:layout_height="match_parent" />
+                        <ImageButton android:background="#00000000" android:src="@drawable/btn_preset" android:id="@+id/ib_preset_8" android:layout_width="80.0dip" android:layout_height="match_parent" />
+                    </FrameLayout>
+                    <FrameLayout android:id="@+id/fr_preset_9" android:contentDescription="Preset 9" android:layout_width="80.0dip" android:layout_height="match_parent" >
+                        <TextView android:textSize="15.0dip" android:gravity="center" android:text="" android:id="@+id/tv_preset_9" android:layout_width="80.0dip" android:layout_height="match_parent" />
+                        <ImageButton android:background="#00000000" android:src="@drawable/btn_preset" android:id="@+id/ib_preset_9" android:layout_width="80.0dip" android:layout_height="match_parent" />
+                    </FrameLayout>
+                    <FrameLayout android:id="@+id/fr_preset_10" android:contentDescription="Preset 10" android:layout_width="80.0dip" android:layout_height="match_parent" >
+                        <TextView android:textSize="15.0dip" android:gravity="center" android:text="" android:id="@+id/tv_preset_10" android:layout_width="80.0dip" android:layout_height="match_parent"  />
+                        <ImageButton android:background="#00000000" android:src="@drawable/btn_preset" android:id="@+id/ib_preset_10" android:layout_width="80.0dip" android:layout_height="match_parent"  />
+                    </FrameLayout>
+                    <FrameLayout android:id="@+id/fr_preset_11" android:contentDescription="Preset 11" android:layout_width="80.0dip" android:layout_height="match_parent" >
+                        <TextView android:textSize="15.0dip" android:gravity="center" android:text="" android:id="@+id/tv_preset_11" android:layout_width="80.0dip" android:layout_height="match_parent"  />
+                        <ImageButton android:background="#00000000" android:src="@drawable/btn_preset" android:id="@+id/ib_preset_11" android:layout_width="80.0dip" android:layout_height="match_parent"  />
+                    </FrameLayout>
+                    <FrameLayout android:id="@+id/fr_preset_12" android:contentDescription="Preset 12" android:layout_width="80.0dip" android:layout_height="match_parent" >
+                        <TextView android:textSize="15.0dip" android:gravity="center" android:text="" android:id="@+id/tv_preset_12" android:layout_width="80.0dip" android:layout_height="match_parent"  />
+                        <ImageButton android:background="#00000000" android:src="@drawable/btn_preset" android:id="@+id/ib_preset_12" android:layout_width="80.0dip" android:layout_height="match_parent"  />
+                    </FrameLayout>
+                    <FrameLayout android:id="@+id/fr_preset_13" android:contentDescription="Preset 13" android:layout_width="80.0dip" android:layout_height="match_parent" >
+                        <TextView android:textSize="15.0dip" android:gravity="center" android:text="" android:id="@+id/tv_preset_13" android:layout_width="80.0dip" android:layout_height="match_parent" />
+                        <ImageButton android:background="#00000000" android:id="@+id/ib_preset_13" android:layout_width="80.0dip" android:layout_height="match_parent" />
+                    </FrameLayout>
+                    <FrameLayout android:id="@+id/fr_preset_14" android:contentDescription="Preset 14" android:layout_width="80.0dip" android:layout_height="match_parent" >
+                        <TextView android:textSize="15.0dip" android:gravity="center" android:text="" android:id="@+id/tv_preset_14" android:layout_width="80.0dip" android:layout_height="match_parent" />
+                        <ImageButton android:background="#00000000" android:id="@+id/ib_preset_14" android:layout_width="80.0dip" android:layout_height="match_parent" />
+                    </FrameLayout>
+                    <FrameLayout android:id="@+id/fr_preset_15" android:contentDescription="Preset 15" android:layout_width="80.0dip" android:layout_height="match_parent" >
+                        <TextView android:textSize="15.0dip" android:gravity="center" android:text="" android:id="@+id/tv_preset_15" android:layout_width="80.0dip" android:layout_height="match_parent" />
+                        <ImageButton android:background="#00000000" android:id="@+id/ib_preset_15" android:layout_width="80.0dip" android:layout_height="match_parent" />
                     </FrameLayout>
     </LinearLayout>
   </HorizontalScrollView>

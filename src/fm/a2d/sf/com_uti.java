@@ -82,7 +82,6 @@ public final class com_uti  {
   public static final int DEV_ONE = 5;  // bch      one
   public static final int DEV_LG2 = 6;  // bch      lg2
   public static final int DEV_XZ2 = 7;  // bch      xz2
-  public static final int DEV_SDR = 8;  // sdr      sdr
 
   public static String m_device = "";
   public static String m_board = "";
@@ -90,18 +89,18 @@ public final class com_uti  {
 
   public static int device = device_get ();//DEV_UNK;
 
-  private static int dg_s2d_cmd_sem = 0;
-  private static boolean dg_s2d_log = true;//false;
+  private static int dg_daemon_cmd_sem = 0;
+  private static boolean dg_daemon_log = true;//false;
   private static InetAddress loop;
   private static boolean loop_set = false;
   //private static boolean enable_non_audio = true;
 
 
   private static final int DEF_BUF = 512;
-  private static boolean s2d_cmd_log = false;
-  private static int s2d_cmd_num = 0;
-  private static boolean s2d_audio_data_get_log = false;
-  private static int s2d_audio_data_get_num = 0;
+  private static boolean daemon_cmd_log = false;
+  private static int daemon_cmd_num = 0;
+  private static boolean daemon_audio_data_get_log = false;
+  private static int daemon_audio_data_get_num = 0;
 
   private static int band_freq_lo = 87500, band_freq_hi = 108000, band_freq_inc = 100, band_freq_odd = 0;
 
@@ -206,7 +205,7 @@ public final class com_uti  {
       tag = tag.substring (0, idx);
     String method = stack_trace_el.getMethodName ();
     //String method2 = stack_trace_el2.getMethodName ();
-    Log.d ("sf" + tag, /*method2 + ":" +*/ method + ": " + text);
+    Log.d ("s" + tag, /*method2 + ":" +*/ method + ": " + text);
   }
   public static void loge (String text) {
     if (! loge_enable)
@@ -219,7 +218,7 @@ public final class com_uti  {
       tag = tag.substring (0, idx);
     String method = stack_trace_el.getMethodName ();
     //String method2 = stack_trace_el2.getMethodName ();
-    Log.e ("sf" + tag, /*method2 + ":" +*/ method + ": " + text);
+    Log.e ("s" + tag, /*method2 + ":" +*/ method + ": " + text);
   }
 
 
@@ -248,7 +247,8 @@ public final class com_uti  {
       return (lval);
     }
     catch (Exception e) {
-      e.printStackTrace ();
+      //e.printStackTrace ();
+      loge ("Exception e: " + e);
     };
     return (def);
   }
@@ -267,7 +267,8 @@ public final class com_uti  {
       return (ival);
     }
     catch (Exception e) {
-      e.printStackTrace ();
+      //e.printStackTrace ();
+      loge ("Exception e: " + e);
     };
     return (def);
   }
@@ -284,7 +285,8 @@ public final class com_uti  {
       return (dval);
     }
     catch (Exception e) {
-      e.printStackTrace ();
+      //e.printStackTrace ();
+      loge ("Exception e: " + e);
     };
     return (def);
   }
@@ -300,6 +302,7 @@ public final class com_uti  {
     catch (InterruptedException e) {
       //Thread.currentThread().interrupt();
       //e.printStackTrace ();
+      loge ("Exception e: " + e);
     }
   }
 
@@ -444,82 +447,14 @@ public final class com_uti  {
       com_uti.sys_run ("chmod 755 " + full_filename + " 1>/dev/null 2>/dev/null" , false);              // Set execute permission; otherwise rw-rw----
     }
     catch (Exception e) {
-      e.printStackTrace ();
+      //e.printStackTrace ();
+      loge ("Exception e: " + e);
       return (null);
     }
 
     return (full_filename);
   }
 
-    // Native API:
-/*
-  //static {  // Already loaded in svc_aud for svc_svc process only
-  //  System.loadLibrary ("jni");
-  //}
-  //private static native int native_prop_get        (int prop);
-  //private static native int native_alsa_cmd (int type, int len, byte [] key, int value);
-
-  public static int alsa_bool_set (String key, int value) {
-    int ret = alsa_cmd (1, key, value);
-    return (ret);
-  }
-  public static int alsa_int_set (String key, int value) {
-    int ret = alsa_cmd (2, key, value);
-    return (ret);
-  }
-  public static int alsa_enum_set (String key, int value) {
-    int ret = alsa_cmd (3, key, value);
-    return (ret);
-  }
-
-  public static int alsa_cmd (int type, String key, int value) { // ssd_run
-
-//old way Feb 23 2014    ssd_cmd += ("/system/bin/ssd " + cmd + " ; ");
-
-    logd ("ssd_via_sys_run: " + ssd_via_sys_run + "  type: " + type + "  key: " + key + "  value: " + value);// + "  cmd: " + cmd);
-
-    if (ssd_via_sys_run) {
-      String cmd = "4 " + type + " \"" + key + "\" " + value;
-      String ssd_path = "/data/data/fm.a2d.sf/lib/libssd.so";
-      if (com_uti.file_get ("/mnt/sdcard/sf/sys_bin"))
-        ssd_path = "/system/bin/ssd";
-      if (ssd_cmd.equals (""))                                          // If first command since commit
-        ssd_cmd += (ssd_path + " " + cmd);
-      else
-        ssd_cmd += (";" + ssd_path + " " + cmd);
-      if (ssd_commit_all)
-        ssd_commit ();  // Commit every command now, due to GS3/Note problems
-    }
-    else {
-
-      try {
-      //byte [] bkey = key.getBytes ("UTF-8");//Charset.forName ("UTF-8"));
-      byte [] bkey = str_to_ba (key);
-
-      //String s = new String (bkey, "UTF-8");
-      //com_uti.logd ("s: \"" + s + "\"");
-
-      int ret = native_alsa_cmd (type, bkey.length, bkey, value);
-      }
-      catch (Throwable t) {
-        t.printStackTrace();
-      }
-    }
-    return (0);
-  }
-  public static int ssd_commit () {
-    if (! ssd_via_sys_run)
-      return (0);
-    if (ssd_cmd.equals (""))
-      return (0);
-    String [] cmds = {ssd_cmd};
-
-    com_uti.sys_run (cmds, ssd_commit_su);
-
-    ssd_cmd = "";
-    return (0);
-  }
-*/
   public static int cached_sys_run (String cmd) {                              // Additive single string w/ commit version
 
     if (sys_cmd.equals (""))
@@ -642,7 +577,8 @@ public final class com_uti  {
       return (exit_val);
     }
     catch (Exception e) {
-      e.printStackTrace ();
+      //e.printStackTrace ();
+      loge ("Exception e: " + e);
     };
     return (-1);
   }
@@ -681,7 +617,8 @@ public final class com_uti  {
       os.flush ();
     }
     catch (Exception e) {
-      e.printStackTrace ();
+      //e.printStackTrace ();
+      loge ("Exception e: " + e);
     };
   }
 */
@@ -920,7 +857,6 @@ Evo 4G LTE  jewel
       case DEV_ONE: return ("ONE");
       case DEV_LG2: return ("LG2");
       case DEV_XZ2: return ("XZ2");
-      case DEV_SDR: return ("SDR");
     }
     return ("UNK");
   }
@@ -959,25 +895,23 @@ Evo 4G LTE  jewel
 
     int dev = DEV_UNK;
 
-    if (file_get ("/mnt/sdcard/sf/dev_gen"))
+    if (file_get ("/sdcard/spirit/dev_gen"))
       dev = (DEV_GEN);
-    else if (file_get ("/mnt/sdcard/sf/dev_sdr"))
-      dev = (DEV_SDR);
-    else if (file_get ("/mnt/sdcard/sf/dev_gs1"))
+    else if (file_get ("/sdcard/spirit/dev_gs1"))
       dev = (DEV_GS1);
-    else if (file_get ("/mnt/sdcard/sf/dev_gs2"))
+    else if (file_get ("/sdcard/spirit/dev_gs2"))
       dev = (DEV_GS2);
-    else if (file_get ("/mnt/sdcard/sf/dev_gs3"))
+    else if (file_get ("/sdcard/spirit/dev_gs3"))
       dev = (DEV_GS3);
-    else if (file_get ("/mnt/sdcard/sf/dev_one"))
+    else if (file_get ("/sdcard/spirit/dev_one"))
       dev = (DEV_ONE);
-    else if (file_get ("/mnt/sdcard/sf/dev_lg2"))
+    else if (file_get ("/sdcard/spirit/dev_lg2"))
       dev = (DEV_LG2);
-    else if (file_get ("/mnt/sdcard/sf/dev_xz2"))
+    else if (file_get ("/sdcard/spirit/dev_xz2"))
       dev = (DEV_XZ2);
-    else if (file_get ("/mnt/sdcard/sf/dev_qcv"))
+    else if (file_get ("/sdcard/spirit/dev_qcv"))
       dev = (DEV_QCV);
-    else if (file_get ("/mnt/sdcard/sf/dev_unk"))
+    else if (file_get ("/sdcard/spirit/dev_unk"))
       dev = (DEV_UNK);
 
     else if (is_gs3_note2 ())
@@ -1016,7 +950,7 @@ Evo 4G LTE  jewel
     else if (motog_get ())
       dev = (DEV_QCV);
 
-    else if (m_board.startsWith ("GALBI") || m_device.startsWith ("G2") || m_device.startsWith ("LS980") || m_device.startsWith ("D80") || m_device.startsWith ("ZEE"))  // "zee" RayGlobe Flex - ls980
+    else if (m_board.startsWith ("GALBI") || m_device.startsWith ("G2") || m_device.startsWith ("LS980") || m_device.startsWith ("D80") || m_device.startsWith ("ZEE"))  // "zee" RayGlobe Flex - ls980     Non-Sprint US & VZN VS980 = No FM
       dev = (DEV_LG2);
 
     else
@@ -1034,7 +968,7 @@ Evo 4G LTE  jewel
           dev = DEV_GS1;
         else if (com_uti.file_get ("/sys/kernel/debug/asoc/U1-YMU823") || com_uti.file_get ("/sys/devices/platform/soc-audio/MC1N2 AIF1") || com_uti.file_get ("/sys/kernel/debug/asoc/U1-YMU823/mc1n2.6-003a"))
           dev = DEV_GS2;
-        else
+        else if (com_uti.file_get ("/sys/kernel/debug/asoc/T0_WM1811/wm8994-codec/codec_reg") || com_uti.file_get ("/sys/kernel/debug/asoc/Midas_WM1811/wm8994-codec/codec_reg") || com_uti.file_get ("/sys/devices/platform/soc-audio/WM8994 AIF1/codec_reg"))
           dev = DEV_GS3;
       }
       else {                                                                          // Only remaining alternative is Broadcom
@@ -1103,7 +1037,7 @@ Evo 4G LTE  jewel
 
 
     // Prefs:
-  private static final String prefs_file = "sf_prefs";
+  private static final String prefs_file = "s2_prefs";
   private static final int MODE_MULTI_PROCESS = 4;
 
     // Prefs Get:
@@ -1226,7 +1160,7 @@ Evo 4G LTE  jewel
 */
   
     // Hidden Audiosystem stuff:
-/*
+///*
   public static int setParameters (final String keyValuePairs) {
     int ret = -7;
     com_uti.logd ("keyValuePairs: " + keyValuePairs);
@@ -1241,7 +1175,7 @@ Evo 4G LTE  jewel
     }
     return (ret);
   }
-
+/*
   public static final int FOR_MEDIA = 1;
   public static final int FORCE_NONE = 0;
   public static final int FORCE_SPEAKER = 1;
@@ -1464,11 +1398,11 @@ Evo 4G LTE  jewel
       
         //API 7 or lesser:
         File m_ext_dir_f2 = Environment.getExternalStorageDirectory ();
-        String m_ext_dir_sf= m_ext_dir_f2.getAbsolutePath ();
-        com_uti.logd ("API <=7 ext dir: " +m_ext_dir_sf);
+        String m_ext_dir_s= m_ext_dir_f2.getAbsolutePath ();
+        com_uti.logd ("API <=7 ext dir: " +m_ext_dir_s);
 
-        //tdir = m_ext_dir_sf + "/spirit_cfg/";
-        tdir = m_ext_dir_sf + "/";                                  // Default temp dir is the sdcard root, if the sdcard is present and writeable
+        //tdir = m_ext_dir_s + "/spirit_cfg/";
+        tdir = m_ext_dir_s + "/";                                  // Default temp dir is the sdcard root, if the sdcard is present and writeable
       }
       else if (Environment.MEDIA_MOUNTED_READ_ONLY.equals (es_state)) {
         com_uti.logd ("SDCard / ExternalStorage available but read-only");
@@ -1504,7 +1438,7 @@ Evo 4G LTE  jewel
 
   private static DatagramSocket ds = null;
 
-  private static int dg_s2d_cmd (int cmd_len, byte[] cmd_buf, int res_len, byte[] res_buf, int rx_tmo) {
+  private static int dg_daemon_cmd (int cmd_len, byte[] cmd_buf, int res_len, byte[] res_buf, int rx_tmo) {
     int len = 0;
 /*
     if (rx_tmo != 1002 && ! enable_non_audio) {
@@ -1516,19 +1450,19 @@ Evo 4G LTE  jewel
 */
     String cmd = (com_uti.ba_to_str (cmd_buf)).substring (0, cmd_len);
 
-    if (com_uti.file_get ("/mnt/sdcard/sf/s2d_log", false))
-      dg_s2d_log = true;
+    if (com_uti.file_get ("/sdcard/spirit/daemon_log", false))
+      dg_daemon_log = true;
     else
-      dg_s2d_log = false;
+      dg_daemon_log = false;
 
-    if (dg_s2d_log)
+    if (dg_daemon_log)
       com_uti.logd ("Before sem++ cmd: " + cmd + "  res_len: " + res_len + "  rx_tmo: " + rx_tmo);
 
-    dg_s2d_cmd_sem ++;
-    while (dg_s2d_cmd_sem != 1) {
-      dg_s2d_cmd_sem --;
+    dg_daemon_cmd_sem ++;
+    while (dg_daemon_cmd_sem != 1) {
+      dg_daemon_cmd_sem --;
       com_uti.ms_sleep (1);
-      dg_s2d_cmd_sem ++;
+      dg_daemon_cmd_sem ++;
 
     }
 
@@ -1563,7 +1497,7 @@ if (ds == null || rx_tmo == 100 || rx_tmo == 15000) {
 
       len = dps.getLength ();
 
-      if (dg_s2d_log) {
+      if (dg_daemon_log) {
         com_uti.logd ("After  getLength() cmd: " + cmd + "  len: " + len);
         if (rx_tmo == 1002)
           com_uti.logd ("hexstr res: " + (com_uti.ba_to_hexstr (rcv_buf)).substring (0, len * 2));
@@ -1602,39 +1536,39 @@ if (ds == null || rx_tmo == 100 || rx_tmo == 15000) {
 
     //com_uti.loge ("5555");
 
-    dg_s2d_cmd_sem --;
+    dg_daemon_cmd_sem --;
 
     return (len);
   }
 
-  public static String s2d_get (String key) {
-    String res = s2d_cmd ("g " + key);
+  public static String daemon_get (String key) {
+    String res = daemon_cmd ("g " + key);
     //com_uti.logd ("key: " + key + "  res: " + res);
     return (res);
   }
-  public static String s2d_set (String key, String val) {
-    String res = s2d_cmd ("s " + key + " " + val);
+  public static String daemon_set (String key, String val) {
+    String res = daemon_cmd ("s " + key + " " + val);
     com_uti.logd ("key: " + key + "  val: " + val + "  res: " + res);
     return (res);
   }
 
 
-  private static String s2d_cmd (String cmd) {
+  private static String daemon_cmd (String cmd) {
     int cmd_len = cmd.length ();
 /*
-    if (s2d_cmd_num % 100 == 0)
-      s2d_cmd_log = true;
+    if (daemon_cmd_num % 100 == 0)
+      daemon_cmd_log = true;
     else
-      s2d_cmd_log = false;
-    s2d_cmd_num ++;
+      daemon_cmd_log = false;
+    daemon_cmd_num ++;
 */
-    if (s2d_cmd_log)
+    if (daemon_cmd_log)
       com_uti.logd ("cmd_len: " + cmd_len + "  cmd: \"" + cmd + "\"");
 
     byte [] cmd_buf = com_uti.str_to_ba (cmd);
     cmd_len = cmd_buf.length;
     //String cmd2 = com_uti.ba_to_str (cmd_buf);
-    //if (s2d_cmd_log)
+    //if (daemon_cmd_log)
     //  com_uti.logd ("cmd_len: " + cmd_len + "  cmd2: \"" + cmd2 + "\"  cmd_buf: \"" + cmd_buf + "\"");
 
     int res_len = DEF_BUF;
@@ -1645,15 +1579,15 @@ if (ds == null || rx_tmo == 100 || rx_tmo == 15000) {
       rx_tmo = 15000;
     else if (cmd.equalsIgnoreCase ("s radio_nop Start"))
       rx_tmo = 100; // Always fails so make it short
-    res_len = dg_s2d_cmd (cmd_len, cmd_buf, res_len, res_buf, rx_tmo);
+    res_len = dg_daemon_cmd (cmd_len, cmd_buf, res_len, res_buf, rx_tmo);
 
     String res = "";//Avoid showing 999 for RT when result is zero length string "" (actually 1 byte long for zero)      "999";
     if (res_len > 0 && res_len <= DEF_BUF) {
-      if (s2d_cmd_log)
+      if (daemon_cmd_log)
         com_uti.logd ("res_len: " + res_len + "  res_buf: \"" + res_buf + "\"");
       res = com_uti.ba_to_str (res_buf);
       res = res.substring (0, res_len);     // Remove extra data
-      if (s2d_cmd_log)
+      if (daemon_cmd_log)
         com_uti.logd ("res: \"" + res + "\"");
     }
     else if (res_len == 0)
@@ -1665,14 +1599,14 @@ if (ds == null || rx_tmo == 100 || rx_tmo == 15000) {
 
 
 /*
-  public static int s2d_audio_data_get (int device, int samplerate, int channels, int buf_len, byte[] buffer) {
+  public static int daemon_audio_data_get (int device, int samplerate, int channels, int buf_len, byte[] buffer) {
     int len = 0;
-    //if (s2d_audio_data_get_num % 10 == 0)
-    //  s2d_audio_data_get_log = true;
+    //if (daemon_audio_data_get_num % 10 == 0)
+    //  daemon_audio_data_get_log = true;
     //else
-    //  s2d_audio_data_get_log = false;
-    //s2d_audio_data_get_num ++;
-    if (s2d_cmd_log)
+    //  daemon_audio_data_get_log = false;
+    //daemon_audio_data_get_num ++;
+    if (daemon_cmd_log)
       com_uti.logd ("device: " + device + "  samplerate: " + samplerate + "  channels: " + channels + "  buf_len: " + buf_len);
 
     int rx_tmo = 1002;
@@ -1684,9 +1618,9 @@ if (ds == null || rx_tmo == 100 || rx_tmo == 15000) {
     byte [] cmd_buf = com_uti.str_to_ba (cmd);
     cmd_len = cmd_buf.length;
 
-    len = dg_s2d_cmd (cmd_len, cmd_buf, buf_len, buffer, rx_tmo);
+    len = dg_daemon_cmd (cmd_len, cmd_buf, buf_len, buffer, rx_tmo);
 
-    if (s2d_cmd_log) {
+    if (daemon_cmd_log) {
       if (len > 0)
         com_uti.logd ("len: " + len + "  buffer[16]: " + buffer [16]);
       else
@@ -2325,6 +2259,114 @@ It should be noted that operation in this region is the same as it is for all RD
       ret = "1";
     else
       ret = "0";
+    return (ret);
+  }
+
+
+    // Shim:
+
+  public static boolean shim_files_operational_get () {                                  // If our lib and have old lib to call  (If just large but no old, assume original)
+    if (com_uti.file_size_get ("/system/lib/libbt-hci.so") > 60000 && com_uti.file_size_get ("/system/lib/libbt-hcio.so") > 10000 && com_uti.file_size_get ("/system/lib/libbt-hcio.so") < 60000)
+      return (true);
+    if (com_uti.file_size_get ("/system/vendor/lib/libbt-vendor.so") > 60000 && com_uti.file_size_get ("/system/vendor/lib/libbt-vendoro.so") > 10000 && com_uti.file_size_get ("/system/vendor/lib/libbt-vendoro.so") < 60000)
+      return (true);
+    return (false);
+  }
+  public static boolean shim_files_possible_get () {
+    if (com_uti.file_get ("/system/lib/libbt-hci.so") || com_uti.file_get ("/system/vendor/lib/libbt-vendor.so"))
+      return (true);
+    return (false);
+  }
+/* OLD: 4 states:
+    BT Off                                                            Use UART  (or BT on and install/use shim if possible)
+    BT On & (Shim Not Installed or Shim Old)    Install Shim, BT Off, Use UART      First run before reboot or first boot after ROM update with no addon.d fix
+    BT On &  Shim     Installed & NOT Active                  BT Off, Use UART      Need reboot & BT to be active
+    BT On &  Shim     Installed &     Active                          Use SHIM  */
+  public static int shim_install () {
+    int ret = 0;
+    boolean restart_bt = false;
+
+    String cmd = "";
+    cmd += ("mount -o remount,rw /system ; ");
+    if (com_uti.file_get ("/system/vendor/lib/libbt-vendor.so")) {
+      cmd += ("mv /system/vendor/lib/libbt-vendor.so  /system/vendor/lib/libbt-vendoro.so ; ");
+      cmd += ("cp /data/data/fm.a2d.sf/lib/libbt-vendor.so /system/vendor/lib/libbt-vendor.so ; ");
+      cmd += ("chmod 644 /system/vendor/lib/libbt-vendor.so ; ");
+    }
+    else {
+      cmd += ("mv /system/lib/libbt-hci.so  /system/lib/libbt-hcio.so ; ");
+      cmd += ("cp /data/data/fm.a2d.sf/lib/libbt-hci.so /system/lib/libbt-hci.so ; ");
+      cmd += ("chmod 644 /system/lib/libbt-hci.so ; ");
+    }
+    cmd += ("cp /data/data/fm.a2d.sf/files/99-spirit.sh /system/addon.d/99-spirit.sh ; ");
+    cmd += ("chmod 755 /system/addon.d/99-spirit.sh ; ");
+    cmd += ("mount -o remount,ro /system ; ");
+    com_uti.sys_run (cmd, true);
+    com_uti.logd ("Done Bluedroid SU commands");
+
+    if (shim_files_operational_get ())
+      com_uti.logd ("Installed SHIM OK");
+    else {
+      com_uti.loge ("Install SHIM ERROR");
+      ret = -1;
+    }
+
+    return (ret);
+  }
+
+//Doesn't help:
+    //cmd += ("kill `pidof com.android.bluetooth` ; ");                // Kill bluetooth process and it will restart
+
+    //cmd += ("pm clear com.android.bluetooth ; ");                       // Stop bluetooth process; can run even if BT is "off"
+    //com_uti.sys_run (cmd, true);
+    //com_uti.ms_sleep (1000);                                              // Extra 1 second delay to ensure
+
+  private static void shim_remove_log (String log) {
+    //Toast.makeText (m_context, log, Toast.LENGTH_LONG).show ();
+    loge (log);
+  }
+
+  public static int shim_remove () {
+    int ret = 0;
+
+    if (! shim_files_operational_get ()) {
+      shim_remove_log ("Shim file not installed !!");
+//      return (-1);
+    }
+
+    String cmd = "";
+    cmd += ("mount -o remount,rw /system ; ");
+
+    if (com_uti.file_get ("/system/lib/libbt-hcio.so"))  //shim_files_operational_get ())
+      cmd += ("mv /system/lib/libbt-hcio.so  /system/lib/libbt-hci.so ; ");
+    else
+      shim_remove_log ("No original hci shim file installed !!");
+
+    if (com_uti.file_get ("/system/vendor/lib/libbt-vendoro.so"))  //shim_files_operational_get ())
+      cmd += ("mv /system/vendor/lib/libbt-vendoro.so  /system/vendor/lib/libbt-vendor.so ; ");
+    else
+      shim_remove_log ("No original vendor shim file installed !!");
+
+    if (com_uti.file_get ("/system/addon.d/99-spirit.sh"))
+      cmd += ("rm /system/addon.d/99-spirit.sh ; ");
+    cmd += ("mount -o remount,ro /system ; ");
+    com_uti.sys_run (cmd, true);
+    com_uti.logd ("Done");
+
+    if (! shim_files_operational_get ()) {
+      com_uti.logd ("Removed SHIM OK");
+      shim_remove_log ("Removed SHIM OK");
+    }
+    else {
+      com_uti.loge ("Remove SHIM ERROR");
+      shim_remove_log ("Remove SHIM ERROR");
+      ret = -1;
+    }
+
+/*
+    //shim_remove_log ("WARM RESTART !!");
+    com_uti.sys_run ("kill `pidof system_server`", true);
+*/
     return (ret);
   }
 

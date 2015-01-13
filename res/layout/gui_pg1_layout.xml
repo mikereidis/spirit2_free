@@ -26,20 +26,17 @@ Drawables:
 <!--
   Record
 -->
-      <ImageView android:id="@+id/iv_record" android:contentDescription="Record" android:visibility="invisible" android:focusable="true" android:clickable="true" android:layout_weight="3" android:layout_width="0dip" android:layout_height="match_parent" android:src="@drawable/sel_record" android:scaleType="center" android:layout_centerInParent="true" />
+      <ImageView android:id="@+id/iv_record" android:contentDescription="Record" android:focusable="true" android:clickable="true" android:layout_weight="3" android:layout_width="0dip" android:layout_height="match_parent" android:src="@drawable/sel_record" android:scaleType="center" android:layout_centerInParent="true" />
 <!--
   PS
 -->
-        <TextView android:id="@+id/tv_ps" android:contentDescription="RDS PS" android:visibility="gone" android:textSize="20.0dip" android:textStyle="bold" android:textColor="#ffffffff" android:gravity="center" 
-        android:layout_width="0dip" android:layout_height="match_parent" android:singleLine="true" android:shadowColor="#ff000000" android:shadowDy="1.0"
-        android:layout_weight="12" />
-        <TextView android:id="@+id/tv_fake_ps" android:contentDescription="RDS PS" android:text="Spirit2 Free" android:textSize="20.0dip" android:textStyle="bold" android:textColor="#ffffffff" android:gravity="center" 
+        <TextView android:id="@+id/tv_ps" android:contentDescription="RDS PS" android:textSize="20.0dip" android:textStyle="bold" android:textColor="#ffffffff" android:gravity="center" 
         android:layout_width="0dip" android:layout_height="match_parent" android:singleLine="true" android:shadowColor="#ff000000" android:shadowDy="1.0"
         android:layout_weight="12" />
 <!--
   Volume & Mute/unmute display
 -->
-    <ImageView android:id="@+id/iv_mute" android:contentDescription="Volume" android:visibility="invisible" android:src="@drawable/btn_volume" android:focusable="true" android:clickable="true" android:layout_weight="4"
+    <ImageView android:id="@+id/iv_mute" android:contentDescription="Volume" android:src="@drawable/btn_volume" android:focusable="true" android:clickable="true" android:layout_weight="4"
     android:layout_width="0dip" android:layout_height="match_parent" android:scaleType="center" />
 
 <!--
@@ -57,10 +54,7 @@ Drawables:
 
   <LinearLayout android:layout_width="match_parent" android:layout_height="0dip" android:layout_weight="1.2" android:layout_gravity="center" android:orientation="horizontal" >
 
-    <TextView android:id="@+id/tv_rt" android:contentDescription="RDS RT" android:visibility="gone" android:layout_width="0dip" android:layout_height="match_parent" android:layout_weight="4" android:textSize="15dip" android:textStyle="normal"
-     android:textColor="#ffd1d1d1" android:ellipsize="marquee" android:gravity="center_vertical|center_horizontal" android:layout_gravity="center_vertical|center_horizontal"
-     android:singleLine="true" android:shadowColor="#74000000" android:shadowDy="-1.0" android:marqueeRepeatLimit="marquee_forever" />
-    <TextView android:id="@+id/tv_fake_rt" android:contentDescription="RDS RT" android:text="Support indie devs so we can support you... :)" android:layout_width="0dip" android:layout_height="match_parent" android:layout_weight="4" android:textSize="15dip" android:textStyle="normal"
+    <TextView android:id="@+id/tv_rt" android:contentDescription="RDS RT" android:layout_width="0dip" android:layout_height="match_parent" android:layout_weight="4" android:textSize="15dip" android:textStyle="normal"
      android:textColor="#ffd1d1d1" android:ellipsize="marquee" android:gravity="center_vertical|center_horizontal" android:layout_gravity="center_vertical|center_horizontal"
      android:singleLine="true" android:shadowColor="#74000000" android:shadowDy="-1.0" android:marqueeRepeatLimit="marquee_forever" />
 
@@ -89,7 +83,7 @@ Drawables:
 
     <LinearLayout android:layout_width="0dip" android:layout_height="match_parent" android:layout_weight="1" android:orientation="vertical"
       android:gravity="center_vertical|center_horizontal" android:layout_gravity="center_vertical|center_horizontal" >
-      <TextView android:id="@+id/tv_picl" android:visibility="invisible" android:contentDescription="RDS PI" android:layout_width="wrap_content" android:layout_height="wrap_content" android:textSize="10dip" android:textStyle="normal"
+      <TextView android:id="@+id/tv_picl" android:contentDescription="RDS PI" android:layout_width="wrap_content" android:layout_height="wrap_content" android:textSize="10dip" android:textStyle="normal"
         android:textColor="#ffa3a3a3" android:gravity="center_vertical|center_horizontal" android:layout_gravity="center_vertical|center_horizontal" android:singleLine="true" />
       <ImageView android:visibility="visible" android:id="@+id/iv_seekdn" android:contentDescription=""         android:src="@drawable/btn_rw" android:background="@drawable/sel_stop_bg"   android:focusable="true" android:clickable="true"
         android:layout_width="wrap_content" android:layout_height="wrap_content"      android:layout_marginTop="2dip" android:layout_marginBottom="4dip" android:layout_marginRight="2dip" android:layout_marginLeft="2dip"
@@ -104,7 +98,7 @@ Drawables:
 
     <LinearLayout android:layout_width="0dip" android:layout_height="match_parent" android:layout_weight="1" android:orientation="vertical"
       android:gravity="center_vertical|center_horizontal" android:layout_gravity="center_vertical|center_horizontal" >
-      <TextView android:id="@+id/tv_ptyn" android:visibility="invisible" android:contentDescription="RDS PT" android:layout_width="wrap_content" android:layout_height="wrap_content" android:textSize="10dip" android:textStyle="normal"
+      <TextView android:id="@+id/tv_ptyn" android:contentDescription="RDS PT" android:layout_width="wrap_content" android:layout_height="wrap_content" android:textSize="10dip" android:textStyle="normal"
         android:textColor="#ffa3a3a3" android:gravity="center_vertical|center_horizontal" android:layout_gravity="center_vertical|center_horizontal" android:singleLine="true" />
       <ImageView android:visibility="visible" android:id="@+id/iv_seekup" android:contentDescription="" android:src="@drawable/btn_ff" android:background="@drawable/sel_stop_bg" android:focusable="true" android:clickable="true"
         android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="2dip" android:layout_marginBottom="4dip"      android:layout_marginRight="2dip" android:layout_marginLeft="2dip"
@@ -155,6 +149,17 @@ Too big; whole size
 <!--
 android:padding="60dip"
 -->
+  <LinearLayout android:id="@+id/vis"
+android:contentDescription="Visualizer"
+  android:layout_width="match_parent"
+  android:layout_height="match_parent"
+android:layout_marginTop="50dip"
+android:layout_marginBottom="70dip"
+android:visibility="visible"
+  >
+
+
+  </LinearLayout>
 
 
 

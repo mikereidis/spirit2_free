@@ -1,10 +1,10 @@
 
-  int s2d_cmd_log = 1;//0;
+  int daemon_cmd_log = 0;
   
 
-  unsigned char logtag [16] = "s2l......";   // Default "s2l" = JNI library
+  unsigned char logtag [16] = "sl......";   // Default "sl" = JNI library
 
-  const char * copyright = "Copyright (c) 2011-2014 Michael A. Reid. All rights reserved.";
+  const char * copyright = "Copyright (c) 2011-2015 Michael A. Reid. All rights reserved.";
 
   #include <dlfcn.h>
 
@@ -30,6 +30,11 @@
   #include <android/log.h>
   #define  loge(...)  fm_log_print(ANDROID_LOG_ERROR,logtag,__VA_ARGS__)
   #define  logd(...)  fm_log_print(ANDROID_LOG_DEBUG,logtag,__VA_ARGS__)
+
+  int fm_log_print (int prio, const char * tag, const char * fmt, ...);
+
+  #include "utils.c"
+
 
   int no_log = 0;
   void * log_hndl = NULL;
@@ -60,42 +65,6 @@
     return (0);
   }
 
-  void alt_usleep (uint32_t us) {
-    struct timespec delay;
-    int err;
-    //if (us == 0)
-    //  return;
-    delay.tv_sec = us / 1000000;
-    delay.tv_nsec = 1000 * 1000 * (us % 1000000);
-        // usleep can't be used because it uses SIGALRM
-    do {
-      err = nanosleep (& delay, & delay);
-    } while (err < 0 && errno == EINTR);
-  }
-
-  int ms_sleep (int ms) {
-    if (ms > 10)
-      loge ("ms_sleep ms: %d", ms);
-    usleep (ms * 1000);                                             // ?? Use nanosleep to avoid SIGALRM ??
-    return (0);
-  }
-
-  int file_get (const char * file) {                                    // Return 1 if file, or directory, or device node etc. exists
-    struct stat sb;
-    if (stat (file, & sb) == 0)                                         // If file exists...
-      return (1);                                                       // Return 1
-    return (0);                                                         // Else if no file return 0
-  }
-
-
-  char prop_buf    [DEF_BUF] = "";
-  char * prop_get (const char * prop) {
-    __system_property_get (prop, prop_buf);
-    logd ("props_log %32.32s: %s", prop, prop_buf);
-    return (prop_buf);
-  }
-
-
     //
 
   int   curr_radio_device_int       = -1;
@@ -109,20 +78,17 @@
   #define DEV_ONE 5
   #define DEV_LG2 6
   #define DEV_XZ2 7
-  #define DEV_SDR 8
 
 
     // STE API support:
 
-  #include "plug/inc/android_fmradio.h"
+  #include "tnr/tnr_tnr.h"
 
 
   static bool lib_name_get (char * lib_name, size_t max_size) {
 
     switch (curr_radio_device_int) {
       case DEV_GEN: strncpy (lib_name, "/data/data/fm.a2d.sf/lib/libs2t_gen.so", max_size);   return (true);
-      case DEV_SDR: strncpy (lib_name, "/data/data/fm.a2d.sf/lib/libs2t_sdr.so", max_size);   return (true);
-
       case DEV_GS1: strncpy (lib_name, "/data/data/fm.a2d.sf/lib/libs2t_ssl.so", max_size);   return (true);
       case DEV_GS2: strncpy (lib_name, "/data/data/fm.a2d.sf/lib/libs2t_ssl.so", max_size);   return (true);
       case DEV_GS3: strncpy (lib_name, "/data/data/fm.a2d.sf/lib/libs2t_ssl.so", max_size);   return (true);
@@ -138,11 +104,8 @@
   struct fmradio_vendor_methods_t * tnr_funcs;
 
   bool lib_load () {
-    char lib_name [DEF_BUF] = "/system/lib/libs2t.so";//"";
-    if (file_get ("/mnt/sdcard/sf/sys_bin")) {
-      loge ("Using: %s", lib_name);
-    }
-    else if (! lib_name_get (lib_name, sizeof (lib_name))) {                 // Read library directory and find matching library
+    char lib_name [DEF_BUF] = "";
+    if (! lib_name_get (lib_name, sizeof (lib_name))) {                 // Read library directory and find matching library
       loge ("Can't get lib_name for curr_radio_device_int: %d", curr_radio_device_int);
       return (false);
     }
@@ -222,7 +185,7 @@
 
     // Client/Server:
 
-    // Unix datagrams requires other write permission for /dev/socket, or somewhere else (ext not FAT on sdcard) writable.
+    // Unix datagrams requires other write permission for /dev/socket, or somewhere else (ext, not FAT) writable.
 
   //#define CS_AF_UNIX        // Use network sockets to avoid filesystem permission issues w/ Unix Domain Address Family sockets
   #define CS_DGRAM            // Use datagrams, not streams/sessions
@@ -231,8 +194,8 @@
 
   #ifdef  CS_AF_UNIX                                                      // For Address Family UNIX sockets
   #include <sys/un.h>
-  #define DEF_API_SRVSOCK    "/dev/socket/srv_sf"
-  #define DEF_API_CLISOCK    "/dev/socket/cli_sf"
+  #define DEF_API_SRVSOCK    "/dev/socket/srv_spirit"
+  #define DEF_API_CLISOCK    "/dev/socket/cli_spirit"
   char api_srvsock [DEF_BUF] = DEF_API_SRVSOCK;
   char api_clisock [DEF_BUF] = DEF_API_CLISOCK;
   #define CS_FAM   AF_UNIX
@@ -392,33 +355,6 @@
     //close (sockfd);
     return (res_len);
   }
-
-  #define HD_MW   256
-  static void hex_dump (const char * prefix, int width, unsigned char * buf, int len) {
-    char tmp  [3 * HD_MW + 8] = "";     // Handle line widths up to HD_MW
-    char line [3 * HD_MW + 8] = "";
-    if (width > HD_MW)
-      width = HD_MW;
-    int i, n;
-    line [0] = 0;
-    if (prefix)
-      strlcpy (line, prefix, sizeof (line));
-    for (i = 0, n = 1; i < len; i ++, n ++) {
-      snprintf (tmp, sizeof (tmp), "%2.2x ", buf [i]);
-      strncat (line, tmp, sizeof (line));
-      if (n == width) {
-        n = 0;
-        logd (line);
-        line [0] = 0;
-        if (prefix)
-          strlcpy (line, prefix, sizeof (line));
-      }
-      else if (i == len - 1 && n)
-        logd (line);
-    }
-  }
-
-
 
   int exiting = 0;
 
@@ -600,16 +536,17 @@
   char  curr_tuner_rds_state    [16]= "Stop";
   char  curr_tuner_rds_af_state [16]= "Stop";
 
-  char  curr_tuner_freq         [16]= "-7";//"107900";
+  char  curr_tuner_freq         [16]= "0";//"107900";
   char  curr_tuner_stereo       [16]= "Mono";
-  char  curr_tuner_thresh       [16]= "-7";
-  char  curr_tuner_rssi         [16]= "-7";
-  char  curr_tuner_most         [16]= "-7";
+  char  curr_tuner_thresh       [16]= "0";
+  char  curr_tuner_rssi         [16]= "0";
+  char  curr_tuner_most         [16]= "0";
+  char  curr_tuner_extra_cmd    [16]= "0";
 
-  char  curr_tuner_rds_pi       [16]= "-7";//"";
-  char  curr_tuner_rds_pt       [16]= "-7";//"-";
-  char  curr_tuner_rds_ps       [16]= "-7";//"-";
-  char  curr_tuner_rds_rt       [96]= "-7";//"-";
+  char  curr_tuner_rds_pi       [16]= "0";//"";
+  char  curr_tuner_rds_pt       [16]= "0";//"-";
+  char  curr_tuner_rds_ps       [16]= "";//-7";//"-";
+  char  curr_tuner_rds_rt       [96]= "";//-7";//"-";
 
   void cb_tuner_change (char * key, char * val) {
 //    logd ("cb_tuner_change key: %s  val: %s", key, val);
@@ -1020,10 +957,35 @@
 
 
   int xz2_digital_input_on () {
+
+//   <path name="capture-fm">
+      alsa_bool_set ("AIF1_CAP Mixer SLIM TX7", 1);       //          Connect Analog Interface 1  to SLIMBus TX 7
+      alsa_enum_set ("SLIM TX7 MUX", 9);                  // DEC2     Connect SLIMBus TX 7 Mux    to Decimator 2
+      alsa_enum_set ("DEC2 MUX", 2);                      // ADC5     Connect Decimator 2         to ADC 5
+      alsa_int_set ("DEC2 Volume", 80);//83);             // 80       Set     Decimator 1 Volume                  !! default 84 distorts on CM11
+      alsa_int_set ("ADC5 Volume", 4);                    // 4        Set     ADC 5 Volume
+
+      alsa_bool_set ("AIF1_CAP Mixer SLIM TX8", 1);       //          Connect Analog Interface 1  to SLIMBus TX 7
+      alsa_enum_set ("SLIM TX8 MUX", 8);                  // DEC1     Connect SLIMBus TX 8 Mux to Decimator 1
+      alsa_enum_set ("DEC1 MUX", 2);                      // ADC6     Connect Decimator 1         to ADC 6
+      alsa_int_set ("DEC1 Volume", 80);//83);             // 80       Set     Decimator 1 Volume                  !! default 84 distorts on CM11
+      alsa_int_set ("ADC6 Volume", 4);                    // 4        Set     ADC 5 Volume
+
+      alsa_enum_set ("SLIM_0_TX Channels", 1);            // 2/Stereo Set SLIMBus TX channels
+
+     ms_sleep (100);
+
+    alsa_bool_set ("MultiMedia1 Mixer SLIM_0_TX", 1);
+    alsa_bool_set ("MultiMedia1 Mixer SLIM_0_TX", 0);
+    alsa_bool_set ("MultiMedia1 Mixer SLIM_0_TX", 1);
+
     return (0);
   }
 
   int xz2_digital_input_off () {
+
+    alsa_bool_set ("MultiMedia1 Mixer SLIM_0_TX", 0);
+
     return (0);
   }
 
@@ -1031,7 +993,6 @@
     switch (curr_radio_device_int) {
       case DEV_UNK: return (-1);
       case DEV_GEN: return (-1);
-
       case DEV_GS1: return (gs1_digital_input_on ());
       case DEV_GS2: return (gs2_digital_input_on ());
       case DEV_GS3: return (gs3_digital_input_on ());
@@ -1039,8 +1000,6 @@
       case DEV_ONE: return (one_digital_input_on ());
       case DEV_LG2: return (lg2_digital_input_on ());
       case DEV_XZ2: return (xz2_digital_input_on ());
-
-      case DEV_SDR: return (-1);
     }
     return (-1);
   }
@@ -1048,7 +1007,6 @@
     switch (curr_radio_device_int) {
       case DEV_UNK: return (-1);
       case DEV_GEN: return (-1);
-
       case DEV_GS1: return (gs1_digital_input_off ());
       case DEV_GS2: return (gs2_digital_input_off ());
       case DEV_GS3: return (gs3_digital_input_off ());
@@ -1056,8 +1014,6 @@
       case DEV_ONE: return (one_digital_input_off ());
       case DEV_LG2: return (lg2_digital_input_off ());
       case DEV_XZ2: return (xz2_digital_input_off ());
-
-      case DEV_SDR: return (-1);
     }
     return (-1);
   }
@@ -1076,16 +1032,11 @@
 
   int server_work_func (unsigned char * cmd_buf, int cmd_len, unsigned char * res_buf, int res_max) {
 
-    if (file_get ("/mnt/sdcard/sf/s2d_log"))
-      s2d_cmd_log = true;
-    else
-      s2d_cmd_log = false;
-
-    if (s2d_cmd_log)
+    if (daemon_cmd_log)
       logd ("server_work_func cmd_len: %d  cmd_buf: \"%s\"", cmd_len, cmd_buf);
     int res_len = tuner_server_work_func (cmd_buf, cmd_len, res_buf, res_max);
 
-    if (s2d_cmd_log)
+    if (daemon_cmd_log)
       logd ("res_len: %d  res_buf: \"%s\"", res_len, res_buf);
     return (res_len);
   }
@@ -1229,6 +1180,11 @@
           logd ("set_threshold: %d", tnr_funcs->set_threshold (NULL, atoi (val)));
           strncpy (curr_tuner_thresh, val,  sizeof (curr_tuner_thresh));
         }
+        else if (strcpy (key, "tuner_extra_cmd") && (klen = strlen (key)) && ! strncmp (ckey, key, klen)) {
+          val += klen;
+          logd ("send_extra_command: %d", tnr_funcs->send_extra_command (NULL, val, NULL, NULL));
+          strncpy (curr_tuner_extra_cmd, val,  sizeof (curr_tuner_extra_cmd));
+        }
         else if (strcpy (key, "radio_dai_state") && (klen = strlen (key)) && ! strncmp (ckey, key, klen)) {
           val += klen;
           logd ("radio_dai_state: %s", set_radio_dai_state (val));
@@ -1261,6 +1217,8 @@
           snprintf (res_buf, res_max -1, "%s",          curr_tuner_rds_state);
         else if (strcpy (key, "tuner_rds_af_state") && (klen = strlen (key)) && ! strncmp (ckey, key, klen))
           snprintf (res_buf, res_max -1, "%s",          curr_tuner_rds_af_state);
+        else if (strcpy (key, "tuner_extra_cmd") && (klen = strlen (key)) && ! strncmp (ckey, key, klen))
+          snprintf (res_buf, res_max -1, "%s",          curr_tuner_extra_cmd);
 
         else if (strcpy (key, "tuner_freq")         && (klen = strlen (key)) && ! strncmp (ckey, key, klen)) {
           if (tuner_initialized)
@@ -1326,7 +1284,7 @@
 
 
 
-  int s2d_cmd (int cmd_len, char * cmd_buf, int res_len, char * res_buf) {
+  int daemon_cmd (int cmd_len, char * cmd_buf, int res_len, char * res_buf) {
     res_len = client_cmd (cmd_buf, cmd_len, res_buf, res_len);      // Send cmd_buf and get response to res_buf
     if (res_len > 0 && res_len <= DEF_BUF) {
       memcpy (cmd_buf, res_buf, res_len);
@@ -1367,11 +1325,11 @@
 
   int main (int argc, char ** argv) {
     if (argc > 1)
-      strncpy (logtag, "s2d......", sizeof (logtag));
+      strncpy (logtag, "sd......", sizeof (logtag));
     else
-      strncpy (logtag, "s2c......", sizeof (logtag));
+      strncpy (logtag, "sc......", sizeof (logtag));
 
-    logd ("Spirit FM Radio s2d utility version 2014, Nov 2");             // !! Need automatic version
+    logd ("Spirit FM Radio daemon version 2015, Jan 11");            // !! Need automatic version
     logd (copyright);                                                     // Copyright
 
     exiting = 0;

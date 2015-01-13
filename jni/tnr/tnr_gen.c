@@ -1,5 +1,5 @@
 
-  #define LOGTAG "s2tnr_gen"
+  #define LOGTAG "stnr_gen"
 
 #include <dlfcn.h>
 #include <string.h>
@@ -21,10 +21,10 @@
 #include <android/log.h>
 #include "jni.h"
 
-#include "inc/android_fmradio.h"
+#include "tnr_tnr.h"
 
 #define EVT_LOCK_BYPASS
-  #include "plug.c"
+  #include "tnr_tnr.c"
 
     // Functions called from this chip specific code to generic code:
 
@@ -280,40 +280,6 @@
 
   int chip_imp_events_process (unsigned char * rds_grpd) {
     return (-1);    // No RDS Data
-/*
-    int ret = 0;
-    radio_data_t rd = {0};
-    //while (1) {//rds_ready_get ()) {                                       // While we have RDS data...
-    ret = ioctl (dev_hndl, Si4709_IOC_RDS_DATA_GET, & rd);
-    if (ret < 0) {
-      //loge ("chip_imp_events_process IOCTL Si4709_IOC_RDS_DATA_GET error: %3.3d", ret);
-      return (-1);
-    }
-    //logd ("chip_imp_events_process IOCTL Si4709_IOC_RDS_DATA_GET success curr_rssi: %3.3d  curr_channel: %3.3d (0x%x)", rd.curr_rssi, rd.curr_channel, rd.curr_channel);
-
-    int blrm = 1;//2;   // Bler Maximum tolerated (3 is max reported ?)
-    //if (rd.blera | rd.blerb | rd.blerc | rd.blerd) {
-    if (rd.blera > blrm| rd.blerb > blrm | rd.blerc > blrm | rd.blerd > blrm) {
-      //loge ("chip_imp_events_process ERROR rds/abcd: %4x %4x %4x %4x", rd.rdsa,  rd.rdsb,  rd.rdsc,  rd.rdsd);
-      //loge ("chip_imp_events_process ERROR blerabcd: %4x %4x %4x %4x", rd.blera, rd.blerb, rd.blerc, rd.blerd);
-      return (-1);
-    }
-      //logd ("chip_imp_events_process");
-      //loge ("chip_imp_events_process ERROR rds/abcd: %4x %4x %4x %4x", rd.rdsa,  rd.rdsb,  rd.rdsc,  rd.rdsd);
-      //loge ("chip_imp_events_process ERROR blerabcd: %4x %4x %4x %4x", rd.blera, rd.blerb, rd.blerc, rd.blerd);
-    rds_grpd [0] = rd.rdsa >> 8;
-    rds_grpd [1] = rd.rdsa & 0xff;
-    rds_grpd [2] = rd.rdsb >> 8;
-    rds_grpd [3] = rd.rdsb & 0xff;
-    rds_grpd [4] = rd.rdsc >> 8;
-    rds_grpd [5] = rd.rdsc & 0xff;
-    rds_grpd [6] = rd.rdsd >> 8;
-    rds_grpd [7] = rd.rdsd & 0xff;
-
-    //rds_group_process (rds_grpd);                                           // Pass ptr to 8 bytes of group data, most significant byte first (big endian)
-    //}
-    return (0);
-*/
   }
 
   int chip_imp_seek_start (int dir) {

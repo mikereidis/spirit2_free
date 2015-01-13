@@ -1,5 +1,5 @@
 
-#define LOGTAG "s2jut...."
+#define LOGTAG "sjut...."
 
 #include <dlfcn.h>
 
@@ -66,7 +66,7 @@
   }
 
 
-  const char * copyright = "Copyright (c) 2011-2014 Michael A. Reid. All rights reserved.";
+  const char * copyright = "Copyright (c) 2011-2015 Michael A. Reid. All rights reserved.";
 
   #include <sys/time.h>
   #include <sys/resource.h>
@@ -89,7 +89,6 @@
   char prop_buf    [DEF_BUF] = "";
 
   jint Java_fm_a2d_sf_svc_1aud_native_1prop_1get (JNIEnv * env, jobject thiz, jint prop) {
-  //jint Java_fm_a2d_sf_com_1uti_native_1prop_1get (JNIEnv * env, jobject thiz, jint prop) {
     __system_property_get ("ro.modversion", prop_buf);
     logd ("native_prop_get %d: %s", prop, prop_buf);
     if (! strncasecmp (prop_buf, "omni", 4))                            // If OmniROM

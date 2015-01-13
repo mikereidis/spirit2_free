@@ -8,24 +8,29 @@
 . /tmp/backuptool.functions
 
 FILE=lib/hw/audio.primary.smdk4x12.so
-#S1_SO=/data/data/com.mikersmicros.fm_unlock/lib/libbt-hci.so
-#S2_SO=/data/data/fm.a2d.s2/lib/libbt-hci.so
+#S1_SO_HCI=/data/data/com.mikersmicros.fm_unlock/lib/libbt-hci.so
+#S2_SO_HCI=/data/data/fm.a2d.s2/lib/libbt-hci.so
 
-NORM_SO=lib/libbt-hci.so
-ORIG_SO=lib/libbt-hcio.so
+NORM_SO_HCI=lib/libbt-hci.so
+ORIG_SO_HCI=lib/libbt-hcio.so
+
+NORM_SO_VEN=vendor/lib/libbt-vendor.so
+ORIG_SO_VEN=vendor/lib/libbt-vendoro.so
 
 
 case "$1" in
   backup)
-    backup_file $S/"$NORM_SO"
+    backup_file $S/"$NORM_SO_HCI"
   ;;
   restore)
-    [ -f "$C/$S/$NORM_SO" ] && mv $S/"$NORM_SO" $S/"$ORIG_SO"
-    [ -f "$C/$S/$NORM_SO" ] && restore_file $S/"$NORM_SO" ""
-    #[ -f "$S1_SO" ] || [ -f "$S2_SO" ] && [ -f "$C/$S/$NORM_SO" ] && mv $S/"$NORM_SO" $S/"$ORIG_SO"
-    #[ -f "$S1_SO" ] || [ -f "$S2_SO" ] && [ -f "$C/$S/$NORM_SO" ] && restore_file $S/"$NORM_SO" ""
-    #[ -f "$S1_SO" ]                    && [ -f "$C/$S/$NORM_SO" ] && cp "$S1_SO" $S/"$NORM_SO"
-    #[ -f "$S2_SO" ]                    && [ -f "$C/$S/$NORM_SO" ] && cp "$S2_SO" $S/"$NORM_SO"
+    [ -f "$C/$S/$NORM_SO_HCI" ] && mv $S/"$NORM_SO_HCI" $S/"$ORIG_SO_HCI"
+    [ -f "$C/$S/$NORM_SO_HCI" ] && restore_file $S/"$NORM_SO_HCI" ""
+    #[ -f "$S1_SO_HCI" ] || [ -f "$S2_SO_HCI" ] && [ -f "$C/$S/$NORM_SO_HCI" ] && mv $S/"$NORM_SO_HCI" $S/"$ORIG_SO_HCI"
+    #[ -f "$S1_SO_HCI" ] || [ -f "$S2_SO_HCI" ] && [ -f "$C/$S/$NORM_SO_HCI" ] && restore_file $S/"$NORM_SO_HCI" ""
+    #[ -f "$S1_SO_HCI" ]                    && [ -f "$C/$S/$NORM_SO_HCI" ] && cp "$S1_SO_HCI" $S/"$NORM_SO_HCI"
+    #[ -f "$S2_SO_HCI" ]                    && [ -f "$C/$S/$NORM_SO_HCI" ] && cp "$S2_SO_HCI" $S/"$NORM_SO_HCI"
+    [ -f "$C/$S/$NORM_SO_VEN" ] && mv $S/"$NORM_SO_VEN" $S/"$ORIG_SO_VEN"
+    [ -f "$C/$S/$NORM_SO_VEN" ] && restore_file $S/"$NORM_SO_VEN" ""
   ;;
   pre-backup)
     # Stub

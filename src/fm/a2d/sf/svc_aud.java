@@ -18,7 +18,6 @@ import android.media.MediaPlayer;
 import android.media.MediaPlayer.OnCompletionListener;
 import android.media.MediaPlayer.OnErrorListener;
 import android.media.MediaPlayer.OnPreparedListener;
-import android.media.audiofx.AudioEffect;
 import android.os.Environment;
 import android.os.PowerManager;
 
@@ -94,22 +93,13 @@ public class svc_aud implements svc_aap, AudioManager.OnAudioFocusChangeListener
 
   private int                   bytes_processed = 0;
   private int                   writes_processed = 0;
-  private int                   audiorecorder_data_size = 0x00000000;
-  private int                   min_pcm_write_buffers = 1;//2;                                // Runs if at least 2 buffers are ready...
+  private int                   min_pcm_write_buffers = 1;//2;          // Runs if at least 1 buffers are ready...
 
   private int                   m_channels = 2;
-  private int                   m_samplerate  = 44100;                               // Default = 8000 (Max w/ AMR)
+  private int                   m_samplerate  = 44100;                  // Default = 8000 (Max w/ AMR)
 
-  private File                  m_record_file           = null;
-  private String                m_rec_directory         = "/Music/fm";
-  private String                m_rec_file_name         = "fm_";
-  private FileOutputStream      m_record_write_file_fos = null;
-  private BufferedOutputStream  m_record_write_file_bos = null;
-
-  private boolean               need_record_finish      = false;
-  private int                   write_stats_seconds     = 60;//10; // Over 11184 will overflow int in calcs of "stats_frames = (2 * write_stats_seconds * m_samplerate * m_channels) / len;"
-  private int                   read_stats_seconds      = 60;//00;//10; // Over 11184 will overflow int in calcs of "stats_frames = (2 *  read_stats_seconds * m_samplerate * m_channels) / len;"
-  private RandomAccessFile      rand_acc_file           = null;
+  private int                   write_stats_seconds     = 6;//10; // Over 11184 will overflow int in calcs of "stats_frames = (2 * write_stats_seconds * m_samplerate * m_channels) / len;"
+  private int                   read_stats_seconds      = 6;//00;//10; // Over 11184 will overflow int in calcs of "stats_frames = (2 *  read_stats_seconds * m_samplerate * m_channels) / len;"
 
   private boolean               pcm_write_thread_waiting= false;
 
@@ -149,7 +139,7 @@ public class svc_aud implements svc_aap, AudioManager.OnAudioFocusChangeListener
   private boolean       m_audiorecord_reading = false;
 
   private boolean aud_mic = true;
-  private int m_rec_src = 0;
+  private int m_aud_src = 0;
 
 
     // Code:
@@ -206,9 +196,6 @@ API level 17 / 4.2+
 
     if (com_uti.device == com_uti.DEV_GEN)
       m_samplerate = 48000;
-    else if (com_uti.device == com_uti.DEV_SDR)
-      m_samplerate = 48000;
-
     else if (com_uti.device == com_uti.DEV_QCV && old_htc)                       // Still no good w/ 48K x 3840
       m_samplerate = 48000;//24000;//48000;//22050;//48000;//24000;//22050;//24000;//48000;//22050;//8000;//22050;
     else if (com_uti.device == com_uti.DEV_QCV)
@@ -217,6 +204,9 @@ API level 17 / 4.2+
       m_samplerate = 48000;//24000;//48000;//22050;//48000;//22050;//44100;//8000;
     else if (com_uti.device == com_uti.DEV_XZ2)
       m_samplerate = 48000;
+    else if (com_uti.device == com_uti.DEV_LG2 && com_uti.android_version >= 21) {
+      m_samplerate = 48000;
+    }
     else if (com_uti.device == com_uti.DEV_LG2) {
       m_samplerate = 44100;//48000;//22050;//44100;//Mar03  48000;//Mar02  44100;//Feb28 back to 44.1     48000;                                         // !!!! Different than prior default of 44100
       if (com_uti.lg2_stock_get ())
@@ -230,15 +220,16 @@ API level 17 / 4.2+
       m_samplerate = 44100;
 
 
-    if (android.os.Build.MANUFACTURER.toUpperCase (Locale.getDefault ()).equals ("SONY"))
+    if (android.os.Build.MANUFACTURER.toUpperCase (Locale.getDefault ()).equals ("SONY")
+            && (com_uti.device != com_uti.DEV_XZ2 || com_uti.android_version < 21)  // Add because FXP on Z2 needs 48k
+            && (com_uti.device != com_uti.DEV_QCV || com_uti.android_version < 21)  // Add because FXP on Z1 needs 48k too
+    )
       m_samplerate = 44100;
 
     com_uti.logd ("m_samplerate 3: " + m_samplerate);
 
-    m_samplerate = 44100;   // !! Fixed now !!
-
-
-    com_uti.logd ("m_samplerate 4 forced all to: " + m_samplerate);
+//!!DISABLE!!    m_samplerate = 44100;   // !! Fixed now !!
+//!!DISABLE!!    com_uti.logd ("m_samplerate 4 forced all to: " + m_samplerate);
 
     m_hw_size = 3840;//320;//3840;//4096;        If wrong, 3840 works better on Qualcomm at least
     try {
@@ -257,9 +248,6 @@ API level 17 / 4.2+
 
     if (com_uti.device == com_uti.DEV_GEN)
       m_hw_size = 16384;
-    else if (com_uti.device == com_uti.DEV_SDR)
-      m_hw_size = 65536;//16384;//4096;//65536;//5120;//16384;
-
     else if (com_uti.device == com_uti.DEV_QCV && old_htc)   // HTC OneXL misreports as 2048, but atminsize shows same as MotoG
       m_hw_size = 320;//1920;//3840;//320;//3840;//1920;//320; // Still no good w/ 48K x 3840
     else if (com_uti.device == com_uti.DEV_QCV && com_uti.m_manufacturer.equals ("SONY"))
@@ -299,12 +287,45 @@ API level 17 / 4.2+
     if (m_hw_size < pcm_size_min)
       m_hw_size = pcm_size_min;
 
-    //plg_api_start ();                                                   // Determine and set device specific audio plugin
  }
 
     // Command handlers:
 
+    //android.media.audiofx.Equalizer m_equalizer = null;
+
+    // Open audio effect control session (before playback ?):           For EQ and Visualisations ?
+  private void audio_session_start (int sessid) {
+    com_uti.logd ("sessid: " + sessid);
+    //int priority = 0;//     !! Any value over 0 kills CM11 DSP Manager     1;//2^7;//2^15;//2147483647;
+    //m_equalizer = new android.media.audiofx.Equalizer (priority, sessid);
+  }
+    // Close audio effect control session (before audio object dies ?)
+  private void audio_session_stop (int sessid) {
+    com_uti.logd ("sessid: " + sessid);
+  }
+
   public String audio_sessid_get () {                                  // Handle audio session changes
+    int new_int_audio_sessid = 0;
+    if (m_audiotrack != null)                                           // If we have an audiotrack active...
+      new_int_audio_sessid = m_audiotrack.getAudioSessionId ();
+
+    //com_uti.logd ("new_int_audio_sessid: " + new_int_audio_sessid + "  int_audio_sessid: " + int_audio_sessid);
+
+    if (new_int_audio_sessid > 0) {                                     // If valid session ID...
+      if (int_audio_sessid != new_int_audio_sessid) {                   // If new session ID...
+        com_uti.logd ("new_int_audio_sessid: " + new_int_audio_sessid + "  int_audio_sessid: " + int_audio_sessid);
+        int_audio_sessid = new_int_audio_sessid;
+        audio_session_start (new_int_audio_sessid);
+      }
+    }
+    else {                                                              // Else if no session ID / audiotrack active...
+      if (int_audio_sessid > 0) {                                       // If we previously had an active session...
+        com_uti.logd ("new_int_audio_sessid: " + new_int_audio_sessid + "  int_audio_sessid: " + int_audio_sessid);
+        audio_session_stop (int_audio_sessid);                          // Stop it
+        int_audio_sessid = 0;
+      }
+    }
+    m_com_api.audio_sessid = "" + int_audio_sessid;
     return (m_com_api.audio_sessid);
   }
 
@@ -378,7 +399,6 @@ API level 17 / 4.2+
     m_com_api.audio_state = "start";
     if (m_svc_acb != null)
       m_svc_acb.cb_audio_state (m_com_api.audio_state);
-    //audio_sessid_get ();                                                // Update audio_sessid
   }
 
     // Called externally for user requested pause
@@ -397,7 +417,6 @@ API level 17 / 4.2+
     m_com_api.audio_state = "pause";
     if (m_svc_acb != null)
       m_svc_acb.cb_audio_state (m_com_api.audio_state);                 // CAN_DUCK
-    //audio_sessid_get ();                                                // Update audio_sessid
   }
 
     // Called externally for tuner stop and service onDestroy
@@ -421,7 +440,6 @@ API level 17 / 4.2+
     if (m_svc_acb != null)
       m_svc_acb.cb_audio_state (m_com_api.audio_state);
     focus_set (false);
-    //audio_sessid_get ();                                                // Update audio_sessid
     //stopSelf ();                                                    // service is no longer necessary. Will be started again if needed.
   }
 
@@ -553,8 +571,10 @@ if (intent != null)
     }
 
     m_hdst_plgd = false;
-    if (m_com_api.audio_state.equalsIgnoreCase ("start") && m_rec_src <= 1 /* !! 8*/ && ! com_uti.file_get ("/mnt/sdcard/sf/aud_mic"))
-      dai_set (true);
+
+        // If audio started & headset mic selected & want FM and not mic...
+    if (m_com_api.audio_state.equalsIgnoreCase ("start") && m_aud_src <= 1 && ! com_uti.file_get ("/sdcard/spirit/aud_mic"))
+      dai_set (true);                                                   // Re-establish FM instead of microphone
   }
 
   private int pcm_write_start () {
@@ -647,6 +667,10 @@ if (intent != null)
 
     // PCM:
 
+  public String audio_record_state_set (String state) {
+    String str = "";
+    return (m_com_api.audio_record_state);
+  }
 
   private void pcm_stat_log (String prefix, int increment, int offset, int len, byte [] buf) {
     int max = -32768, min = 32769, avg = 0, max_avg = 0;
@@ -699,9 +723,6 @@ private final int getAndIncrement(int modulo) {
     public void run () {
       com_uti.logd ("pcm_write_runnable run()");
 
-      if (com_uti.device == com_uti.DEV_SDR)
-        min_pcm_write_buffers = aud_buf_num / 4;    // ?? Change later to 2
-
       native_priority_set (pcm_priority);
 
       try {
@@ -735,8 +756,6 @@ private final int getAndIncrement(int modulo) {
               continue;                                                 // Restart loop
             }
                                                                         // Here when at least 2 buffers are ready to write, so we write the 1st at the head...
-            if (com_uti.device == com_uti.DEV_SDR)
-              min_pcm_write_buffers = 2;  // !!!!
 
             //com_uti.loge ("pcm_write_runnable run() ready to write bufs: " + bufs + "  tail: " + aud_buf_tail + "  head: " + aud_buf_head);
 
@@ -752,8 +771,6 @@ private final int getAndIncrement(int modulo) {
 
             bytes_processed += len;                                     // Stats++
 
-    // Largest value 0xFFFFFFFC = 4294967292 max total file size, so max data size = 4294967256 = 1073741814 samples (0x3FFFFFF6)
-    //wav_write_bytes (wav_header, 0x04, 4, audiorecorder_data_size + 36);        // Chunksize = total filesize - 8 = DataSize + 36
 
             int stats_frames = (2 * write_stats_seconds * m_samplerate * m_channels) / len;
             if (writes_processed % stats_frames == 0) {    // Every stats_seconds
@@ -771,7 +788,6 @@ private final int getAndIncrement(int modulo) {
 
                                                                         // Here when thread is finished...
         com_uti.logd ("pcm_write_runnable run() done writes_processed: " + writes_processed);
-        rand_acc_file = null;
       }
       catch (Throwable e) {
         com_uti.loge ("pcm_write_runnable run() throwable: " + e);
@@ -780,7 +796,6 @@ private final int getAndIncrement(int modulo) {
       return;
     }
   };
-
 
 
 
@@ -805,9 +820,9 @@ private final int getAndIncrement(int modulo) {
     com_uti.logd ("enable: " + enable);
     String ret = "";
     if (enable)
-      ret = com_uti.s2d_set ("radio_dai_state", "Start");       // m_plg_api.digital_input_on ();
+      ret = com_uti.daemon_set ("radio_dai_state", "Start");       // m_plg_api.digital_input_on ();
     else
-      ret = com_uti.s2d_set ("radio_dai_state", "Stop");        // m_plg_api.digital_input_off ();
+      ret = com_uti.daemon_set ("radio_dai_state", "Stop");        // m_plg_api.digital_input_off ();
     return (ret);
   }
 
@@ -868,8 +883,9 @@ dai_delay = 0;  // !! No delay ??
 
     audiorecorder_read_stop ();
 
-    if (m_rec_src <= 8 && ! com_uti.file_get ("/mnt/sdcard/sf/aud_mic"))
-      dai_set (false);
+        // If mic selected & not FM & want FM and not mic...
+    if (m_aud_src <= 8 && ! com_uti.file_get ("/sdcard/spirit/aud_mic"))
+      dai_set (false);                                                  // De-establish FM instead of microphone
 
     return (0);
   }
@@ -923,7 +939,36 @@ dai_delay = 0;  // !! No delay ??
     audio_blank = blank;
     return (audio_blank);
   }
-                                                                        // All lengths in bytes; converting to shorts created problems.
+
+/* C code:
+  void aud_mod (int len, signed char * buf) {
+    int i = 0;
+    signed short * sbuf = (signed short *) buf;
+    for (i = 0; i < len / 2; i++) {
+      //signed short short_sample = * ((signed short *) & buf [i * 2]);
+      //int sample = short_sample;
+      sbuf [i] *= 4;//3;
+    }
+  }
+*/
+
+  void aud_mod (int len, byte [] buf) {   // Modify read audio, such as amplification
+    if (com_uti.device == com_uti.DEV_GS1) {
+        // Amplify by 4
+    }
+    else if (com_uti.device == com_uti.DEV_GS3) {
+      int ctr = 0;
+      for (ctr = 0; ctr < len / 4; ctr ++) {    // Swap channels
+        byte temp1 = buf [0];
+        byte temp2 = buf [1];
+        buf [0] = buf [2];
+        buf [1] = buf [3];
+        buf [2] = temp1;
+        buf [3] = temp2;
+      }
+    }
+  }
+
   private boolean aud_buf_read (int samplerate, int channels, int len_max) {    // Fill a PCM read buffer for PCM Read thread
     int bufs = aud_buf_tail - aud_buf_head;
     if (bufs < 0)                                                       // If underflowed...
@@ -977,6 +1022,9 @@ dai_delay = 0;  // !! No delay ??
         audio_blank = false;
     }
 //*/
+
+    aud_mod (len, aud_buf_data [aud_buf_tail]);
+
     int stats_frames = (2 * read_stats_seconds * samplerate * channels) / len;
     int reads_processed = read_ctr;
     if (reads_processed % stats_frames == 0) {    // Every stats_seconds
@@ -1019,8 +1067,10 @@ dai_delay = 0;  // !! No delay ??
     pcm_write_start ();
     if (include_read)
       pcm_read_start ();
-    if (m_rec_src <= 8 && ! com_uti.file_get ("/mnt/sdcard/sf/aud_mic"))
-      dai_set (true);
+
+        // If mic selected & not FM & want FM and not mic...
+    if (m_aud_src <= 8 && ! com_uti.file_get ("/sdcard/spirit/aud_mic"))
+      dai_set (true);                                                   // Establish FM instead of microphone
   }
   private void pcm_audio_pause (boolean include_read) {
     if (m_audiotrack != null)
@@ -1087,8 +1137,11 @@ dai_delay = 0;  // !! No delay ??
 
     if (need_restart)
       pcm_audio_start (true);                                           // If audio started and device needs restart... (GS3 only needs for OmniROM, but make universal)
-    else if (m_com_api.audio_state.equalsIgnoreCase ("start") && m_rec_src <= 8 && ! com_uti.file_get ("/mnt/sdcard/sf/aud_mic"))
-      dai_set (true);
+
+        // If audio started & headset mic selected & want FM and not mic...
+    else if (m_com_api.audio_state.equalsIgnoreCase ("start") && m_aud_src <= 8 && ! com_uti.file_get ("/sdcard/spirit/aud_mic"))
+      dai_set (true);                                                   // Re-establish FM instead of microphone
+
 
     com_uti.logd ("Done new audio_output: " + m_com_api.audio_output);
     return (m_com_api.audio_output);
@@ -1216,9 +1269,11 @@ VOICE_COMMUNICATION 7       11  (Microphone audio source tuned for voice communi
 
     int[] m_all_rate = new int []   {44100/*, 48000, 22050, 11025, 8000*/};
 
-      // first entry "11" is replaced by rec_src if set, or 5 CAMCORDER
-    int [] m_mic_srcs = new int []   {11, 1, 0, 5,  9, 10, 6, 7};   // Microphone sources       MediaRecorder.AudioSource.DEFAULT ++
-    int [] m_dir_srcs = new int []   {11, 9, 10, 5, 1, 0, 5, 6, 7}; // Direct sources           MediaRecorder.AudioSource.DEFAULT ++        !! Stock Xperia Z worked w/ 9/10, CM11 + Lollipop use 5
+    m_all_rate [0] = m_samplerate;
+
+      // first entry "11" is replaced by aud_src if set, or 5 CAMCORDER
+    int [] m_mic_srcs = new int []   {11,  1, 0, 5, 10, 9, 6, 7};   // Microphone sources       MediaRecorder.AudioSource.DEFAULT ++
+    int [] m_dir_srcs = new int []   {11, 10, 9, 5, 1,  0, 5, 6, 7}; // Direct sources           MediaRecorder.AudioSource.DEFAULT ++        !! Stock Xperia Z worked w/ 9/10, CM11 + Lollipop use 5
     int [] m_srcs = null;
 
     int default_src = MediaRecorder.AudioSource.MIC;//MediaRecorder.AudioSource.CAMCORDER;  // 5
@@ -1233,7 +1288,9 @@ VOICE_COMMUNICATION 7       11  (Microphone audio source tuned for voice communi
     m_srcs = m_mic_srcs;
     if (com_uti.m_manufacturer.startsWith ("SONY") ||                   // Doesn't work with Xperia Z w/ AOSP, which ends up selecting 5/Camcorder because 9 and 10 don't work.
         com_uti.motorola_stock_get ()              ||   // com_uti.m_manufacturer.startsWith ("MOTO") ||
-       (com_uti.m_manufacturer.startsWith ("LG") && com_uti.device == com_uti.DEV_QCV)    ) {       // LG G3
+//?? Disable to see ??       (com_uti.m_manufacturer.startsWith ("LG") && com_uti.device == com_uti.DEV_QCV) ||      // LG G3
+       (com_uti.m_device.startsWith ("SERRANO"))         // GS4 Mini
+            ) { 
       use_fmr = true;
       m_srcs = m_dir_srcs;
     }
@@ -1243,14 +1300,14 @@ VOICE_COMMUNICATION 7       11  (Microphone audio source tuned for voice communi
       src = cnt_src;
       if (src == 11) {                                                  // If special first entry...
         com_uti.loge ("99 99 99 99 99 99 99 99 99 99 99 99 99 99 99 99 99 99 99 99 99 99 99 99 99 99 99 99 ");
-        String filename = "/mnt/sdcard/sf/rec_src";
-        if (com_uti.file_get (filename)) {                              // If rec_src file
+        String filename = "/sdcard/spirit/aud_src";
+        if (com_uti.file_get (filename)) {                              // If aud_src file
           byte [] content = com_uti.file_read_16k (filename);
           String cont = com_uti.ba_to_str (content);
           src = com_uti.int_get (cont);
           com_uti.loge ("cont: " + cont + "  src: " + src);
         }
-        else {                                                          // Else if NO rec_src file
+        else {                                                          // Else if NO aud_src file
           if (use_fmr)                                                  // If direct FM
             continue;                                                   // Go to next iteration...
           else
@@ -1271,7 +1328,7 @@ VOICE_COMMUNICATION 7       11  (Microphone audio source tuned for voice communi
             //continue; / break;
             AudioRecord recorder = new AudioRecord (src, rate, channelConfig, audioFormat, m_hw_size);//bufferSize);
             if (recorder.getState() == AudioRecord.STATE_INITIALIZED) { // If works, then done
-              m_rec_src = src;
+              m_aud_src = src;
               return (recorder);
             }
           }

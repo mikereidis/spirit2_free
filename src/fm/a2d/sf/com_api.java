@@ -19,7 +19,7 @@ public class com_api {
   public String     radio_cdown         = "999";
   public String     radio_error         = "";
 
-  public static final int max_presets   = 4;
+  public static final int max_presets   = 16;
   public String []  radio_freq_prst     =  {"","","","","","","","","","","","","","","","",};
   public String []  radio_name_prst     =  {"","","","","","","","","","","","","","","","",};
 
@@ -62,7 +62,7 @@ public class com_api {
   public  String tuner_rds_picl     = "";//WKBW";                           // ro ... ... Values:   North American Call Letters or Hex PI for tuner_rds_pi
   public  String tuner_rds_pt       = "";//-1";                             // ro ... ... Values:   0 - 31
   public  String tuner_rds_ptyn     = "";                               // ro ... ... Values:   Describes tuner_rds_pt (English !)
-  public  String tuner_rds_ps       = "Spirit2 Free";                               // ro ... ... Values:   RBDS 8 char info or RDS Station
+  public  String tuner_rds_ps       = "SpiritF";                               // ro ... ... Values:   RBDS 8 char info or RDS Station
   public  String tuner_rds_rt       = "";//OBNOXIOUS !!     "Analog 2 Digital radio ; Thanks for Your Support... :)";                               // ro ... ... Values:   64 char
 
   public  String tuner_rds_af       = "";                               // ro ... ... Values:   Space separated array of AF frequencies

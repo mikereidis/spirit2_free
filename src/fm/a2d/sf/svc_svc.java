@@ -51,12 +51,6 @@ public class svc_svc extends Service implements svc_tcb, svc_acb {  // Service c
   private svc_tap               m_svc_tap   = null;
   private svc_aap               m_svc_aap   = null;
 
-  private Notification          mynot       = null;                         // Create a new Notification object
-  private Notification          m_notif     = null;
-  private static final int      S2_NOTIF_ID = 2112;                         // No relevance to S2_NOTIF_ID except to uniquely identify notification !! Spirit1 uses same !!
-  private NotificationManager   m_NM        = null;
-  private boolean               need_startfg= true;
-
   //private int                 start_type  = START_NOT_STICKY;             // Don't restart if killed; not important enough to restart, which may crash again. ?? But still restarts ??
   private int                   start_type  = START_STICKY;                 // !!!! See if Sticky reduces audio dropouts
 
@@ -71,15 +65,6 @@ public class svc_svc extends Service implements svc_tcb, svc_acb {  // Service c
 
   private BluetoothAdapter      m_bt_adapter    = null;
 
-    // Remote Control:
-  private RemoteControlClient   m_rcc       = null;
-
-  private boolean               remote_state = false;
-
-  private String                last_tuner_rds_ps   = "";
-  private String                last_tuner_freq     = "";
-  private String                last_audio_state    = "";
-
   private AudioManager          m_AM = null;
 
   @Override
@@ -92,8 +77,6 @@ public class svc_svc extends Service implements svc_tcb, svc_acb {  // Service c
 
       m_AM = (AudioManager) m_context.getSystemService (Context.AUDIO_SERVICE);
 
-      notif_state_set (true);
-
       if (m_com_api == null) {
         m_com_api = new com_api (this);                                 // Instantiate Common API   class
         com_uti.logd ("m_com_api: " + m_com_api);
@@ -102,6 +85,9 @@ public class svc_svc extends Service implements svc_tcb, svc_acb {  // Service c
       m_svc_aap = new svc_aud (this, this, m_com_api);                  // Instantiate audio        class
 
       m_svc_tap = new svc_tnr (this, this, m_com_api);                  // Instantiate tuner        class
+
+
+        startForeground (2112, new Notification.Builder (m_context).build ());
     }
     catch (Throwable e) {
       e.printStackTrace ();
@@ -122,10 +108,9 @@ public class svc_svc extends Service implements svc_tcb, svc_acb {  // Service c
   public void onDestroy () {
     com_uti.logd ("");
 
-    notif_state_set (false);
+      stopForeground (true);
 
     //tuner_state_set ("stop");
-    //remote_state_set (false);
     //m_svc_tap = null;
   }
 
@@ -171,11 +156,14 @@ public class svc_svc extends Service implements svc_tcb, svc_acb {  // Service c
         int ifreq = com_uti.tnru_freq_fix (25 + com_uti.tnru_khz_get (freq));
         com_uti.logd ("Set preset val: " + val + "  freq: " + freq);
         if (ifreq >= 50000 && ifreq <= 499999) {
-          com_uti.prefs_set (m_context, "radio_freq_prst_" + ctr, "" + freq);
-          com_uti.prefs_set (m_context, "radio_name_prst_" + ctr, val);
         }
         presets_init ();                                                // Load presets
       }
+    }
+
+    val = extras.getString ("param", "");
+    if (! val.equalsIgnoreCase ("")) {
+      com_uti.setParameters (val);
     }
 
 // radio_freq : preset or seek
@@ -251,6 +239,10 @@ public class svc_svc extends Service implements svc_tcb, svc_acb {  // Service c
       com_uti.prefs_set (m_context, "audio_stereo", val);
     }
 
+    val = extras.getString ("audio_record_state", "");
+    if (! val.equals (""))
+      m_svc_aap.audio_record_state_set (val);
+
     radio_status_send ();                                               // Return results
 
     }
@@ -270,9 +262,6 @@ public class svc_svc extends Service implements svc_tcb, svc_acb {  // Service c
     Intent radio_status_intent = radio_status_send ();                  // Update widgets, apps, etc. and get resulting Intent
     m_com_api.radio_update (radio_status_intent);                       // Get current data in Radio API using Intent (To update all dynamic/external data)
 
-    notif_radio_update  ();                                             // Update notification shade
-
-    remote_radio_update ();                                             // Update remote controls: lockscreen, AVRCP and future components
   }
 
 
@@ -481,10 +470,8 @@ public class svc_svc extends Service implements svc_tcb, svc_acb {  // Service c
       String audio_output = com_uti.prefs_get (m_context, "audio_output", "headset");
       m_svc_aap.audio_output_set (audio_output);                      // Set Audio Output from prefs
 
-      remote_state_set (true);                                          // Remote State = Playing
     }
     else if (audio_state.equalsIgnoreCase ("stop")) {                   // If audio state = Stop...
-      remote_state_set (false);                                         // Remote State = Stopped = Media buttons not needed ?
     }
     else if (audio_state.equalsIgnoreCase ("pause")) {                  // If audio state = Pause...
       // Remote State = Still Playing
@@ -681,7 +668,7 @@ public class svc_svc extends Service implements svc_tcb, svc_acb {  // Service c
     m_com_api.tuner_rds_picl     = "";//WKBW";                           // ro ... ... Values:   North American Call Letters or Hex PI for tuner_rds_pi
     m_com_api.tuner_rds_pt       = "";//-1";                             // ro ... ... Values:   0 - 31
     m_com_api.tuner_rds_ptyn     = "";//";                               // ro ... ... Values:   Describes tuner_rds_pt (English !)
-    m_com_api.tuner_rds_ps       = "";//Spirit2 Free";                        // ro ... ... Values:   RBDS 8 char info or RDS Station
+    m_com_api.tuner_rds_ps       = "";//SpiritF";                        // ro ... ... Values:   RBDS 8 char info or RDS Station
     m_com_api.tuner_rds_rt       = "";//Thanks for Your Support... :)";  // ro ... ... Values:   64 char
 
     m_com_api.tuner_rds_af       = "";//";                               // ro ... ... Values:   Space separated array of AF frequencies
@@ -733,8 +720,6 @@ public class svc_svc extends Service implements svc_tcb, svc_acb {  // Service c
       case com_uti.DEV_ONE: return ("libs2t_bch.so");
       case com_uti.DEV_LG2: return ("libs2t_bch.so");
       case com_uti.DEV_XZ2: return ("libs2t_bch.so");
-      case com_uti.DEV_SDR: return ("libs2t_sdr.so");
-      //default:      return ("libs2t_gen.so");
     }
     return ("libs2t_gen.so");
   }
@@ -744,44 +729,14 @@ public class svc_svc extends Service implements svc_tcb, svc_acb {  // Service c
   private int files_init () {
     com_uti.logd ("starting...");
 
-    if (com_uti.file_get ("/mnt/sdcard/sf/sys_bin")) {
-      String lib_name = lib_name_get ();  //"libs2t_ssl.so";
-      String cmd = "";
-      cmd += ("mount -o remount,rw /system 1>/dev/null 2>/dev/null; ");
-      cmd += ("cp /data/data/fm.a2d.sf/lib/libssd.so /system/bin/ssd 1>/dev/null 2>/dev/null; ");
-      cmd += ("chmod 755 /system/bin/ssd 1>/dev/null 2>/dev/null; ");
-      cmd += ("cp /data/data/fm.a2d.sf/lib/libs2d.so /system/bin/s2d 1>/dev/null 2>/dev/null; ");
-      cmd += ("chmod 755 /system/bin/s2d 1>/dev/null 2>/dev/null; ");
-      cmd += ("cp /data/data/fm.a2d.sf/lib/" + lib_name + " /system/lib/libs2t.so 1>/dev/null 2>/dev/null; ");
-      cmd += ("chmod 644 /system/lib/libs2t.so 1>/dev/null 2>/dev/null; ");
-      cmd += ("mount -o remount,ro /system 1>/dev/null 2>/dev/null; ");
-      cmd += ("echo -n 1>/dev/null 2>/dev/null");
-      com_uti.sys_run (cmd, true);
-      com_uti.logd ("Done installing system binaries to /system/bin/");
-    }    
-
-
-    //String bsb_full_filename = com_uti.file_create (m_context, R.raw.busybox,  "busybox",       true);
-    //    String ssd_full_filename = "";
-    //if (com_uti.ssd_via_sys_run)
-    //      ssd_full_filename = com_uti.file_create (m_context, R.raw.ssd,           "ssd",           true);
     //String wav_full_filename = com_uti.file_create (m_context, R.raw.s_wav,    "s.wav",         false);             // Not executable
-
+    //String bb1_full_filename = com_uti.file_create (m_context, R.raw.b1_bin,     "b1.bin",        false);             // Not executable
+    //String bb2_full_filename = com_uti.file_create (m_context, R.raw.b2_bin,     "b2.bin",        false);             // Not executable
 
     String add_full_filename = com_uti.file_create (m_context, R.raw.spirit_sh,  "99-spirit.sh",  true);
-//    String bb1_full_filename = com_uti.file_create (m_context, R.raw.b1_bin,     "b1.bin",        false);             // Not executable
-//    String bb2_full_filename = com_uti.file_create (m_context, R.raw.b2_bin,     "b2.bin",        false);             // Not executable
 
         // Check:
     int ret = 0;
-        //if (! com_uti.access_get (bsb_full_filename, false, false, true)) { // rwX
-        //  com_uti.loge ("error unexecutable busybox utility");
-        //  ret ++;
-        //}
-        //      if (/*com_uti.ssd_via_sys_run &&*/ ! com_uti.access_get (ssd_full_filename, false, false, true)) { // rwX
-        //        com_uti.loge ("error unexecutable ssd utility");                  // !!!! Get this sometimes, so must ignore errors.
-        //        ret ++;
-        //      }
 
       if (! com_uti.access_get (add_full_filename, false, false, true)) { // rwX
         com_uti.loge ("error unexecutable addon.d script 99-spirit.sh");
@@ -801,77 +756,6 @@ public class svc_svc extends Service implements svc_tcb, svc_acb {  // Service c
     return (ret);
   }
 
-  private int shim_install () {
-    int ret = 0;
-    boolean restart_bt = false;
-
-    if (bt_get ()) {
-      restart_bt = true;
-      bt_set (false, true);                                             // Bluetooth off, and wait for off
-      com_uti.logd ("Start 4 second delay after BT Off");
-      com_uti.ms_sleep (4000);                                          // Extra 4 second delay to ensure BT is off !!
-      com_uti.logd ("End 4 second delay after BT Off");
-    }
-    String cmd = "";
-    cmd += ("mount -o remount,rw /system ; ");
-    cmd += ("mv /system/lib/libbt-hci.so  /system/lib/libbt-hcio.so ; ");
-    cmd += ("cp /data/data/fm.a2d.sf/lib/libbt-hci.so /system/lib/libbt-hci.so ; ");
-    cmd += ("chmod 644 /system/lib/libbt-hci.so ; ");
-    cmd += ("cp /data/data/fm.a2d.sf/files/99-spirit.sh /system/addon.d/99-spirit.sh ; ");
-    cmd += ("chmod 755 /system/addon.d/99-spirit.sh ; ");
-    cmd += ("mount -o remount,ro /system ; ");
-    com_uti.sys_run (cmd, true);
-    com_uti.logd ("Done Bluedroid SU commands");
-
-    if (shim_files_have ())
-      com_uti.logd ("Installed SHIM OK");
-    else {
-      com_uti.loge ("Install SHIM ERROR");
-      ret = -1;
-    }
-
-    if (restart_bt) {
-      bt_set (true, true);                                              // Bluetooth on, and wait for on  (Need to set BT on so reboot has it on.)
-
-      //Toast.makeText (m_context, "WARM RESTART PENDING FOR SHIM INSTALL !!", Toast.LENGTH_LONG).show ();  java.lang.RuntimeException: Can't create handler inside thread that has not called Looper.prepare()
-
-/* Don't need a delay before reboot because BT is on enough to stay on after reboot ?? (And we waited for On to be detected anyway)
-      com_uti.logd ("Start 4 second delay after BT On");
-      com_uti.ms_sleep (4000);                                            // Extra 4 second delay to ensure BT is on
-      com_uti.logd ("End 4 second delay after BT On");
-*/
-      //Toast.makeText (m_context, "WARM RESTART !!", Toast.LENGTH_LONG).show ();
-      //com_uti.sys_run ("kill `pidof system_server`", true);
-      com_uti.sys_run ("reboot", true);                                 // On M7 GPE requires reboot
-    }
-
-    return (ret);
-  }
-
-//Doesn't help:
-    //cmd += ("kill `pidof com.android.bluetooth` ; ");                // Kill bluetooth process and it will restart
-
-    //cmd += ("pm clear com.android.bluetooth ; ");                       // Stop bluetooth process; can run even if BT is "off"
-    //com_uti.sys_run (cmd, true);
-    //com_uti.ms_sleep (1000);                                              // Extra 1 second delay to ensure
-
-  private boolean shim_files_have () {                                  // If our lib and have old lib to call  (If just large but no old, assume original)
-    if (com_uti.file_size_get ("/system/lib/libbt-hci.so") > 60000 && com_uti.file_size_get ("/system/lib/libbt-hcio.so") > 10000 && com_uti.file_size_get ("/system/lib/libbt-hcio.so") < 60000)
-      return (true);
-    return (false);
-  }
-  private boolean shim_install_support_get () {
-    if (com_uti.device == com_uti.DEV_XZ2 || com_uti.device == com_uti.DEV_ONE || com_uti.device == com_uti.DEV_LG2)
-      return (true);
-    return (false);
-  }
-
-/* OLD: 4 states:
-    BT Off                                                            Use UART  (or BT on and install/use shim if possible)
-    BT On & (Shim Not Installed or Shim Old)    Install Shim, BT Off, Use UART      First run before reboot or first boot after ROM update with no addon.d fix
-    BT On &  Shim     Installed & NOT Active                  BT Off, Use UART      Need reboot & BT to be active
-    BT On &  Shim     Installed &     Active                          Use SHIM
-*/
 
   private int bcom_init () {    // Install shim if needed (May change BT state & warm restart). Determine UART or SHIM Mode & create/delete "use_shim" flag file for s2d. Turn BT off if needed.
     com_uti.logd ("start");
@@ -885,18 +769,34 @@ public class svc_svc extends Service implements svc_tcb, svc_acb {  // Service c
       com_uti.sys_run ("rm " + full_filename, true);                      // Remove file/flag
     }
 
-    if (com_uti.file_get ("/system/lib/libbt-hci.so")) {                  // If Bluedroid file exists...
+    if (com_uti.shim_files_possible_get ()) {                                             // If Bluedroid...
       com_uti.logd ("Bluedroid support");
 
-      boolean fresh_shim_install = false;   // !!!! Need code to update shim when it changes !!!!   (Stable Jan 1, 2014 -> July 31, 2014)
-      if (! shim_files_have () && shim_install_support_get ()) {        // If shim not installed AND supported device...
+      boolean fresh_shim_install = false;               // !!!! Need code to update shim when it changes !!!!   (Stable Jan 1, 2014 -> July 31/Nov 30, 2014)
+      if (! com_uti.shim_files_operational_get ()) {                                // If shim files not operational...
         if (bt_get ()) {                                                // July 31, 2014: only install shim if BT is on
-          shim_install ();                                              // Install shim
+          bt_set (false, true);                                             // Bluetooth off, and wait for off
+          com_uti.logd ("Start 4 second delay after BT Off");
+          com_uti.ms_sleep (4000);                                          // Extra 4 second delay to ensure BT is off !!
+          com_uti.logd ("End 4 second delay after BT Off");
+
+          com_uti.shim_install ();                                              // Install shim
+
+          bt_set (true, true);                                              // Bluetooth on, and wait for on  (Need to set BT on so reboot has it on.)
+            //Toast.makeText (m_context, "WARM RESTART PENDING FOR SHIM INSTALL !!", Toast.LENGTH_LONG).show ();  java.lang.RuntimeException: Can't create handler inside thread that has not called Looper.prepare()
+        /* Don't need a delay before reboot because BT is on enough to stay on after reboot ?? (And we waited for On to be detected anyway)
+            com_uti.logd ("Start 4 second delay after BT On");
+            com_uti.ms_sleep (4000);                                            // Extra 4 second delay to ensure BT is on
+            com_uti.logd ("End 4 second delay after BT On"); */
+            //Toast.makeText (m_context, "WARM RESTART !!", Toast.LENGTH_LONG).show ();
+            //com_uti.sys_run ("kill `pidof system_server`", true);
+          com_uti.sys_run ("reboot", true);                                 // On M7 GPE requires reboot
+
           fresh_shim_install = true;
         }
       }
 
-      if (! fresh_shim_install && shim_files_have () && bt_get ()) {    // If not fresh shim install, and shim installed, and BT is on...
+      if (! fresh_shim_install && com_uti.shim_files_operational_get () && bt_get ()) {    // If not fresh shim install, and shim files operational, and BT is on...
         com_uti.logd ("Bluedroid shim installed & BT on");
         try {
           FileOutputStream fos = m_context.openFileOutput (short_filename, Context.MODE_PRIVATE); // | MODE_WORLD_WRITEABLE      // Somebody got a NullPointerException here
@@ -1068,56 +968,5 @@ public class svc_svc extends Service implements svc_tcb, svc_acb {  // Service c
       return (-1);
     }
   }
-
-
-    // Remote control client, for lockscreen and BT AVRCP:
-
-  private void remote_state_set (boolean state) {                       // Called only by cb_audio_state w/ state=true for start, false for stop
-  }
-
-
-  private void remote_radio_update () {                                 // Called only by displays_update() which is called only by cb_* callbacks
-  }
-
-    // Notification shade:
-
-  private void notif_radio_update () {                                  // Called only by displays_update() which is called only by cb_* callbacks
-
-    if (m_com_api.audio_state.equalsIgnoreCase ("start")) {             // If audio started...
-      if (need_startfg) {
-        need_startfg = false;
-        com_uti.logd ("startForeground");
-        m_notif = new Notification.Builder (this)
-            .build ();
-        startForeground (S2_NOTIF_ID, m_notif);                         // Now in audio foreground
-      }
-    }
-    else {
-      need_startfg = true;
-      //notif_state_set (false);
-      //stopForeground (true);                                          // !! Need FG for lockscreen play !! So can't unset foreground when paused,,,   Only in onDestroy
-//stopForeground (false);   // !!!! ???? Can stopForeground but keep active notification ??
-    }
-  }
- 
-   // Start/stop service = foreground, FM Notification in status bar, Expanded message in "Notifications" window.
-
-  private void notif_state_set (boolean state) {                        // Called only by onCreate w/ state = true and onDestroy w/ state = false
-    com_uti.logd ("state: " + state);
-    if (! state) {                                                      // Notifications off, go to idle non-foreground state
-      com_uti.logd ("false");
-      stopForeground (true);                                            // Service not in foreground state and remove notification (true)
-      return;
-    }
-///*    !!!! Need this or bad audio !!!!
-    mynot = new Notification.Builder (this)
-        .build ();
-
-    com_uti.logd ("startForeground (S2_NOTIF_ID, mynot);");
-    startForeground (S2_NOTIF_ID, mynot);                               // Now in audio foreground
-//*/
-    return;
-  }
-
 
 }

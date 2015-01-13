@@ -1,5 +1,7 @@
 
     // GUI Activity:
+    // Copyright 2011-2015 Michael A. Reid. All rights reserved.
+
 package fm.a2d.sf;
 
 import android.app.Activity;
@@ -28,7 +30,9 @@ public class gui_act extends Activity {     //public class gui_act extends Fragm
     com_uti.logd ("stat_creates: " + stat_creates++);
 
     m_context = this;
-    //com_uti.logd ("Spirit2 Free " + com_uti.app_version_get (m_context) + "  Copyright 2011-2014 Michael A. Reid. All rights reserved.");
+
+    //com_uti.logd ("SpiritF " + com_uti.app_version_get (m_context) + " " + copyright);
+
     com_uti.logd ("savedInstanceState: " + savedInstanceState);
     //com_uti.logd ("dev: " + com_uti.device);
 

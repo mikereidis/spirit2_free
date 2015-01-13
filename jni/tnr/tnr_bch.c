@@ -1,5 +1,5 @@
 
-  #define LOGTAG "s2tnr_bch"
+  #define LOGTAG "stnr_bch"
 
 #include <dlfcn.h>
 #include <string.h>
@@ -21,19 +21,19 @@
 #include <android/log.h>
 #include "jni.h"
 
-#include "inc/android_fmradio.h"
+#include "tnr_tnr.h"
 
 #define EVT_LOCK_BYPASS
-  #include "plug.c"
+  #include "tnr_tnr.c"
 
-// Unix datagrams requires other write permission for /dev/socket, or somewhere else (ext not FAT on sdcard) writable.
+// Unix datagrams requires other write permission for /dev/socket, or somewhere else (ext, not FAT) writable.
 
 //#define CS_AF_UNIX        // Use network sockets to avoid filesystem permission issues.
 #define CS_DGRAM
 
 #ifdef  CS_AF_UNIX
-#define DEF_API_SRVSOCK    "/dev/socket/srv_s2"
-#define DEF_API_CLISOCK    "/dev/socket/cli_s2"
+#define DEF_API_SRVSOCK    "/dev/socket/srv_spirit"
+#define DEF_API_CLISOCK    "/dev/socket/cli_spirit"
 char api_srvsock [DEF_BUF] = DEF_API_SRVSOCK;
 char api_clisock [DEF_BUF] = DEF_API_CLISOCK;
 #endif
@@ -83,223 +83,14 @@ char api_clisock [DEF_BUF] = DEF_API_CLISOCK;
 
     // FM Chip specific code
 
-  //#include "utils.c"
-
 #ifndef DEF_BUF
 #define DEF_BUF 512    // Raised from 256 so we can add headers to 255-256 byte buffers
 #endif
 
 // Debug:
-int hci_dbg      = 0;//1;
-int reg_dbg      = 0;//1;
+//int hci_dbg      = 0;//1;
+int reg_dbg = 0;//      = 0;//1;
 //extern int evt_dbg;//      = 0;//1;
-
-
-int file_find (const char * dir, const char * pat, char * path_buf, int path_len) {      // Find first file under subdir dir, with pattern pat. Put results in path_buf of size path_len.
-  static int nest = 0;
-  path_buf [0] = 0;
-  if (nest == 0)
-    logd ("file_find: %d %s %s", nest, dir, pat);
-
-  nest ++;
-  if (nest > 16) {                                                      // Routine is recursive; if more than 16 subdirectories nested... (/system/xbin/bb -> /system/xbin)
-    logd ("file_find maximum nests: %d  dir: %s  path: %s", nest, dir, pat);
-    nest --;
-    return (0);                                                         // Done w/ no result
-  }
-
-  DIR  *dp;
-  struct dirent *dirp;
-  struct stat sb;
-  int ret = 0;
-
-  if ((dp = opendir (dir)) == NULL) {                                    // Open the directory. If error...
-    //#define EACCES      13  /* Permission denied */
-    if (errno == 13)                                                    // Common problem (Even w/ SU)
-      logd ("file_find: can't open directory %s  errno: %d (EACCES Permission denied)", dir, errno);
-    else
-      logd ("file_find: can't open directory %s  errno: %d", dir, errno);
-    nest --;
-    return (0);//-13);                                                       // Done w/ no result & error code -EPERM
-  }
-  //logd ("file_find opened directory %s", dir);
-
-  while ((dirp = readdir (dp)) != NULL) {                                // For all files/dirs in this directory... (Could terminate with errno set !!)
-    //logd ("file_find: readdir returned file/dir %s", dirp->d_name);
-
-    if (strlen (dirp->d_name) == 1)
-      if (dirp->d_name[0] == '.')
-        continue;                                                       // Ignore/Next if "." current dir
-
-    if (strlen (dirp->d_name) == 2)
-      if (dirp->d_name[0] == '.' && dirp->d_name[1] == '.')
-        continue;                                                       // Ignore/Next if ".." parent dir
-
-    char filename[DEF_BUF] = {0};
-    strlcpy (filename, dir, sizeof (filename));
-    strlcat (filename, "/", sizeof (filename));
-    strlcat (filename, dirp->d_name, sizeof (filename));                // Set fully qualified filename
-
-    ret = stat (filename, &sb);                                         // Get file/dir status.
-    if (ret == -1) {
-      logd ("file_find: stat errno: %d", errno);
-      continue;                                                         // Ignore/Next if can't get status
-    }
-
-    if (S_ISDIR (sb.st_mode)) {                                         // If this is a directory...
-      //logd ("file_find: dir %d", sb.st_mode);
-      if (file_find (filename, pat, path_buf, path_len)) {              // Recursively call self: Go deeper to find the file, If found...
-        closedir (dp);                                                  // Close the directory.
-        nest --;
-        return (1);                                                     // File found
-      }
-    }
-
-    else if (S_ISREG (sb.st_mode)) {                                     // If this is a regular file...
-      //logd ("file_find: reg %d", sb.st_mode);
-      int pat_len = strlen (pat);
-      int filename_len = strlen (filename);
-      if (filename_len >= pat_len) {
-        if (! strncasecmp (pat, &filename [filename_len - pat_len], pat_len)) {   // !! Case insensitive
-          logd ("file_find pattern: %s  filename: %s", pat, filename);
-          strlcpy (path_buf,filename, path_len);
-          closedir (dp);                                                // Close the directory.
-          nest --;
-          return (1);                                                   // File found
-        }
-      }
-    }
-    else {
-      logd ("file_find: unk %d", sb.st_mode);
-    }
-  }
-  closedir (dp);                                                        // Close the directory.
-  nest --;
-  return (0);                                                           // Done w/ no result
-}
-
-int hcd_num = 0;
-
-int hcd_file_find (char * path_buf, int path_len) {      // Find first file under subdir dir, with pattern pat. Put results in path_buf of size path_len.
-// lib, usr, vendor xbin
-  int ret = file_find ("/system", ".hcd", path_buf, path_len);          // Sometimes under system/vendor/firmware instead of system/etc/firmware
-
-  hcd_num = 0;
-
-//loge ("HCD hcd file_find ret: %d", ret);
-  if (ret) {                  // If we have at least one BC *.hcd or *.HCD firmware file in /system...
-    logd ("hcd_file_find have *.hcd file: %s", path_buf);
-    //if (! (strncmp ("/system/etc/firmware/BCM4335A0_001.001.038.0015.0020.hcd", path_buf, path_len))) {
-    //if (! (strncmp ("/system/etc/firmware/BCM4335A", path_buf, sizeof ("/system/etc/firmware/BCM4335A"))) ||
-    //    ! (strncmp ("/system/etc/firmware/BCM4335B", path_buf, sizeof ("/system/etc/firmware/BCM4335B")))
-    //        ) {
-    if (! (strncmp ("/system/etc/firmware/BCM4335", path_buf, strlen ("/system/etc/firmware/BCM4335"))) ) {
-      logd ("hcd_file_find BCM4335A or BCM4335B");//HTC One A0 HCD file");
-      /*if (file_get ("/system/etc/firmware/BCM4335B0_002.001.006.0092.0093.hcd")) {
-        logd ("hcd_file_find using HTC One BCM4335B0_002.001.006.0092.0093");
-        strncpy (path_buf, "/system/etc/firmware/BCM4335B0_002.001.006.0092.0093.hcd", path_len);
-      }
-      if (file_get ("/system/etc/firmware/BCM4335B0_002.001.006.0191.0194.hcd")) {*/
-        //logd ("hcd_file_find using HTC One BCM4335B0_002.001.006.0191.0194");
-        //strncpy (path_buf, "/system/etc/firmware/BCM4335B0_002.001.006.0191.0194.hcd", path_len);
-        strncpy (path_buf, "/data/data/fm.a2d.sf/files/b1.bin", path_len);
-        hcd_num = 1;
-      //}
-    }
-    else if (! (strncmp ("/system/etc/firmware/BCM4339", path_buf, strlen ("/system/etc/firmware/BCM4339"))) ) {    // Z2
-      logd ("hcd_file_find Sony Z2 bin BCM4339");
-      //strncpy (path_buf, "/data/data/fm.a2d.sf/files/b2.bin", path_len);
-    }
-    else if (! (strncmp ("/system/bin/BCM4335", path_buf, strlen ("/system/bin/BCM4335"))) ) {
-      logd ("hcd_file_find LG G2 bin BCM4335A or BCM4335B");
-      strncpy (path_buf, "/data/data/fm.a2d.sf/files/b2.bin", path_len);
-      hcd_num = 2;
-    }
-    else if (! (strncmp ("/system/vendor/firmware/BCM4335", path_buf, strlen ("/system/vendor/firmware/BCM4335"))) ) {
-    //CM:   system//vendor/firmware:
-    //-rw-r--r-- root     root        44046 2008-08-01 08:00 BCM4335B0_002.001.006.0191.0201_ORC.hcd
-      logd ("hcd_file_find LG G2 CM vendor/firmware BCM4335A or BCM4335B");
-      strncpy (path_buf, "/data/data/fm.a2d.sf/files/b2.bin", path_len);
-      hcd_num = 2;
-    }
-    else {
-      loge ("hcd_file_find ASSUME !!!! BCM4335A or BCM4335B");
-      strncpy (path_buf, "/data/data/fm.a2d.sf/files/b2.bin", path_len);
-      hcd_num = 2;
-    }
-
-
-    return (1);
-  }
-/*  ret = file_find ("/system/bin", ".hcd", path_buf, path_len);
-  if (ret) {                  // If we have at least one BC *.hcd or *.HCD firmware file in /system/bin...
-    logd ("hcd_file_find have *.hcd file: %s", path_buf);
-    return (1);
-  }*/
-  logd ("hcd_file_find no *.hcd file or no permission");
-  return (0);                                                           // Done w/ no result
-}
-
-
-//long ms_get ();
-//static void hex_dump (const char * prefix, int width, unsigned char * buf, int len);
-
-char user_dev [DEF_BUF] = "";
-
-const char * user_char_dev_get (const char * dir_or_dev, int user) {
-  DIR  * dp;
-  struct dirent * dirp;
-  struct stat sb;
-  int ret = 0;
-  logd ("user_char_dev_get: %s  %d", dir_or_dev, user);
-
-  ret = stat (dir_or_dev, & sb);                                        // Get file/dir status.
-  if (ret == -1) {
-    loge ("user_char_dev_get: dir_or_dev stat errno: %d", errno);
-    return (NULL);
-  }
-
-  if (S_ISCHR(sb.st_mode)) {                                            // If this is a character device...
-    if (sb.st_uid == user) {                                            // If user match...
-      //strlcpy (user_dev, dir_or_dev, sizeof (user_dev));
-      //return (user_dev);                                                // Device found
-      return (dir_or_dev);
-    }
-    return (NULL);
-  }
-
-  if ((dp = opendir (dir_or_dev)) == NULL) {                            // Open the directory. If error...
-    loge ("user_char_dev_get: can't open dir_or_dev: %s  errno: %d", dir_or_dev, errno);
-    return (NULL);                                                      // Done w/ no result
-  }
-  //logd ("user_char_dev_get opened directory %s", dir_or_dev);
-
-  while ((dirp = readdir (dp)) != NULL) {                               // For all files/dirs in this directory... (Could terminate with errno set !!)
-    //logd ("user_char_dev_get: readdir returned file/dir %s", dirp->d_name);
-
-    char filename[DEF_BUF] = {0};
-    strlcpy (filename, dir_or_dev, sizeof (filename));
-    strlcat (filename, "/", sizeof (filename));
-    strlcat (filename, dirp->d_name, sizeof (filename));                // Set fully qualified filename
-
-    ret = stat (filename, & sb);                                        // Get file/dir status.
-    if (ret == -1) {
-      loge ("user_char_dev_get: file stat errno: %d", errno);
-      continue;                                                         // Ignore/Next if can't get status
-    }
-
-    if (S_ISCHR(sb.st_mode)) {                                          // If this is a character device...
-      //logd ("user_char_dev_get: dir %d", sb.st_mode);
-      if (sb.st_uid == user) {                                          // If user match...
-        closedir (dp);                                                  // Close the directory.
-        strlcpy (user_dev, filename, sizeof (user_dev));
-        return (user_dev);                                              // Device found
-      }
-    }
-  }
-  closedir (dp);                                                        // Close the directory.
-  return (NULL);
-}
 
 
 int pid_get (const char * cmd, int idx) {
@@ -388,50 +179,46 @@ int sock_rx_tmo_set (int fd, int tmo) {                                 // tmo =
 }
 
 
-  //int lock_enable = 0;
-  int lock_enable = 1;  // !! This freezes sooner or later !!       BUT without lock get regular errors !!!
+  char * holder_id = "None";
 
 int lock_open (const char * id, volatile int * lock, int tmo) {
-  int start_time = 0, attempts = 0;
-
+  int attempts = 0;
   volatile int lock_val = * lock;
 
   //logd ("lock_open %s  lock_val: %d  lock: %d  tmo: %d", id, lock_val, * lock, tmo);
-  start_time = ms_get ();                                               // Set start time
+  int start_time   = ms_get ();                                         // Set start time
+  int timeout_time = start_time + tmo;                                  // Set end/timeout time
+  int elapsed_time = ms_get () - start_time;
 
-  while (ms_get () < start_time + tmo) {                                // Until timeout
-
-    if (* lock < 0) {
-      * lock = 0;
-      loge ("lock_open clear negative lock");
+  while (ms_get () < timeout_time) {                                    // Until timeout
+    if (* lock < 0) {                                                   // If negative...
+      * lock = 0;                                                       // Fix
+      loge ("!!!!!!!!! lock_open clear negative lock id: %s  holder_id: %s", id, holder_id, attempts);
     }
 
-    while (lock_enable && (* lock) && ms_get () < start_time + tmo) {                                   // While the lock is enable and is NOT acquired...
-      int ms = ms_get () - start_time;
-      if (ms > 100)
-        loge ("lock_open sleep 10 ms %s attempts: %d  lock_val: %d  lock: %d  ms: %d",id, attempts, lock_val, * lock, ms);// Else we lost attempt
-      ms_sleep (10);                                                   // Sleep a while then try again
+    while ((* lock) && ms_get () < timeout_time) {                      // While the lock is NOT acquired and we have not timed out...
+      if (elapsed_time > 100)
+        loge ("lock_open sleep 10 ms id: %s  holder_id: %s  attempts: %d  lock_val: %d  lock: %d  elapsed_time: %d", id, holder_id, attempts, lock_val, * lock, elapsed_time);// Else we lost attempt
+      ms_sleep (10);                                                    // Sleep a while then try again
     }
+    elapsed_time = ms_get () - start_time;
 
     (* lock) ++;                                                        // Attempt to acquire lock (1st or again)
     lock_val = (* lock);
     if (lock_val == 1) {                                                // If success...
       if (attempts)                                                     // If not 1st try...
-        loge ("lock_open %s success attempts: %d  lock_val: %d  lock: %d  ms: %d", id, attempts, lock_val, * lock, ms_get () - start_time);
+        loge ("lock_open %s success id: %s  holder_id: %s  attempts: %d  lock_val: %d  lock: %d  elapsed_time: %d", id, holder_id, attempts, lock_val, * lock, elapsed_time);
+      holder_id = (char *) id;
       return (0);                                                       // Lock acquired
     }
-    else if (lock_enable) {
-      (* lock) --;                                                        // Release lock attempt
-      loge ("lock_open %s lost attempts: %d  lock_val: %d  lock: %d  ms: %d",id, attempts, lock_val, * lock, ms_get () - start_time);// Else we lost attempt
-      attempts ++;
-    }
     else {
-      loge ("BYPASSING lock_open %s timeout attempts: %d  lock_val: %d  lock: %d  ms: %d", id, attempts, lock_val, * lock, ms_get () - start_time);
-      return (0);
+      (* lock) --;                                                      // Release lock attempt
+      loge ("lock_open lost id: %s  holder_id: %s  attempts: %d  lock_val: %d  lock: %d  elapsed_time: %d", id, holder_id, attempts, lock_val, * lock, elapsed_time);// Else we lost attempt
+      attempts ++;
     }
   }
   lock_val = (* lock);
-  loge ("lock_open %s timeout attempts: %d  lock_val: %d  lock: %d  ms: %d", id, attempts, lock_val, * lock, ms_get () - start_time);
+  loge ("lock_open timeout id: %s  holder_id: %s  attempts: %d  lock_val: %d  lock: %d  elapsed_time: %d", id, holder_id, attempts, lock_val, * lock, elapsed_time);
   return (-1);                                                          // Error, no lock
 }
 
@@ -444,19 +231,11 @@ int lock_close (const char * id, volatile int * lock) {
 
 
   int shim_hci_enable = 0;                                              // Default 0 = UART, 1 = Bluedroid SHIM
-
-  #include "acc_hci.c"
+  #include "bch_hci.c"
 
   // Do internal HCI command:
 
 int do_acc_hci (unsigned char * cmd_buf, int cmd_len, unsigned char * res_buf, int res_max, int rx_tmo ) {
-
-/*Not needed here, done in acc_hci.c
-  if (cmd_len == 1 && cmd_buf [0] == 0x73) {
-    loge ("do_acc_hci got ready inquiry");
-    res_buf [0] = 0x37;
-    return (1);
-  }*/
 
   int hx_ret = hci_xact (cmd_buf, cmd_len);
   if (hx_ret < 8 || hx_ret > 270) {
@@ -490,10 +269,6 @@ int do_acc_hci (unsigned char * cmd_buf, int cmd_len, unsigned char * res_buf, i
 typedef struct {
 	__u8 b[6];
 } __attribute__((packed)) bdaddr_t;
-
-#include "inc/hci.h"
-#include "inc/hci_lib.h"
-
 
 //ar r libbluetooth.a libbluetooth.so
 //cd ../../../../android-3/arch-arm/usr/lib/;mkdir bt; mv libbluetooth.* bt
@@ -820,7 +595,7 @@ unsigned char hci_fm_on[] = { 0x01, 0x15, 0xfc, 0x03, 0x00, 0x00, 0x01 };   // p
 
 
   static volatile int hci_cmd_lock = 0;                                 // Need a lock due to usage of non-thread safe hci_cmd_* routines; hcitool, do_client_hci etc. Also HCI Events are promiscuous
-                                                                        // Still needed on Spirit2 or get errors from simultaneous commands
+                                                                        // Still needed or get errors from simultaneous commands
 
 int hci_cmd (uint8_t ogf, uint16_t ocf, unsigned char * cmd_buf, int cmd_len, unsigned char * res_buf, int res_max) {
   int hci_cmd_start_time = 0;
@@ -1383,20 +1158,34 @@ Seek:
     if (stat ("/system/lib/libbt-hci.so", & sb) == 0) {                 // If Bluedroid file exists...
       if (sb.st_size > 60000 && file_get ("/system/lib/libbt-hcio.so")){// If our lib and have old lib to call  (If just large but no old, assume original
         if (file_get ("/dev/ttyHS0") || file_get ("/dev/ttyHS99")) {
-          //if (bt_get ()) {                                              // com.android.bluetooth always runs after BT turned on, even when off
-
+          //if (bt_get ())                                              // com.android.bluetooth always runs after BT turned on, even when off
           if (file_get ("/data/data/fm.a2d.sf/files/use_shim")) {
             logd ("chip_imp_api_on will use SHIM");
-            shim_hci_enable = 1;                                          // Use shim
+            shim_hci_enable = 1;                                        // Use shim
+          }
+        }
+      }
+    }
+    else if (stat ("/system/vendor/lib/libbt-vendor.so", & sb) == 0) {                 // If Bluedroid file exists...
+      if (sb.st_size > 60000 && file_get ("/system/vendor/lib/libbt-vendoro.so")){// If our lib and have old lib to call  (If just large but no old, assume original
+        if (file_get ("/dev/ttyHS0") || file_get ("/dev/ttyHS99")) {
+          //if (bt_get ())                                              // com.android.bluetooth always runs after BT turned on, even when off
+          if (file_get ("/data/data/fm.a2d.sf/files/use_shim")) {
+            logd ("chip_imp_api_on will use SHIM");
+            shim_hci_enable = 1;                                        // Use shim
           }
         }
       }
     }
 
-    if (shim_hci_enable)
-      return (shim_hci_start ());
+
+    int ret = 0;
+    if (shim_hci_enable) {
+      ret = shim_hci_start ();
+//bc_g2_pcm_set ();
+    }
     else
-      return (uart_hci_start ());
+      ret = uart_hci_start ();
 
 /* 
     int ret = shim_hci_start ();                                        // Always try shim mode first (Can't use, doesn't return error
@@ -1599,7 +1388,48 @@ int bc_reg_aud_ctl0  = 0;                                               // BC_RE
 
 
 
+// 3f 00 = "Customer_Extension"
+/*
+01-15 19:46:39.924 D/fm_hrdw ( 2104): bc_mute_set: 0
+
+01-15 19:46:40.064 D/fm_hrdw ( 2104): bc_g2_pcm_set 1
+01-15 19:46:40.064 E/fm_hrdw ( 2104): do_acc_hci hci err: 252 Unknown HCI Error
+01-15 19:46:40.064 E/fm_hrdw ( 2104): hci_cmd error res_len: 8  hci_err: 252 Unknown HCI Error
+01-15 19:46:40.064 D/fm_hrdw ( 2104): 00 04 0f 04 00 01 00 fc 
+01-15 19:46:40.064 D/fm_hrdw ( 2104): hci_cmd failed command ogf: 0x3f  ocf: 0x0  cmd_len: 13  res_max: 252
+01-15 19:46:40.064 D/fm_hrdw ( 2104): 00 00 00 00 01 00 fc 05 f3 88 01 02 05 
+01-15 19:46:40.064 E/fm_hrdw ( 2104): bc_g2_pcm_set hci error: 252 Unknown HCI Error
+
+01-15 19:46:40.114 D/fm_hrdw ( 2104): uart_recv flushed bytes: 7
+01-15 19:46:40.114 D/fm_hrdw ( 2104): ff 04 ff 04 f3 00 88 00 
+01-15 19:46:40.114 D/fm_hrdw ( 2104): uart_cmd uart_recv fret: 8  flushed: 0xf3
+
+
+01-15 19:46:40.194 D/fm_hrdw ( 2104): regional_set
+01-15 19:46:40.194 D/fm_hrdw ( 2104): bc_rbds_set: 1
+*/
+
+
 int bc_g2_pcm_set () {
+loge ("bc_g2_pcm_set");
+      ms_sleep (50);
+      reg_set (0xfb | 0x20000,  0x00000000);                            // Audio PCM ????       fb 00 00 00 00 00 
+      ms_sleep (50);
+
+
+//  bc_g2_pcm_set_orig ();
+
+      int inc = 100;
+      ms_sleep (50);
+      reg_set (0xfd | 0x10000, inc);
+      ms_sleep (50);
+      reg_set (0xf8 | 0x10000,  0x00ff);                                // Vol Max              f8 00 ff 00 
+
+  bc_g2_pcm_set_orig ();
+}
+
+int bc_g2_pcm_set_orig () {
+loge ("bc_g2_pcm_set_orig");
   unsigned char res_buf [MAX_HCI];
   int res_len;
   logd ("bc_g2_pcm_set 1");     // hcitool cmd 3f 00 f3 88 01 02 05
@@ -1615,19 +1445,13 @@ int bc_g2_pcm_set () {
     loge ("bc_g2_pcm_set hci_cmd error res_len: %d", res_len);
   else 
     loge ("bc_g2_pcm_set OK");
+  return (0);
 }
 
 
+  int version_sdk;
+  char version_sdk_prop_buf       [DEF_BUF];
 
-char product_device_prop_buf    [DEF_BUF] = "";
-char product_manuf_prop_buf     [DEF_BUF] = "";
-char product_board_prop_buf     [DEF_BUF] = "";
-
-void props_log (const char * prop, char * prop_buf) {
-  //char prop_buf [DEF_BUF] = "";
-  __system_property_get (prop, prop_buf);
-  logd ("props_log %32.32s: %s", prop, prop_buf);
-}
 
 
   int band_setup ();
@@ -1639,6 +1463,7 @@ void props_log (const char * prop, char * prop_buf) {
   #define MAX_RDS_BLOCKS 20 //40//41//40 //42
 
   int is_lg2 = 0;
+  int is_m7  = 0;
 
     // Chip API:
   int chip_imp_pwr_on (int pwr_rds) {
@@ -1656,6 +1481,8 @@ void props_log (const char * prop, char * prop_buf) {
     //bc_reg_dump (0x00, 0x4f, 4);
 
     int pwr_val = 0x01;                                                 // No RDS
+    if (pwr_rds)
+      pwr_val = 0x03;
     if (reg_set (0x00, pwr_val) < 0)                                    // Write power reg.
       loge ("chip_imp_pwr_on 1 error writing 0x00");
     else
@@ -1796,17 +1623,49 @@ ms_sleep (50);
     props_log ("ro.product.manufacturer",           product_manuf_prop_buf);
     if (! strncasecmp (product_manuf_prop_buf,   "LG", strlen (   "LG")))       is_lg2 = 1;     // LG or LGE
 
-    if (is_lg2) {                                                       // Special LG G2 stuff needed, or no audio
+    if (! strncasecmp (product_manuf_prop_buf,  "HTC", strlen (  "HTC")))       is_m7  = 1;
+
+    props_log ("ro.build.version.sdk",        version_sdk_prop_buf);      // Android 4.4 KitKat = 19
+    version_sdk = atoi (version_sdk_prop_buf);
+
+
+    if (is_lg2 && shim_hci_enable == 0)   // UART only; see bt-ven.c not yet in bt-hci.c
+      bc_g2_pcm_set ();
+    else if (is_lg2) {                                                  // Special LG G2 stuff needed, or no audio
       ms_sleep (50);
       reg_set (0xfb | 0x20000,  0x00000000);                            // Audio PCM ????       fb 00 00 00 00 00 
       ms_sleep (50);
-      bc_g2_pcm_set ();
+      //if (shim_hci_enable == 0)   // UART only; see bt-ven.c not yet in bt-hci.c
+      //  bc_g2_pcm_set ();
       int inc = 100;
       ms_sleep (50);
       reg_set (0xfd | 0x10000, inc);
       ms_sleep (50);
       reg_set (0xf8 | 0x10000,  0x00ff);                                // Vol Max              f8 00 ff 00 
     }
+    else {  // For HTC One M7 and Sony Z2/Z3:
+      ms_sleep (50);
+      reg_set (0xfb | 0x20000,  0x00000000);                            // Audio PCM ????       fb 00 00 00 00 00 
+      ms_sleep (50);
+      int inc = 100;
+      ms_sleep (50);
+      reg_set (0xfd | 0x10000, inc);
+      ms_sleep (50);
+
+      int vol_val = 0x0040;                                             // Target max about 27,000
+      if (version_sdk >= 21 && file_get ("/system/framework/htcirlibs.jar")) // If HTC One M7 GPE       (Stock Android 5 too ????)
+        vol_val = 0x0060;
+      else if (version_sdk >= 21 && is_m7)
+        vol_val = 0x0040;
+      //else if (version_sdk >= 21 && is_xz2)   // Early ROM needed 0x0040 but FXP-cm-12-20150102-UNOFFICIAL-castor_windy does not
+      //  vol_val = 0x0040;
+      else
+        vol_val = 0x00ff;
+
+      if (vol_val != 0x00ff)
+        reg_set (0xf8 | 0x10000,  vol_val);                               // Vol Max              f8 00 ff 00 
+    }
+
 
     //bc_reg_dump (0x00, 0x7f, 1);
 
@@ -2075,36 +1934,21 @@ int bc_vol_poke (int vol) {
   extern int curr_stro_sig;// = 0;
   int stro_sig = 0;
   int need_stro_sig_chngd = 0;
+  extern int stro_evt_enable;// = 1;
 
   int chip_imp_stro_get () {
     //logd ("chip_imp_stro_get");
     return (curr_stro_sig);
   }
 
-//#define BCM2048_RDS_BLOCK_MASK    0xF0
-//#define BCM2048_RDS_BLOCK_A       0x00
-//#define BCM2048_RDS_BLOCK_B       0x10
-//#define BCM2048_RDS_BLOCK_C       0x20
-//#define BCM2048_RDS_BLOCK_D       0x30
-//#define BCM2048_RDS_BLOCK_C_SCORE 0x40
-//#define BCM2048_RDS_BLOCK_E       0x60
+    // RDS:
 
-  extern int stro_evt_enable;// = 1;
-
-  extern unsigned char rds_grpd [8];// = {0};
-
-
-  extern int total_blocks;
-  extern int status_error_blocks;
-  extern int blkseq_error_blocks;
-  extern int avoidd_error_blocks;
-  extern int total_block_errors;
-  extern int total_block_errors_curr;
-  extern int total_block_errors_last;
-
-  extern int last_blk_idx;//= -1;
-
-  extern int rds_group_process (unsigned char * grp);
+//#define  SUPPORT_RDS
+#ifdef  SUPPORT_RDS
+  #include "bch_rds.c"
+#else
+  int rds_events_process (unsigned char * rds_grpd) {return (-1);}
+#endif
 
     // Seek
     //int seek_in_progress    = 0;
@@ -2114,37 +1958,8 @@ int bc_vol_poke (int vol) {
     //logd ("chip_imp_events_process: %p", rds_grpd);
     int ret = 0;
 
-    if (seek_in_progress) {
-      logd ("chip_imp_events_process: %p  seek in progress", rds_grpd);
-      return (-1);
-    }
-
-    int flags = reg_get (0x12 | 0x10000);                               // Read 2 bytes event/RDS event register  For some reason, this needs to be done before RDS flags get and process, still fails some time
-    if (evt_dbg)
-      logd ("evt_get flags: 0x%x", flags);
-    if (seek_in_progress) {
-      //bc_seek_handle (flags);
-    }
-    else {                                                              // If not seeking...
-      if (flags & 0x1000) {                                             // If sync lost
-        if (rds_error_debug)
-          logd ("evt_get RDS sync lost flags: 0x%x", flags);            // !!!!!! Should count these !!
-      }
-      else if (stro_evt_enable) {
-        //logd ("evt_get stro_sig check");
-        if (flags & 0x20) //0x40)                                       // STEREO_ACTIVE    !!!! Why don't stereo status bits work on TI or BC !! ??
-          stro_sig = 1;
-        else
-          stro_sig = 0;
-        if (stro_sig != curr_stro_sig) {
-          curr_stro_sig = stro_sig;
-          need_stro_sig_chngd = 1;
-        }
-      }
-    }
-
-    return (-1);                                                        // No RDS; Already called rds_group_process(), possibly multiple times.
-
+    ret = rds_events_process (rds_grpd);
+    return (ret);
   }
 
     // Seek:
@@ -2383,12 +2198,17 @@ int regional_set (int lo, int hi, int inc, int odd, int emph75, int rbds) {
       if (val == 990) {
         intern_band = 0;  // EU
         band_setup ();
-        return (0);
       }
       else if (val == 991) {
         intern_band = 1;  // US
         band_setup ();
-        return (0);
+      }
+      else if (full_val >= 200000 && full_val <= 200255) {
+        int vol_reg_val = full_val - 200000;
+        reg_set (0xf8 | 0x10000,  vol_reg_val);//0x000f);//0x00ff);                                // Vol Max              f8 00 ff 00 
+      }
+      else if (full_val == 230000) {
+        bc_g2_pcm_set ();
       }
 
     return (0);

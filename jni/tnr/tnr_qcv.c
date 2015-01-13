@@ -1,5 +1,5 @@
 
-  #define LOGTAG "s2tnr_qcv"
+  #define LOGTAG "stnr_qcv"
 
 #include <dlfcn.h>
 #include <string.h>
@@ -21,10 +21,10 @@
 #include <android/log.h>
 #include "jni.h"
 
-#include "inc/android_fmradio.h"
+#include "tnr_tnr.h"
 
 #define EVT_LOCK_BYPASS             // Locking causes problems at beginning due to blocking iris_buf_get()
-  #include "plug.c"
+  #include "tnr_tnr.c"
 
     // Functions called from this chip specific code to generic code:
 
@@ -48,6 +48,7 @@
   extern int curr_freq_lo;
   extern int curr_freq_hi;
 
+  int curr_stereo = 0;
 
   //extern struct v4l2_capability    v4l_cap;//     = {0};
 
@@ -146,25 +147,27 @@ if (0) {
     sys_run ((char *) "setprop hw.fm.mode normal >/dev/null 2>/dev/null ; setprop hw.fm.version 0 >/dev/null 2>/dev/null ; setprop ctl.start fm_dl >/dev/null 2>/dev/null");
 
     if (file_get ("/system/lib/modules/radio-iris-transport.ko"))
-      sys_run ((char *) "insmod /system/lib/modules/radio-iris-transport.ko >/dev/null 2>/dev/null");//>/sdcard/s2z1 2>/sdcard/s2z2");
+      sys_run ((char *) "insmod /system/lib/modules/radio-iris-transport.ko >/dev/null 2>/dev/null");
 
 
     char value [4] = {0x41,0x42,0x43,0x44};//"z";//'z';//0;    //char prop_buf [DEF_BUF] = "";
     int i = 0, init_success = 0;
-    for (i = 0; i < 600; i ++) {
+    int sleep_ms = 10;
+    int max_ms = 6000;
+    for (i = 0; i < max_ms / sleep_ms; i ++) {
       __system_property_get ("hw.fm.init", value);
       if (value [0] == '1') {
         init_success = 1;
         break;
       }
       else {
-        ms_sleep (10);
+        ms_sleep (sleep_ms);
       }
     }
     if (init_success == 1)
-      logd ("chip_imp_api_on init success after %d milliseconds", i);
+      logd ("chip_imp_api_on init success after %d milliseconds", i * sleep_ms);
     else
-      loge ("chip_imp_api_on init error 0x%x after %d milliseconds", value, i);
+      loge ("chip_imp_api_on init error 0x%x after %d milliseconds", value, i * sleep_ms);
 
 
 ms_sleep (1000);
@@ -456,26 +459,6 @@ enum iris_buf_t {
         IRIS_BUF_MAX,
 };
 
-extern int curr_pi;// = 0;         // Program ID. Canada non-national = 0xCxxx.   // 88.5: 0x163e, 106.1: 0xc448, 105.3: 0xc87d, 106.9: 0xdc09, 91.5: 0xb102, 89.1: 0, 89.9: 0x15d6, 93.9: 0xccb6
-extern int cand_pi;// = 0;
-extern int conf_pi;// = 0;
-
-extern int curr_pt;// = -1;         // 88.5: 5 = Rock   106.1: 6 = Classic Rock
-extern int cand_pt;// = -1;
-extern int conf_pt;// = -1;
-
-extern int need_pi_chngd;//       = 0;
-extern int need_pt_chngd;//       = 0;
-extern int need_ps_chngd;//       = 0;
-extern int need_rt_chngd;//       = 0;
-
-extern char conf_ps[9];// ="        ";  // Confirmed PS: When a new Current PS matches Candidate PS, the candidate is considered confirmed and copied here where the App can retrieve it.
-extern char conf_rt[65];// ="                                                                ";     // Confirmed RT.
-
-  int curr_stereo = 0;
-
-  int iris_rds_ok_dbg = 1;
-
 
   const char * id_get (int id) {
     if (id >= V4L2_CID_PRIVATE_IRIS_SRCHMODE && id <= V4L2_CID_PRIVATE_SINR_SAMPLES) {          // 0x8000030
@@ -654,6 +637,19 @@ extern char conf_rt[65];// ="                                                   
       ret = chip_ctrl_set (V4L2_CID_PRIVATE_IRIS_ANTENNA, v4l_antenna - 2);                     // 0 = External/headset antenna for OneS/XL/Evo 4G/All others, 1 = internal for Xperia T - Z1
      logd ("chip_imp_pwr_on PRIVATE_IRIS_ANTENNA ret: %d  v4l_antenna: %d", ret, v4l_antenna);
     }
+    if (pwr_rds) {
+      if (chip_ctrl_set (V4L2_CID_PRIVATE_IRIS_RDSON, 1) < 0)           // 0 = OFF, 1 = ON
+        loge ("chip_imp_pwr_on PRIVATE_IRIS_RDSON 1 error");
+      else
+        logd ("chip_imp_pwr_on PRIVATE_IRIS_RDSON 1 success");
+
+      chip_ctrl_set (V4L2_CID_PRIVATE_IRIS_RDSGROUP_PROC, -1);
+      chip_ctrl_set (V4L2_CID_PRIVATE_IRIS_PSALL, -1);
+      chip_ctrl_set (V4L2_CID_PRIVATE_IRIS_RDSD_BUF, 128);
+      chip_ctrl_get (V4L2_CID_PRIVATE_IRIS_RDSGROUP_PROC);              // 0x08000010 = 56 = 0x38 = 0x07 << RDS_CONFIG_OFFSET (3)
+      chip_ctrl_get (V4L2_CID_PRIVATE_IRIS_RDSD_BUF);
+      chip_ctrl_get (V4L2_CID_PRIVATE_IRIS_PSALL);                      // 0x8000014 = 56, ? Bug, copied RDSGROUP_PROC instead of boolean "pass all ps strings"
+    }
 //ms_sleep (200);
     band_setup ();
 
@@ -671,6 +667,19 @@ extern char conf_rt[65];// ="                                                   
     chip_imp_mute_set (1);                                                         // Mute
 
     logd ("chip_imp_pwr_off chip_imp_mute_set done");
+
+    if (pwr_rds) {
+//      ms_sleep (100);
+
+      if (chip_ctrl_set (V4L2_CID_PRIVATE_IRIS_RDSON, 0) < 0)           // 0 = OFF, 1 = ON
+        loge ("chip_imp_pwr_off PRIVATE_IRIS_RDSON 0 error");
+      else
+        logd ("chip_imp_pwr_off PRIVATE_IRIS_RDSON 0 success");
+
+//      ms_sleep (100);
+    }
+
+    logd ("chip_imp_pwr_off RDS off done");
 
     // The close () powers down       !!! NO !!! Need the below:
     // ?? !! Actually keeps running on AT&T OneX(L), mute will cover it.
@@ -846,8 +855,8 @@ static struct v4l2_queryctrl tavarua_v4l2_queryctrl[] = {        {
         loge ("chip_imp_rssi_get VIDIOC_G_TUNER errno: %d", errno);
       return (-1);
     }
-    static int times2 = 0;
-    if (times2 ++ % 10 == 0)
+    static int timesb = 0;
+    if (timesb ++ % 10 == 0)
       //logd ("chip_imp_rssi_get VIDIOC_G_TUNER success: %d", v4l_tuner.signal);  // At 87.5 got 180 and 185
       if (extra_log)
         logd ("chip_imp_rssi_get VIDIOC_G_TUNER success name: %s  type: %d  cap: 0x%x  lo: %d  hi: %d  sc: %d  am: %d  sig: %d  afc: %d", v4l_tuner.name,
@@ -919,7 +928,6 @@ curr_stereo = v4l_tuner.audmode;
     return (curr_stereo);
   }
 
-
 // From radio-iris-commands.h :
 
 enum iris_evt_t {
@@ -947,41 +955,29 @@ enum iris_evt_t {
         IRIS_EVT_NEW_ERT,
 };
 
+    // RDS:
+
+//#define  SUPPORT_RDS
+#ifdef  SUPPORT_RDS
+  #include "qcv_rds.c"
+#else
+  int rds_events_process (unsigned char * rds_grpd) {return (-1);}
+#endif
 
   int chip_imp_events_process (unsigned char * rds_grpd) {
     int ret = 0;
 
-    //logd ("chip_imp_events_process before iris_rds_buf_handle (BUF_RT_RDS)");
-//    ret = iris_rds_buf_handle (BUF_RT_RDS);
-/*
-    if (ret < 0) {
-      loge ("chip_imp_events_process BUF_RT_RDS errno: %d", errno);
-      //return (-1);                                                      // No RDS
-    }
-    //else
-    //  logd ("chip_imp_events_process BUF_RT_RDS success: %d", ret);
-*/
+    ret = rds_events_process (rds_grpd);
+    return (ret);
 
-    //logd ("chip_imp_events_process before iris_rds_buf_handle (BUF_PS_RDS)");
-//    ret = iris_rds_buf_handle (BUF_PS_RDS);
-/*
-    if (ret < 0) {
-      loge ("chip_imp_events_process BUF_PS_RDS errno: %d", errno);
-      //return (-1);                                                      // No RDS
-    }
-    //else
-    //  logd ("chip_imp_events_process BUF_PS_RDS success: %d", ret);
-*/
-    return (-1);                                                        // No RDS; Already called rds_group_process(), possibly multiple times.
-
-
+#ifdef  NOT_USED
     char misc_buf [MISC_BUF_SIZE];
     memset (misc_buf, 0, sizeof (misc_buf));
 logd ("chip_imp_events_process before iris_buf_get()");
     ret = iris_buf_get (misc_buf, sizeof (misc_buf), BUF_EVENTS);   // Get events...
     if (ret < 0) {
       loge ("chip_imp_events_process EVENTS errno: %d", errno);
-      return (-1);                                                      // No RDS; Already called rds_group_process(), possibly multiple times.
+      return (-1);                                                      // No RDS
     }
 logd ("chip_imp_events_process EVENTS success: %d", ret);
 buf_display (misc_buf, ret);
@@ -1001,12 +997,15 @@ buf_display (misc_buf, ret);
         break;
       case IRIS_EVT_NEW_RAW_RDS:
         logd ("Got IRIS_EVT_NEW_RAW_RDS");
+        iris_rds_buf_handle (BUF_RAW_RDS);
         break;
       case IRIS_EVT_NEW_RT_RDS:
 logd ("Got IRIS_EVT_NEW_RT_RDS");
+        iris_rds_buf_handle (BUF_RT_RDS);
         break;
       case IRIS_EVT_NEW_PS_RDS:
 logd ("Got IRIS_EVT_NEW_PS_RDS");
+        iris_rds_buf_handle (BUF_PS_RDS);
         break;
       case IRIS_EVT_ERROR:
         logd ("Got IRIS_EVT_ERROR");
@@ -1036,6 +1035,7 @@ logd ("Got IRIS_EVT_NEW_PS_RDS");
         break;
       case 15:
         logd ("Got IRIS_EVT_NEW_AF_LIST");
+        iris_rds_buf_handle (BUF_AF_LIST);
         break;
       case 16:
         loge ("IRIS_EVT_TXRDSDAT");
@@ -1045,6 +1045,7 @@ logd ("Got IRIS_EVT_NEW_PS_RDS");
         break;
       case 18:
         loge ("Got IRIS_EVT_RADIO_DISABLED");
+        //iris_rds_buf_handle (BUF_AF_LIST);    !! ??
         break;
       case 19:
         loge ("Got IRIS_EVT_NEW_ODA");
@@ -1060,8 +1061,8 @@ logd ("Got IRIS_EVT_NEW_PS_RDS");
         loge ("Unknown event: %d", event);
         break;
     }
-
-    return (-1);                                                        // No RDS; Already called rds_group_process(), possibly multiple times.
+    return (-1);                                                        // No RDS
+#endif
   }
 
     // Seek:

@@ -1,5 +1,5 @@
 
-  #define LOGTAG "s2tnr_ssl"
+  #define LOGTAG "stnr_ssl"
 
 #include <dlfcn.h>
 #include <string.h>
@@ -21,11 +21,11 @@
 #include <android/log.h>
 #include "jni.h"
 
-#include "inc/android_fmradio.h"
+#include "tnr_tnr.h"
 
 #define EVT_LOCK_BYPASS
             // Locking causes problems after a while; blocks in events_process()    (   ioctl (dev_hndl, Si4709_IOC_RDS_DATA_GET, & rd);    )
-  #include "plug.c"
+  #include "tnr_tnr.c"
 
 
     // Functions called from this chip specific code to generic code:
@@ -297,11 +297,29 @@ typedef struct
 
     // chip_*() functions used by plug.c
 
+  int sys_run (char * cmd) {
+    int ret = system (cmd);
+    logd ("sys_run ret: %d  cmd: \"%s\"", ret, cmd);
+    return (ret);
+  }
+
   int chip_imp_api_on (int freq_lo, int freq_hi, int freq_inc) {
     logd ("chip_imp_api_on freq_lo: %d  freq_hi: %d  freq_inc: %d", freq_lo, freq_hi, freq_inc);
     curr_freq_lo = freq_lo;
     curr_freq_hi = freq_hi;
     curr_freq_inc= freq_inc;
+
+    if (file_get ("/system/lib/modules/Si4709_driver.ko"))
+      sys_run ("insmod /system/lib/modules/Si4709_driver.ko    >/dev/null 2>/dev/null ; modprobe Si4709_driver >/dev/null 2>/dev/null");
+    else if (file_get ("/lib/modules/Si4709_driver.ko"))
+      sys_run ("insmod        /lib/modules/Si4709_driver.ko    >/dev/null 2>/dev/null ; modprobe Si4709_driver >/dev/null 2>/dev/null");
+    else if (file_get ("/system/lib/modules/radio-si4709-i2c.ko"))
+      sys_run ("insmod /system/lib/modules/radio-si4709-i2c.ko >/dev/null 2>/dev/null ; modprobe radio-si4709-i2c >/dev/null 2>/dev/null");
+    else if (file_get ("/lib/modules/radio-si4709-i2c.ko"))
+      sys_run ("insmod        /lib/modules/radio-si4709-i2c.ko >/dev/null 2>/dev/null ; modprobe radio-si4709-i2c >/dev/null 2>/dev/null");
+    else
+      sys_run ("modprobe Si4709_driver >/dev/null 2>/dev/null ; modprobe radio_si4709_i2c >/dev/null 2>/dev/null");
+
     dev_hndl = open ("/dev/fmradio", O_RDONLY);
     if (dev_hndl < 0) {
       logd ("chip_imp_api_on error opening samsung /dev/fmradio: %3.3d", errno);
@@ -339,7 +357,6 @@ typedef struct
       return (-1);
     }
 
-
     logd ("chip_imp_pwr_on IOCTL Si4709_IOC_POWERUP success");
     //chip_info_log ();
     //chip_imp_mute_set (1);                                                       // Mute for now
@@ -347,6 +364,20 @@ typedef struct
 ms_sleep (100); // !!!! NEED !!!! ??
 ms_sleep (100);
 
+    if (pwr_rds) {
+      ret = ioctl (dev_hndl, Si4709_IOC_RDS_ENABLE);
+      if (ret < 0)
+        loge ("sl_chip_imp_pwr_on IOCTL Si4709_IOC_RDS_ENABLE error: %d %d", ret, errno);
+      else
+        logd ("sl_chip_imp_pwr_on IOCTL Si4709_IOC_RDS_ENABLE success");
+    }
+    else {
+      ret = ioctl (dev_hndl, Si4709_IOC_RDS_DISABLE);
+      if (ret < 0)
+        loge ("sl_chip_imp_pwr_on IOCTL Si4709_IOC_RDS_DISABLE error: %d %d", ret, errno);
+      else
+        logd ("sl_chip_imp_pwr_on IOCTL Si4709_IOC_RDS_DISABLE success");
+    }
     ms_sleep (200);
     band_setup ();
 
@@ -359,6 +390,17 @@ ms_sleep (100);
   int chip_imp_pwr_off (int pwr_rds) {
     int ret = 0;
     logd ("chip_imp_pwr_off");
+    if (pwr_rds) {
+//      ms_sleep (100);
+      ret = ioctl (dev_hndl, Si4709_IOC_RDS_DISABLE);
+      if (ret < 0) {
+        loge ("chip_imp_pwr_off IOCTL Si4709_IOC_RDS_DISABLE error: %d %d", ret, errno);
+     }
+      else {
+        logd ("chip_imp_pwr_off IOCTL Si4709_IOC_RDS_DISABLE success");
+      }
+      ms_sleep (100);
+    }
     chip_imp_mute_set (1);                                                         // Mute
     ret = ioctl (dev_hndl, Si4709_IOC_POWERDOWN);
     if (ret < 0) {
@@ -488,80 +530,25 @@ ms_sleep (100);
     return (0);
   }
 
-  int sls_status_chip_imp_events_process_cnt = 0;
+
+    // RDS:
+
+//#define  SUPPORT_RDS
+#ifdef  SUPPORT_RDS
+  #include "ssl_rds.c"
+#else
+  int rds_events_process (unsigned char * rds_grpd) {return (-1);}
+#endif
+
+  //int sls_status_chip_imp_events_process_cnt = 0;
   int chip_imp_events_process (unsigned char * rds_grpd) {
     int ret = 0;
-    radio_data_t rd = {0};
-//block
-/*
-    status_rssi_t sr = {0};
-    ret = ioctl (dev_hndl, Si4709_IOC_STATUS_RSSI_GET, & sr);
-    if (ret < 0) {
-      loge ("chip_imp_events_process IOCTL                    Si4709_IOC_STATUS_RSSI_GET error: %d %d  rds_ready: %3.3d  rds_synced: %3.3d  seek_tune_complete: %3.3d  seekfail_bandlimit: %3.3d\
-          afc_railed: %3.3d  block_error_a: %3.3d stereo: %3.3d  rssi: %3.3d", ret, errno, sr.rdsr, sr.rdss, sr.stc, sr.sfbl, sr.afcrl, sr.blera, sr.st, sr.rssi);
-     return (-1);
-    }
-    if (sls_status_chip_imp_events_process_cnt ++ % 1200 == 0)                           // Every 2 minutes / number times called in a ,,,
-      logd ("chip_imp_events_process                          Si4709_IOC_STATUS_RSSI_GET success: %3.3d  rds_ready: %3.3d  rds_synced: %3.3d  seek_tune_complete: %3.3d  seekfail_bandlimit: %3.3d\
-          afc_railed: %3.3d  block_err_a: %3.3d stereo: %3.3d  rssi: %3.3d", ret, sr.rdsr, sr.rdss, sr.stc, sr.sfbl, sr.afcrl, sr.blera, sr.st, sr.rssi);
-    if (sr.rdsr == 0)    // If rds not ready
-      return (-1);
-*/
-    ret = ioctl (dev_hndl, Si4709_IOC_RDS_DATA_GET, & rd);              // !!!! Sometimes blocks !!
-    if (ret < 0) {
-      //loge ("chip_imp_events_process IOCTL Si4709_IOC_RDS_DATA_GET error: %d %d", ret, errno);
-      return (-1);
-    }
-    //logd ("chip_imp_events_process IOCTL Si4709_IOC_RDS_DATA_GET success curr_rssi: %3.3d  curr_channel: %3.3d (0x%x)", rd.curr_rssi, rd.curr_channel, rd.curr_channel);
 
-    int blrm = 1;//2;   // Bler Maximum tolerated (3 is max reported ?)
-    if (rd.blera > blrm | rd.blerb > blrm | rd.blerc > blrm | rd.blerd > blrm) {
-      //loge ("chip_imp_events_process ERROR rds/abcd: %4x %4x %4x %4x", rd.rdsa,  rd.rdsb,  rd.rdsc,  rd.rdsd);
-      //loge ("chip_imp_events_process ERROR blerabcd: %4x %4x %4x %4x", rd.blera, rd.blerb, rd.blerc, rd.blerd);
-      return (-1);
-    }
-      //logd ("chip_imp_events_process");
-      //loge ("chip_imp_events_process ERROR rds/abcd: %4x %4x %4x %4x", rd.rdsa,  rd.rdsb,  rd.rdsc,  rd.rdsd);
-      //loge ("chip_imp_events_process ERROR blerabcd: %4x %4x %4x %4x", rd.blera, rd.blerb, rd.blerc, rd.blerd);
-    rds_grpd [0] = rd.rdsa >> 8;
-    rds_grpd [1] = rd.rdsa & 0xff;
-    rds_grpd [2] = rd.rdsb >> 8;
-    rds_grpd [3] = rd.rdsb & 0xff;
-    rds_grpd [4] = rd.rdsc >> 8;
-    rds_grpd [5] = rd.rdsc & 0xff;
-    rds_grpd [6] = rd.rdsd >> 8;
-    rds_grpd [7] = rd.rdsd & 0xff;
-
-    return (0);                                                         // Return 0 = Have RDS data
+    ret = rds_events_process (rds_grpd);
+    return (ret);
   }
-/* 89.1 errors: (!! AF processing and errors still happen when AF is off)
-03-13 00:50:20.566 D/fm_hrdw ( 3678): chip_imp_events_process IOCTL Si4709_IOC_RDS_DATA_GET success curr_rssi: 20  curr_channel: 8910 (0x22ce)
-03-13 00:50:20.570 E/fm_hrdw ( 3678): chip_imp_events_process ERROR rds/abcd:    0  808    0 2020
-03-13 00:50:20.570 E/fm_hrdw ( 3678): chip_imp_events_process ERROR blerabcd:    0    0    0    0
-03-13 00:50:20.574 E/fm_hrdw ( 3678): chip_imp_events_process IOCTL Si4709_IOC_RDS_DATA_GET error: -1
-
-03-13 00:50:20.668 D/fm_hrdw ( 3678): chip_imp_events_process IOCTL Si4709_IOC_RDS_DATA_GET success curr_rssi: 20  curr_channel: 8910 (0x22ce)
-03-13 00:50:20.668 E/fm_hrdw ( 3678): chip_imp_events_process ERROR rds/abcd:    0  809    0 2020
-03-13 00:50:20.668 E/fm_hrdw ( 3678): chip_imp_events_process ERROR blerabcd:    0    0    0    0
-03-13 00:50:20.671 E/fm_hrdw ( 3678): chip_imp_events_process IOCTL Si4709_IOC_RDS_DATA_GET error: -1
-
-03-13 00:50:20.765 D/fm_hrdw ( 3678): chip_imp_events_process IOCTL Si4709_IOC_RDS_DATA_GET success curr_rssi: 20  curr_channel: 8910 (0x22ce)
-03-13 00:50:20.765 E/fm_hrdw ( 3678): chip_imp_events_process ERROR rds/abcd:    0  80e    0 2020
-03-13 00:50:20.765 E/fm_hrdw ( 3678): chip_imp_events_process ERROR blerabcd:    0    0    0    0
-03-13 00:50:20.773 E/fm_hrdw ( 3678): chip_imp_events_process IOCTL Si4709_IOC_RDS_DATA_GET error: -1
-
-03-13 00:50:20.867 D/fm_hrdw ( 3678): chip_imp_events_process IOCTL Si4709_IOC_RDS_DATA_GET success curr_rssi: 20  curr_channel: 8910 (0x22ce)
-03-13 00:50:20.867 E/fm_hrdw ( 3678): chip_imp_events_process ERROR rds/abcd:    0  80f    0 2020
-03-13 00:50:20.871 E/fm_hrdw ( 3678): chip_imp_events_process ERROR blerabcd:    0    0    0    0
-03-13 00:50:20.875 E/fm_hrdw ( 3678): chip_imp_events_process IOCTL Si4709_IOC_RDS_DATA_GET error: -1  */
 
     // Seek:
-//#define Si4709_IOC_SEEK_UP                          _IOR(Si4709_IOC_MAGIC, 6, uint32_t)
-//#define Si4709_IOC_SEEK_DOWN                        _IOR(Si4709_IOC_MAGIC, 7, uint32_t)
-//#define Si4709_IOC_RSSI_SEEK_TH_SET                 _IOW(Si4709_IOC_MAGIC, 9, u8)
-//#define Si4709_IOC_SEEK_SNR_SET                     _IOW(Si4709_IOC_MAGIC, 10, u8)
-//#define Si4709_IOC_SEEK_CNT_SET                     _IOW(Si4709_IOC_MAGIC, 11, u8)
-//#define Si4709_IOC_SEEK_CANCEL                      _IO(Si4709_IOC_MAGIC, 26)/*VNVS:START 13-OCT'09---- Added IOCTLs for reading the device-id,chip-id,power configuration, system configuration2 registers*/
 
   int chip_imp_seek_start (int dir) {
     int ret = 0;

@@ -1,7 +1,7 @@
 
 Spirit2 Free is an Over-The-Air (Real) FM Radio application for Android.
 
-Spirit2 Free is Copyright 2011-2014 Michael A. Reid (mikereidis@gmail.com). All rights are reserved.
+Spirit2 Free is Copyright 2011-2015 Michael A. Reid (mikereidis@gmail.com). All rights are reserved.
 
 See COPYRIGHT_MICHAEL_REID_GPLv3AFFERO.txt file for the standard GPLv3 AFFERO licensing notice.
 
@@ -39,7 +39,7 @@ I appreciate the financial support of people buying my apps, Spirit2: https://pl
 
 I am also happy to accept Paypal "donations" to my mikereidis@gmail.com address : https://www.paypal.com/cgi-bin/webscr?cmd=_donations&business=mikereidis%40gmail%2ecom&lc=CA&item_name=Spirit%20FM%20%2d%20Mike%20Reid&currency_code=USD&bn=PP%2dDonationsBF%3abtn_donateCC_LG%2egif%3aNonHosted
 
-The commercial Spirit2 has many features that are not in this Spirit2 Free app. As time goes by, I may move paid features to the free version. The closer I can get to a "normal" salary, the more willing I will be to do so.
+The commercial Spirit2 has many features that are not in this Spirit2 Free app. As time goes by, I may move paid features to the Free version. The closer I can get to a "normal" salary, the more willing I will be to do so.
 
 
 Thanks ! :)
