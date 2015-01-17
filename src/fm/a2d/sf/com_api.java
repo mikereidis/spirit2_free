@@ -88,7 +88,10 @@ public class com_api {
   public static PendingIntent pend_intent_get (Context context, String key, String val) {
     Intent intent = new Intent ("fm.a2d.sf.action.set");
     com_uti.logx ("context: " + context + "  m_context: " + m_context + "  intent: " + intent + "  key: " + key + "  val: " + val);
-
+    /*if (intent == null) {
+      com_uti.loge ("intent == null");
+      return (null);
+    }*/
     intent.setClass (context, svc_svc.class);                         // !! Note possible different context and m_context !!
     intent.putExtra (key, val);
     PendingIntent pi = PendingIntent.getService (context, ++ curr_pending_intent_num, intent, PendingIntent.FLAG_UPDATE_CURRENT);// Different 2nd parameter
@@ -97,17 +100,37 @@ public class com_api {
   public void key_set (String key, String val, String key2, String val2) {  // Presets currently require simultaneous preset frequency and name
     com_uti.logd ("key: " + key + "  val: " + val + "  key2: " + key2 + "  val2: " + val2);
     Intent intent = new Intent ("fm.a2d.sf.action.set");
+    /*if (intent == null) {
+      com_uti.loge ("intent == null");
+      return;
+    }*/
     intent.setClass (m_context, svc_svc.class);
     intent.putExtra (key, val);
     intent.putExtra (key2, val2);
     m_context.startService (intent);
   }
   public void key_set (String key, String val) {
+    try {
     com_uti.logd ("key: " + key + "  val: " + val);
     Intent intent = new Intent ("fm.a2d.sf.action.set");
-    intent.setClass (m_context, svc_svc.class);
+    /*if (intent == null) {
+      com_uti.loge ("intent == null");
+      return;
+    }*/
+
+//    intent.setClass (m_context, svc_svc.class);
+    intent.setComponent (new android.content.ComponentName ("fm.a2d.sf",
+            "fm.a2d.sf.svc_svc"));  // Seperate lines for single pass sed
+
     intent.putExtra (key, val);
-    m_context.startService (intent);
+    if (m_context != null)
+      m_context.startService (intent);
+    else
+      com_uti.loge ("m_context == null");
+    }
+    catch (Throwable e) {
+      e.printStackTrace ();
+    };
   }
 
 

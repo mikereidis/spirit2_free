@@ -21,7 +21,7 @@ public class gui_act extends Activity {     //public class gui_act extends Fragm
   private static BroadcastReceiver m_bcast_lstnr = null;
 
   private   gui_gap     m_gui       = null;
-  private   Context     m_context   = null;
+  public static   Context     m_context   = null;
 
     // Lifecycle:
 

@@ -28,7 +28,7 @@
 
     // Functions called from this chip specific code to generic code:
 
-  int ms_sleep (int ms);
+  long ms_sleep (long ms);
 
   #define  loge(...)  fm_log_print(ANDROID_LOG_ERROR, LOGTAG,__VA_ARGS__)
   #define  logd(...)  fm_log_print(ANDROID_LOG_DEBUG, LOGTAG,__VA_ARGS__)
@@ -335,7 +335,11 @@ enum v4l2_cid_iris_private_iris_t {
         V4L2_CID_PRIVATE_IRIS_SET_CALIBRATION,
 };
 
-
+#define V4L2_CID_RDS_TX_PI                      (V4L2_CID_FM_TX_CLASS_BASE + 2)
+#define V4L2_CID_RDS_TX_PTY                     (V4L2_CID_FM_TX_CLASS_BASE + 3)
+#define V4L2_CID_RDS_TX_PS_NAME                 (V4L2_CID_FM_TX_CLASS_BASE + 5)
+#define V4L2_CID_RDS_TX_RADIO_TEXT              (V4L2_CID_FM_TX_CLASS_BASE + 6)
+ 
 /*
         .vidioc_querycap              = iris_vidioc_querycap,
         .vidioc_queryctrl             = iris_vidioc_queryctrl,
@@ -520,7 +524,7 @@ enum iris_buf_t {
   }
 
 
-  int v4l_transmit = 0;
+  int s2_tx = 0;
   int v4l_antenna = 0;
 
   int chip_imp_pwr_on (int pwr_rds) {
@@ -551,8 +555,12 @@ enum iris_buf_t {
     //chip_ctrl_get (V4L2_CID_TUNE_POWER_LEVEL);
 
     int new_state = 1;                                                    // Rx
-    v4l_transmit = 0;   // !!
-    if (v4l_transmit)
+    //if (file_get ("/data/data/fm.a2d.s2/files/s2_tx"))
+    if (pwr_rds == 107300)
+      s2_tx = 1;
+    else
+      s2_tx = 0;
+    if (s2_tx)
       new_state = 2;                                                      // Tx
     if (chip_ctrl_set (V4L2_CID_PRIVATE_IRIS_STATE, new_state) < 0)              // 0 = FM_OFF, 1 = FM_RECV, 2 = FM_TRANS, 3 = FM_RESET
       loge ("chip_imp_pwr_on PRIVATE_IRIS_STATE 1 error for: %d", new_state);
@@ -669,14 +677,17 @@ enum iris_buf_t {
     logd ("chip_imp_pwr_off chip_imp_mute_set done");
 
     if (pwr_rds) {
-//      ms_sleep (100);
+int need_at_least_one_of_these_delays_or_tx_on_may_fail = 1;
+if (need_at_least_one_of_these_delays_or_tx_on_may_fail)
+  ms_sleep (100);
 
       if (chip_ctrl_set (V4L2_CID_PRIVATE_IRIS_RDSON, 0) < 0)           // 0 = OFF, 1 = ON
         loge ("chip_imp_pwr_off PRIVATE_IRIS_RDSON 0 error");
       else
         logd ("chip_imp_pwr_off PRIVATE_IRIS_RDSON 0 success");
 
-//      ms_sleep (100);
+if (need_at_least_one_of_these_delays_or_tx_on_may_fail)
+  ms_sleep (100);
     }
 
     logd ("chip_imp_pwr_off RDS off done");
@@ -1360,27 +1371,135 @@ int chip_get () {
   }*/
 
 
-  extern int RSSI_FACTOR;// = 16;//20; // 62.5/50 -> 1000  (See 60)     Highest seen locally = 57, 1000 / 62.5 = 16
+  void pi_set (int pi) {
+    if (chip_ctrl_set (V4L2_CID_RDS_TX_PI, pi) < 0)
+      loge ("pi_set PRIVATE_IRIS_EMPHASIS error pi: %d", pi);
+    else
+      logd ("pi_set PRIVATE_IRIS_EMPHASIS success pi: %d", pi);
+  }
+  void pt_set (int pt) {
+    if (chip_ctrl_set (V4L2_CID_RDS_TX_PTY, pt) < 0)
+      loge ("pt_set PRIVATE_IRIS_EMPHASIS error pt: %d", pt);
+    else
+      logd ("pt_set PRIVATE_IRIS_EMPHASIS success pt: %d", pt);
+  }
+///*
+  struct mr_v4l2_ext_control {
+    __u32 id;
+    __u32 size;
+    __u32 reserved2 [1];
+    union {
+      __s32 value;
+      __s64 value64;
+      char * string;
+    };
+  } __attribute__ ((packed));
+ 
+  struct mr_v4l2_ext_controls {
+    __u32 ctrl_class;
+    __u32 count;
+    __u32 error_idx;
+    __u32 reserved [2];
+    struct mr_v4l2_ext_control * controls;
+  };
+//*/ 
+  void ps_set_rds (const char * ps) {
+    struct mr_v4l2_ext_control ext_ctl;
+    struct mr_v4l2_ext_controls v4l2_ctls;
 
+    ext_ctl.id     = V4L2_CID_RDS_TX_PS_NAME;
+    ext_ctl.string = (char *) ps;
+    ext_ctl.size   = 9;//strlen (ps) + 1;
+
+    // Ctrls data struct:
+    v4l2_ctls.ctrl_class = V4L2_CTRL_CLASS_FM_TX;
+    v4l2_ctls.count      = 1;//15;//
+    v4l2_ctls.controls   = & ext_ctl;
+
+    int ret = ioctl (dev_hndl, VIDIOC_S_EXT_CTRLS, & v4l2_ctls);
+    if (ret < 0)
+      loge ("ps_set_rds error ps: %s  ret: %d  errno: %d", ps, ret, errno);
+    else
+      logd ("ps_set_rds success ps: %s  ret: %d", ps, ret);
+  }
+  void rt_set_rds (const char * rt) {
+    struct mr_v4l2_ext_control ext_ctl;
+    struct mr_v4l2_ext_controls v4l2_ctls;
+
+    ext_ctl.id     = V4L2_CID_RDS_TX_RADIO_TEXT;
+    ext_ctl.string = (char *) rt;
+    ext_ctl.size   = strlen (rt) + 1;
+
+    // Ctrls data struct:
+    v4l2_ctls.ctrl_class = V4L2_CTRL_CLASS_FM_TX;
+    v4l2_ctls.count      = 1;//15;//
+    v4l2_ctls.controls   = & ext_ctl;
+
+    int ret = ioctl (dev_hndl, VIDIOC_S_EXT_CTRLS, & v4l2_ctls);
+    if (ret < 0)
+      loge ("rt_set_rds error rt: %s  ret: %d  errno: %d", rt, ret, errno);
+    else
+      logd ("rt_set_rds success rt: %s  ret: %d", rt, ret);
+  }
+
+  extern int RSSI_FACTOR;// = 16;//20; // 62.5/50 -> 1000  (See 60)     Highest seen locally = 57, 1000 / 62.5 = 16
 
   int chip_imp_extra_cmd (const char * command, char ** parameters) {
     if (command == NULL)
       return (-1);
+
+    const char * data = command + 4;
+    if (strlen (command) < 5) {
+    }
+    else if (! strncmp (command, "PI: ", strlen ("PI: "))) {
+      pi_set (atoi (data));
+      return (0);
+    }
+    else if (! strncmp (command, "PT: ", strlen ("PT: "))) {
+      pt_set (atoi (data));
+      return (0);
+    }
+    else if (! strncmp (command, "PS: ", strlen ("PS: "))) {
+      ps_set_rds (data);
+      return (0);
+    }
+    else if (! strncmp (command, "RT: ", strlen ("RT: "))) {
+      rt_set_rds (data);
+      return (0);
+    }
+
     int full_val = atoi (command);              // full_val = -2^31 ... +2^31 - 1       = Over 9 digits
     int ctrl = (full_val / 1000) - 200;         // ctrl = hi 3 digits - 200     (control to write to)
     int val  = (full_val % 1000);               // val  = lo 3 digits           (value to write)
+/*
+    long full_val = atol (command);              // full_val = -2^31 ... +2^31 - 1       = Over 9 digits
+    long ctrl = ((full_val % 1000000) / 1000) - 200;         // ctrl = hi 3 digits - 200     (control to write to)
+    long val  = (full_val % 1000);               // val  = lo 3 digits           (value to write)
+*/
+
     logd ("chip_imp_extra_cmd command: %s  full_val: %d  ctrl: %d  val: %d", command, full_val, ctrl, val);
 
-      if (val == 990) {
-        intern_band = 0;  // EU
-        band_setup ();
-        return (0);
-      }
-      else if (val == 991) {
-        intern_band = 1;  // US
-        band_setup ();
-        return (0);
-      }
+    if (val == 990) {
+      intern_band = 0;  // EU
+      band_setup ();
+      return (0);
+    }
+    else if (val == 991) {
+      intern_band = 1;  // US
+      band_setup ();
+      return (0);
+    }
+/*
+    else if (val == 980) {
+      char * ptr = command;
+      char * max_ptr = ptr + strlen (command);
+      while (* ptr != ' ' && * ptr != 0 && ptr < max_ptr)
+        ptr ++;
+      while (* ptr == ' ' && * ptr != 0 && ptr < max_ptr)
+        ptr ++;
+      return (0);
+    }    
+*/
 
     if (ctrl >= 1 && ctrl <= 999) {
       ctrl += 0x08000000;

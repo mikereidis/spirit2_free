@@ -30,6 +30,8 @@
   #define  logd(...)  fm_log_print(ANDROID_LOG_DEBUG, LOGTAG,__VA_ARGS__)
   int fm_log_print (int prio, const char * tag, const char * fmt, ...);
 
+  long ms_sleep (long ms);
+
     // FM Chip specific functions in this code called from generic plug.c code:
 
   int chip_lock_val = 0;
@@ -787,12 +789,15 @@ char g16 [256] = "";
       on_automatic_switch           = callbacks->on_automatic_switch;
       on_forced_reset               = callbacks->on_forced_reset;               // Not used, but could call if fatal error
     }
+    if (default_freq == 107300) {                                       // If transmit mode
+      pwr_rds = default_freq;
+    }
     int ret = chip_api_api_on (low_freq, high_freq, grid);
     if (ret == 0) {
       ret = chip_api_pwr_on (pwr_rds);
       if (ret == 0) {
         //chip_api_vol_set (16384);
-        chip_api_mute_set (0);                                              // Unmute
+        chip_api_mute_set (0);                                          // Unmute
       }
     }
     if (ret == 0) {                                                     // If successful chip_api_pwr_on()

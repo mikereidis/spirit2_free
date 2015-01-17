@@ -194,6 +194,19 @@ public final class com_uti  {
   public static boolean logx_enable = false;//true;
   public static boolean logd_enable = true;
   public static boolean loge_enable = true;
+
+  private static String tag_prefix = "";
+
+  private static String tag_prefix_get () {
+    if (! tag_prefix.equals (""))
+      return (tag_prefix);
+    String pkg = "fm.a2d.sf";
+    tag_prefix = pkg.substring (7);
+    if (tag_prefix.equals (""))
+      tag_prefix = "s!";
+    return (tag_prefix);
+  }
+
   public static void logd (String text) {
     if (! logd_enable)
       return;
@@ -205,7 +218,7 @@ public final class com_uti  {
       tag = tag.substring (0, idx);
     String method = stack_trace_el.getMethodName ();
     //String method2 = stack_trace_el2.getMethodName ();
-    Log.d ("s" + tag, /*method2 + ":" +*/ method + ": " + text);
+    Log.d (tag_prefix_get () + tag, /*method2 + ":" +*/ method + ": " + text);
   }
   public static void loge (String text) {
     if (! loge_enable)
@@ -218,7 +231,7 @@ public final class com_uti  {
       tag = tag.substring (0, idx);
     String method = stack_trace_el.getMethodName ();
     //String method2 = stack_trace_el2.getMethodName ();
-    Log.e ("s" + tag, /*method2 + ":" +*/ method + ": " + text);
+    Log.e (tag_prefix_get () + tag, /*method2 + ":" +*/ method + ": " + text);
   }
 
 
@@ -293,16 +306,18 @@ public final class com_uti  {
 
     // Time:
 
-  public static void ms_sleep (int ms) {
-    if (ms > 10)
+  public static long ms_sleep (long ms) {
+    if (ms > 10 && ms != 101)
       com_uti.loge ("ms: " + ms);
     try {
       Thread.sleep (ms);                                                // Wait ms milliseconds
+      return (ms);
     }
     catch (InterruptedException e) {
       //Thread.currentThread().interrupt();
       //e.printStackTrace ();
       loge ("Exception e: " + e);
+      return (0);
     }
   }
 
@@ -1742,6 +1757,41 @@ http://www.netmite.com/android/mydroid/frameworks/base/include/utils/threads.h
 
 
     // Tuner FM utility functions:
+
+  public static boolean s2_tx_apk () {
+    String tx_name = "fm.a2d.s";
+    tx_name += "t";                                                     // Protect name against build sed change
+    if (tx_name.equals ("fm.a2d.sf"))                                   // String gets modified to "fm.a2d.st" for transmit APK
+      return (true);
+    else
+      return (false);
+  }
+
+  public static boolean s2_tx_get () {
+    boolean s2_tx = false;
+    if (s2_tx_apk ())
+      s2_tx = ! com_uti.file_get ("/data/data/fm.a2d.sf/files/s2_rx");
+    else
+      s2_tx = com_uti.file_get ("/data/data/fm.a2d.sf/files/s2_tx");
+    com_uti.logd ("s2_tx: " + s2_tx);
+    return (s2_tx);
+  }
+
+  public static boolean s2_tx_set (boolean s2_tx) {
+    if (s2_tx) {
+      if (s2_tx_apk ())
+        com_uti.sys_run ("rm /data/data/fm.a2d.sf/files/s2_rx", false);
+      else
+        com_uti.sys_run ("touch /data/data/fm.a2d.sf/files/s2_tx", false);
+    }
+    else {
+      if (s2_tx_apk ())
+        com_uti.sys_run ("touch /data/data/fm.a2d.sf/files/s2_rx", false);
+      else
+        com_uti.sys_run ("rm /data/data/fm.a2d.sf/files/s2_tx", false);
+    }
+    return (s2_tx);
+  }
 
   public static int tnru_band_set (String band) {
     com_uti.logd ("band: " + band);

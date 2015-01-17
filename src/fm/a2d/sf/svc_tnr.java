@@ -192,7 +192,11 @@ com_uti.logd ("FREQ CODE freq: " + freq + "  hci: " + hci + "  port: " + port);
 
         int ret = 0;
         //com_uti.file_delete ("s2d_stop");
-        ret = com_uti.sys_run ("killall libs2d.so 1>/dev/null 2>/dev/null ; /data/data/fm.a2d.sf/lib/libs2d.so " + com_uti.device + "  1>/dev/null 2>/dev/null", true);//  &", true);
+
+        String s2_tx = "";
+        if (com_uti.s2_tx_get ())
+          s2_tx = " s2_tx ";
+        ret = com_uti.sys_run ("killall libs2d.so 1>/dev/null 2>/dev/null ; /data/data/fm.a2d.sf/lib/libs2d.so " + com_uti.device + s2_tx + " 1>/dev/null 2>/dev/null", true);//  &", true);
 
         com_uti.logd ("daemon kill/start ret: " + ret);
 

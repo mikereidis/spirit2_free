@@ -28,7 +28,7 @@
 
     // Functions called from this chip specific code to generic code:
 
-  int ms_sleep (int ms);
+  long ms_sleep (long ms);
 
   #define  loge(...)  fm_log_print(ANDROID_LOG_ERROR, LOGTAG,__VA_ARGS__)
   #define  logd(...)  fm_log_print(ANDROID_LOG_DEBUG, LOGTAG,__VA_ARGS__)

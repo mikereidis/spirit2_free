@@ -144,6 +144,75 @@ public class svc_aud implements svc_aap, AudioManager.OnAudioFocusChangeListener
 
     // Code:
 
+  private void audio_transmit_pause () {
+    audio_transmit_stop ();
+  }
+  private void audio_transmit_stop () {
+dai_set (false);
+
+//    String cmd1 = "/data/data/fm.a2d.st/lib/libssd.so 4 1 \"SLIMBUS_0_RX Audio Mixer MultiMedia1\" 1";    // Wired headset audio on
+//    sys_run (cmd1, true);//false);
+
+//    com_uti.alsa_bool_set ("SLIMBUS_0_RX Audio Mixer MultiMedia1", 1);    // Wired headset audio on
+//    com_uti.ssd_commit ();
+
+    //AudioSystem.setDeviceConnectionState (AudioSystem.DEVICE_OUT_WIRED_HEADSET, AudioSystem.DEVICE_STATE_AVAILABLE, "");     // Headset available
+  }
+
+  private void audio_transmit_start () {
+dai_set (true);
+
+
+  //AudioManager  m_AM        = null;
+  //m_AM = (AudioManager) this.getSystemService (Context.AUDIO_SERVICE);
+  if (m_AM != null) {
+    int max_musi_vol = m_AM.getStreamMaxVolume  (AudioManager.STREAM_MUSIC);
+    //int cur_musi_vol = m_AM.getStreamVolume     (AudioManager.STREAM_MUSIC);
+
+    m_AM.setStreamVolume (AudioManager.STREAM_MUSIC, max_musi_vol, AudioManager.FLAG_SHOW_UI);// Display volume change
+  }
+
+//      AudioSystem.setDeviceConnectionState(AudioSystem.DEVICE_OUT_FM_TX, AudioSystem.DEVICE_STATE_AVAILABLE, "");
+/*
+      String cmd1 = "/data/data/fm.a2d.st/lib/libssd.so 4 1 \"SLIMBUS_0_RX Audio Mixer MultiMedia1\" 0";    // Wired headset audio off
+
+      //AudioSystem.setDeviceConnectionState (AudioSystem.DEVICE_OUT_WIRED_HEADSET, AudioSystem.DEVICE_STATE_UNAVAILABLE, "");     // Headset unavailable
+
+      String cmd2 = "/data/data/fm.a2d.st/lib/libssd.so 4 1 \"INTERNAL_FM_RX Audio Mixer MultiMedia1\" 1";
+      String cmd3 = "/data/data/fm.a2d.st/lib/libssd.so 4 1 \"INTERNAL_FM_RX Audio Mixer MultiMedia4\" 1";
+      String cmd4 = "/data/data/fm.a2d.st/lib/libssd.so 4 1 \"INTERNAL_FM_RX Audio Mixer MultiMedia5\" 1";
+      String [] cmds = {cmd1, cmd2, cmd3, cmd4};
+      //String [] cmds = {cmd2, cmd3, cmd4};
+      //String [] cmds = {cmd1, cmd2};
+      sys_run (cmds, true);//false);
+*/
+/* !!!! Why does this block on MOG, OXL and ONE ???
+      String cmd1 = "/data/data/fm.a2d.sf/files/ssd 4 1 \"SLIMBUS_0_RX Audio Mixer MultiMedia1\" 0";    // Wired headset audio off
+      String cmd2 = "/data/data/fm.a2d.sf/files/ssd 4 1 \"INTERNAL_FM_RX Audio Mixer MultiMedia1\" 1";
+      //String cmd3 = "/data/data/fm.a2d.sf/files/ssd 4 1 \"INTERNAL_FM_RX Audio Mixer MultiMedia4\" 1";
+      //String cmd4 = "/data/data/fm.a2d.sf/files/ssd 4 1 \"INTERNAL_FM_RX Audio Mixer MultiMedia5\" 1";
+      //String [] cmds = {cmd1, cmd2, cmd3, cmd4};
+      String [] cmds = {cmd1, cmd2};
+      com_uti.sys_run (cmds, true);//false);
+*/
+
+/*
+      com_uti.alsa_bool_set ("SLIMBUS_0_RX Audio Mixer MultiMedia1", 0);    // Wired headset audio off
+      com_uti.ssd_commit ();
+      com_uti.alsa_bool_set ("INTERNAL_FM_RX Audio Mixer MultiMedia1", 1);
+      com_uti.ssd_commit ();
+      com_uti.alsa_bool_set ("INTERNAL_FM_RX Audio Mixer MultiMedia4", 1);
+      com_uti.ssd_commit ();
+      com_uti.alsa_bool_set ("INTERNAL_FM_RX Audio Mixer MultiMedia5", 1);
+      com_uti.ssd_commit ();
+*/
+      //if (m_svc_acb != null)
+      //  m_svc_acb.cb_audio_state_chngd ("start");
+
+  }
+
+  private boolean s2_tx = false;
+
   public svc_aud (Context c, svc_acb cb_aud, com_api svc_com_api) {                              // Constructor
 
     com_uti.logd ("stat_constrs: " + stat_constrs++);
@@ -152,6 +221,18 @@ public class svc_aud implements svc_aap, AudioManager.OnAudioFocusChangeListener
     m_context = c;
     m_com_api = svc_com_api;
     com_uti.logd ("");
+
+    if (com_uti.s2_tx_get ())
+      s2_tx = true;
+    else
+      s2_tx = false;
+
+    if (s2_tx) {
+      com_uti.logd ("s2_tx");
+      //audio_transmit_start ();
+      ////return;
+    }
+
 
     old_htc = false;
     if (com_uti.m_device.startsWith ("EVITA") || com_uti.m_device.startsWith ("VILLE") || com_uti.m_device.startsWith ("JEWEL")) {// || com_uti.m_device.startsWith ("M7C")) {
@@ -305,6 +386,12 @@ API level 17 / 4.2+
   }
 
   public String audio_sessid_get () {                                  // Handle audio session changes
+    if (s2_tx) {
+      com_uti.logd ("s2_tx");
+      //return;
+      //return (0);
+      return ("0");
+    }
     int new_int_audio_sessid = 0;
     if (m_audiotrack != null)                                           // If we have an audiotrack active...
       new_int_audio_sessid = m_audiotrack.getAudioSessionId ();
@@ -334,6 +421,9 @@ API level 17 / 4.2+
     // Player and overall audio state control: (public's now via m_com_api)
 
   public String audio_state_set (String desired_state) {                // Called only by svc_svc:audio_state_set() & svc_svc:audio_start()
+    if (s2_tx)
+      com_uti.logd ("s2_tx");
+
     com_uti.logd ("desired_state: " + desired_state + "  current audio_state: " + m_com_api.audio_state);
     if (desired_state.equalsIgnoreCase ("toggle")) {                    // TOGGLE:
       if (m_com_api.audio_state.equalsIgnoreCase ("start"))
@@ -341,14 +431,36 @@ API level 17 / 4.2+
       else
         desired_state = "start";
     }
+
     if (desired_state.equalsIgnoreCase ("start")) {                     // START:
-      audio_start ();
+      if (s2_tx) {
+        audio_transmit_start ();
+        m_com_api.audio_state = desired_state;
+        //if (m_svc_acb != null)
+        //  m_svc_acb.cb_audio_state_chngd (desired_state);
+      }
+      else
+        audio_start ();
     }
     else if (desired_state.equalsIgnoreCase ("stop")) {                 // STOP:
-      audio_stop ();
+      if (s2_tx) {
+        audio_transmit_stop ();
+        m_com_api.audio_state = desired_state;
+        //if (m_svc_acb != null)
+        //  m_svc_acb.cb_audio_state_chngd (desired_state);
+      }
+      else
+        audio_stop ();
     }
     else if (desired_state.equalsIgnoreCase ("pause")) {                // PAUSE:
-      audio_pause ();
+      if (s2_tx) {
+        audio_transmit_pause ();
+        m_com_api.audio_state = desired_state;
+        //if (m_svc_acb != null)
+        //  m_svc_acb.cb_audio_state_chngd (desired_state);
+      }
+      else
+        audio_pause ();
     }
     return (m_com_api.audio_state);
   }
@@ -640,6 +752,12 @@ if (intent != null)
       com_uti.loge ("ret: " + ret);
   }
   public void onAudioFocusChange (int focusChange) {
+    if (s2_tx) {
+      com_uti.logd ("s2_tx");
+      return;
+      //return (0);
+      //return ("0");
+    }
     com_uti.logd ("focusChange: " + focusChange + "  audio_state: " + m_com_api.audio_state);
     switch (focusChange) {
       case AudioManager.AUDIOFOCUS_GAIN:                                // Gain
@@ -668,6 +786,12 @@ if (intent != null)
     // PCM:
 
   public String audio_record_state_set (String state) {
+    if (s2_tx) {
+      com_uti.logd ("s2_tx");
+      return ("Stop");
+      //return (0);
+      //return ("0");
+    }
     String str = "";
     return (m_com_api.audio_record_state);
   }
@@ -1050,6 +1174,12 @@ dai_delay = 0;  // !! No delay ??
   }
 
   public String audio_stereo_set (String new_audio_stereo) {
+    if (s2_tx) {
+      com_uti.logd ("s2_tx");
+      //return;
+      //return (0);
+      return (new_audio_stereo);
+    }
     //if (m_com_api.audio_stereo.equalsIgnoreCase (new_audio_stereo))   // Done if no change
     //  return (-1);
     m_com_api.audio_stereo = new_audio_stereo;                          // Set new audio output
@@ -1088,6 +1218,9 @@ dai_delay = 0;  // !! No delay ??
   }
 
   private void audio_output_off () {                                                    // Called only from audio_pause, after pcm read and write stopped
+    if (s2_tx) {                                                        // Do nothing if transmit mode...
+      return;
+    }
     com_uti.logd ("current api audio_state: " + m_com_api.audio_state + "  current api audio_output: " + m_com_api.audio_output);
     if (m_com_api.audio_output.equalsIgnoreCase ("speaker") && m_hdst_plgd)             // If Speaker switch off and headset plugged in...
       setDeviceConnectionState (DEVICE_OUT_WIRED_HEADSET, DEVICE_STATE_AVAILABLE, "");  // Headset available
@@ -1098,6 +1231,10 @@ dai_delay = 0;  // !! No delay ??
     // CAN_DUCK
     // Called by svc_svc:onStartCommand() (change from UI/Widget) & svc_svc:audio_state_set() (at start from prefs)
   public String audio_output_set (String new_audio_output) {
+    if (s2_tx) {                                                        // Do nothing if transmit mode...
+      com_uti.logd ("s2_tx");
+      return (new_audio_output);
+    }
 
     com_uti.logd ("current api audio_state: " + m_com_api.audio_state + "  current api audio_output: " + m_com_api.audio_output + "  new_audio_output: " + new_audio_output);
     if (new_audio_output.equalsIgnoreCase ("toggle")) {                 // If toggle...

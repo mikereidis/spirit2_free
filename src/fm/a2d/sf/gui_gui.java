@@ -355,6 +355,15 @@ public class gui_gui implements gui_gap {
 
     tuner_stereo_load_prefs ();
 
+    if (com_uti.s2_tx_apk () && com_uti.s2_tx_get ()) {
+      boolean not_rcc_enabled = false;
+      if (not_rcc_enabled)  m_gui_act.startActivity (new Intent ("android.settings.ACTION_NOTIFICATION_LISTENER_SETTINGS"));
+    }
+    else {
+      //svc_rcc.stop ();
+    }
+
+
     return (true);
   }
 
@@ -639,7 +648,7 @@ Rotate counter by 0.75 MHz = 8.766 degrees
     //com_uti.logd ("dialog: " + ret);
     return (ret);
   }
-
+/*
   private void app_install (String filename) {
 
     m_com_api.key_set ("tuner_state", "Stop");                      // Full power down/up
@@ -651,11 +660,11 @@ Rotate counter by 0.75 MHz = 8.766 degrees
     intent.setDataAndType (Uri.fromFile (new java.io.File (com_uti.getExternalStorageDirectory() + "/download/" + filename)), "application/vnd.android.package-archive");
     intent.setFlags (Intent.FLAG_ACTIVITY_NEW_TASK);
 
-    m_context.startActivity (intent);
+    m_gui_act.startActivity (intent);
 
     m_gui_act.finish ();
   }
-
+*/
   private Dialog menu_dialog_create (final int id) {
     com_uti.logd ("id: " + id);
 
@@ -663,20 +672,35 @@ Rotate counter by 0.75 MHz = 8.766 degrees
 
     dlg_bldr.setTitle ("SpiritF " + com_uti.app_version_get (m_context));
 
+    boolean free = true;
+
     String menu_msg = "Select EQ (Equalizer) or Cancel.";
+    if (free)
+      menu_msg = "Select Go Pro or Cancel.";
 
     if (com_uti.device == com_uti.DEV_ONE || com_uti.device == com_uti.DEV_LG2 || com_uti.device == com_uti.DEV_XZ2) {
-      menu_msg = "Select EQ (Equalizer), Install BT Shim, Remove BT Shim.";
+      if (free)
+        menu_msg = "Select Go Pro, Install BT Shim, Remove BT Shim.";
+      else
+        menu_msg = "Select EQ (Equalizer), Install BT Shim, Remove BT Shim.";
     }
 
-    dlg_bldr.setMessage (menu_msg);//R.string.menu_msg);
+    dlg_bldr.setMessage (menu_msg);
 
-    dlg_bldr.setNegativeButton ("EQ", new DialogInterface.OnClickListener () {     //
-      public void onClick (DialogInterface dialog, int whichButton) {
-        eq_start ();
-        //app_install ("s2_140912.apk");
-      }
-    });
+    if (free) {
+      dlg_bldr.setNegativeButton ("Go Pro", new DialogInterface.OnClickListener () {
+        public void onClick (DialogInterface dialog, int whichButton) {
+          purchase ("fm.a2d." + "s2");  // Avoid app name change
+        }
+      });
+    }
+    else {
+      dlg_bldr.setNegativeButton ("EQ", new DialogInterface.OnClickListener () {
+        public void onClick (DialogInterface dialog, int whichButton) {
+          eq_start ();
+        }
+      });
+    }
 
     if (com_uti.device == com_uti.DEV_ONE || com_uti.device == com_uti.DEV_LG2 || com_uti.device == com_uti.DEV_XZ2) {
 
@@ -702,7 +726,6 @@ Rotate counter by 0.75 MHz = 8.766 degrees
     dlg_bldr.setPositiveButton ("Cancel", new DialogInterface.OnClickListener () {     //
       public void onClick (DialogInterface dialog, int whichButton) {
         //purchase ("fm.a2d.sf");
-        //app_install ("sf_141125.apk");
       }
     });
 
@@ -719,33 +742,20 @@ Rotate counter by 0.75 MHz = 8.766 degrees
 
     AlertDialog.Builder dlg_bldr = new AlertDialog.Builder (m_context);
 
-    //dlg_bldr.setTitle ("SpiritF v1203");
-    dlg_bldr.setTitle ("SpiritF " + com_uti.app_version_get (m_context));// + "  " + m_gui_act.getPackageName());
+    dlg_bldr.setTitle ("SpiritF " + com_uti.app_version_get (m_context));
 
     String intro_msg = "";
-/*
-    if (com_uti.device == com_uti.DEV_GS1)
-      intro_msg =   "WARNING !: GT-I9000 has speaker DAMAGE RISK !\n\n" +
-                    "Do NOT use or accept all risk.\n\n";
-*/
     if (! com_uti.file_get ("/system/bin/su") && ! com_uti.file_get ("/system/xbin/su"))
-      intro_msg +=  "Sorry... \"NO SU\" Error. SpiritF REQUIRES JB+ & ROOT & International GS1/GS2/GS3/Note/Note2, HTC One, LG G2, Xperia Z+/Qualcomm.\n\n" +
-        "Thanks ! :) Mike...";
+      intro_msg +=  "ERROR: NO SuperUser/SuperSU/Root  SpiritF REQUIRES Root.\n\n";
     else if (com_uti.device == com_uti.DEV_UNK)
-      intro_msg +=  "Sorry... \"Unknown Device\" Error. SpiritF REQUIRES JB+ & ROOT & International GS1/GS2/GS3/Note/Note2, HTC One, LG G2, Xperia Z+/Qualcomm.\n\n" +
-        "Thanks ! :) Mike...";
+      intro_msg +=  "ERROR: Unknown Device. SpiritF REQUIRES International GS1/GS2/GS3/Note/Note2, HTC One, LG G2, Xperia Z+/Qualcomm.\n\n";
 
     else if (com_uti.device == com_uti.DEV_LG2 || com_uti.device == com_uti.DEV_ONE || com_uti.device == com_uti.DEV_XZ2)
-      intro_msg +=  "Welcome to SpiritF ! :)\n\n" +
-        "Please wait while it starts... HTC One, LG G2 & Sony Z2+ can take 15 seconds and may REBOOT after first install.\n\n" +
-        "SpiritF has been MASSIVELY re-architected for LOLLIPOP. Please report BUGS.\n\n" +
-        "Thanks ! :) Mike...";
+      intro_msg +=  "SpiritF Starting...\n\n" +
+        "HTC One, LG G2 & Sony Z2+ can take 15 seconds and may REBOOT on install.\n\n";
 
     else
-      intro_msg +=  "Welcome to SpiritF ! :)\n\n" +
-        "Please wait while it starts...\n\n" +
-        "SpiritF has been MASSIVELY re-architected for LOLLIPOP. Please report BUGS.\n\n" +
-        "Thanks ! :) Mike...";
+      intro_msg +=  "SpiritF Starting...\n\n";
 
     dlg_bldr.setMessage (intro_msg);
 
@@ -766,11 +776,11 @@ Rotate counter by 0.75 MHz = 8.766 degrees
     m_com_api.key_set ("tuner_band", band);
   }
 
-/*
+
   void purchase (String app_name) {                                     // Purchase app_name: fm.a2d.sf
 
     try {
-      m_context.startActivity (new Intent (Intent.ACTION_VIEW, Uri.parse ("market://details?id=" + app_name)));                  // Market only
+      m_gui_act.startActivity (new Intent (Intent.ACTION_VIEW, Uri.parse ("market://details?id=" + app_name)));                  // Market only
       return;   // Done
     }
     catch (android.content.ActivityNotFoundException e) {
@@ -781,8 +791,8 @@ Rotate counter by 0.75 MHz = 8.766 degrees
     }
 
     try {
-      //m_context.startActivity (new Intent (Intent.ACTION_VIEW, Uri.parse ("http://market.android.com/details?" + app_name))); // Choose browser or market (Browser only if no market)
-      m_context.startActivity (new Intent (Intent.ACTION_VIEW, Uri.parse ("https://play.google.com/store/apps/details?id=" + app_name))); // Choose browser or market (Browser only if no market)
+      //m_gui_act.startActivity (new Intent (Intent.ACTION_VIEW, Uri.parse ("http://market.android.com/details?" + app_name))); // Choose browser or market (Browser only if no market)
+      m_gui_act.startActivity (new Intent (Intent.ACTION_VIEW, Uri.parse ("https://play.google.com/store/apps/details?id=" + app_name))); // Choose browser or market (Browser only if no market)
     }
     catch (android.content.ActivityNotFoundException e) {
       com_uti.loge ("There is no browser or market app installed");
@@ -791,7 +801,7 @@ Rotate counter by 0.75 MHz = 8.766 degrees
       e.printStackTrace ();
     }
   }
-*/
+
 
 
     // Regional settings:
@@ -852,16 +862,17 @@ Rotate counter by 0.75 MHz = 8.766 degrees
       return;
     }
     else if (freq < 47001 && freq > 46999) {                            // Code 47 = disable monitoring
-      com_uti.prefs_set (m_context, "radio_report_period", 0);
+      //com_uti.prefs_set (m_context, "radio_report_period", 0);
       return;
     }
     else if (freq < 48001 && freq > 47999) {                            // Code 48 = Enable transmit
-      //tnr_qcv:v4l_transmit = 1
-      //Toast.makeText (m_context, "!!! TRANSMIT SONY ONLY !!!", Toast.LENGTH_LONG).show ();*/
+      com_uti.s2_tx_set (true);
+      if (! com_uti.m_manufacturer.startsWith ("SONY"))
+        Toast.makeText (m_context, "!!! TRANSMIT likely on SONY ONLY !!!", Toast.LENGTH_LONG).show ();
       return;
     }
     else if (freq < 49001 && freq > 48999) {                            // Code 49 = Disable transmit
-      //tnr_qcv:v4l_transmit = 0
+      com_uti.s2_tx_set (false);
       return;
     }
     else if (freq < 7001 && freq > 6999) {                              // Code 7 = logs_email
@@ -1647,7 +1658,7 @@ Rotate counter by 0.75 MHz = 8.766 degrees
     i.putExtra (Intent.EXTRA_STREAM, Uri.parse ("file://" + filename));  // File -> attachment
 
     try {
-      m_context.startActivity (Intent.createChooser (i, "Send email..."));
+      m_gui_act.startActivity (Intent.createChooser (i, "Send email..."));
     }
     catch (android.content.ActivityNotFoundException e) {
       Toast.makeText (m_context, "No email. Manually send " + filename, Toast.LENGTH_LONG).show ();

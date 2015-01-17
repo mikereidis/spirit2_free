@@ -67,6 +67,8 @@
 
     //
 
+  int s2_tx = 0;
+
   int   curr_radio_device_int       = -1;
 
   #define DEV_UNK -1
@@ -943,12 +945,23 @@
   }
 
   int qcv_digital_input_on () {
+    if (s2_tx) {
+      alsa_bool_set ("SLIMBUS_0_RX Audio Mixer MultiMedia1", 0);    // Wired headset audio off
+      alsa_bool_set ("INTERNAL_FM_RX Audio Mixer MultiMedia1", 1);
+      alsa_bool_set ("INTERNAL_FM_RX Audio Mixer MultiMedia4", 1);
+      alsa_bool_set ("INTERNAL_FM_RX Audio Mixer MultiMedia5", 1);
+      return (0);
+    }
     alsa_bool_set ("MultiMedia1 Mixer INTERNAL_FM_TX", 1);
     alsa_bool_set ("MultiMedia1 Mixer SLIM_0_TX", 0);                 // Turn off microphone path
     ms_sleep (100);
     return (0);
   }
   int qcv_digital_input_off () {
+    if (s2_tx) {
+      alsa_bool_set ("SLIMBUS_0_RX Audio Mixer MultiMedia1", 1);    // Wired headset audio on
+      return (0);
+    }
     alsa_bool_set ("MultiMedia1 Mixer INTERNAL_FM_TX", 0);
     ms_sleep (100);
     return (0);
@@ -1101,8 +1114,11 @@
               else
                 logd ("tuner_init: %d", ret);
             }
+            int def_freq = 106100;
+            if (s2_tx)
+              def_freq = 107300;
             if (ret == 0)
-              logd ("rx_start: %d", ret = tnr_funcs->rx_start (NULL, g_cbp, 87500, 108000, 106100, freq_inc));      // Start receive: Enable API, power on chip, start rx_thread
+              logd ("rx_start: %d", ret = tnr_funcs->rx_start (NULL, g_cbp, 87500, 108000, def_freq, freq_inc));      // Start receive: Enable API, power on chip, start rx_thread
             if (ret != 0)
               strncpy (cval, "Stop", sizeof (cval));
           }
@@ -1255,10 +1271,11 @@
         else if (strcpy (key, "tuner_rds_rt")       && (klen = strlen (key)) && ! strncmp (ckey, key, klen))
           snprintf (res_buf, res_max -1, "%s",          curr_tuner_rds_rt);
 
-
-        if (strlen (res_buf) <- 0)
-          strncpy (res_buf, "-4949", res_max);
-
+/*
+        if (strlen (res_buf) <= 0)
+          //strncpy (res_buf, "-4949", res_max);
+          strncpy (res_buf, "", res_max);
+*/
         return (strlen (res_buf));
       }
 
@@ -1329,8 +1346,8 @@
     else
       strncpy (logtag, "sc......", sizeof (logtag));
 
-    logd ("Spirit FM Radio daemon version 2015, Jan 11");            // !! Need automatic version
-    logd (copyright);                                                     // Copyright
+    logd ("Spirit FM Radio daemon version 2015, Jan 16");               // !! Need automatic version
+    logd (copyright);                                                   // Copyright
 
     exiting = 0;
 
@@ -1342,6 +1359,11 @@
         curr_radio_device_int = atoi (argv [1]);
         logd ("Server mode curr_radio_device_int: %d", curr_radio_device_int);
 
+        s2_tx = 0;
+        //if (file_get ("/data/data/fm.a2d.sf/files/s2_tx"))
+        if (argc > 2)
+          s2_tx = 1;
+//tuner_state
         int ret = daemon (0, 0);
         logd ("daemon() ret: %d", ret);
 

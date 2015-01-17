@@ -21,11 +21,11 @@
   }
 
 
-  int ms_sleep (int ms) {
-    if (ms > 10)
+  long ms_sleep (long ms) {
+    if (ms > 10 && ms != 101)
       loge ("ms_sleep ms: %d", ms);
     usleep (ms * 1000);
-    return (0);
+    return (ms);
   }
 
 
