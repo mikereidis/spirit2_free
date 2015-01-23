@@ -14,7 +14,7 @@ al  /system/vendor/lib/libbt-vendor*
 a mount -o remount,rw /system ; adb push libs/armeabi/libbt-vendor.so /sdcard/ ; a cp /sdcard/libbt-vendor.so /system/vendor/lib/libbt-vendor.so ; al  /system/vendor/lib/libbt-vendor*
 */
 
-#define LOGTAG "sven"
+#define LOGTAG "sfbt-ven"
 
 int extra_logs = 0;//1;
 

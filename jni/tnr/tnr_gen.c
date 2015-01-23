@@ -1,5 +1,5 @@
 
-  #define LOGTAG "stnr_gen"
+  #define LOGTAG "sftnrgen"
 
 #include <dlfcn.h>
 #include <string.h>

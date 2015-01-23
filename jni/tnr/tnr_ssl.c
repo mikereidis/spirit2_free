@@ -1,5 +1,5 @@
 
-  #define LOGTAG "stnr_ssl"
+  #define LOGTAG "sftnrssl"
 
 #include <dlfcn.h>
 #include <string.h>
@@ -41,34 +41,6 @@
 
 
   int dev_hndl      =     -1;
-
-    // Signal stuff:
-
-  #include <signal.h>
-  static struct sigaction old_sa[NSIG];
-  void android_sigaction (int signal, siginfo_t * info, void * reserved) {
-    if (dev_hndl > 0)
-      close (dev_hndl);
-    old_sa [signal].sa_handler (signal);                                // Original signal handler
-  }
-
-  void signal_catch_start () {
-	// Try to catch crashes...
-    struct sigaction handler;
-    memset (& handler, 0, sizeof (sigaction));
-    handler.sa_sigaction = android_sigaction;
-    handler.sa_flags = SA_RESETHAND;
-
-    #define CATCHSIG(X) sigaction(X, & handler, & old_sa [X])
-    CATCHSIG (SIGILL);
-    CATCHSIG (SIGABRT);
-    CATCHSIG (SIGBUS);
-    CATCHSIG (SIGFPE);
-    CATCHSIG (SIGSEGV);
-    CATCHSIG (SIGSTKFLT);
-    CATCHSIG (SIGPIPE);
-  }
-
 
     // FM Chip specific code:
 
@@ -331,8 +303,6 @@ typedef struct
     }
     logd ("chip_imp_api_on samsung /dev/fmradio or /dev/radio0: %3.3d", dev_hndl);
 
-    //signal_catch_start ();
-
     return (0);
   }
 
@@ -361,8 +331,8 @@ typedef struct
     //chip_info_log ();
     //chip_imp_mute_set (1);                                                       // Mute for now
 
-ms_sleep (100); // !!!! NEED !!!! ??
-ms_sleep (100);
+ms_sleep (101); // !!!! NEED !!!! ??
+ms_sleep (101);
 
     if (pwr_rds) {
       ret = ioctl (dev_hndl, Si4709_IOC_RDS_ENABLE);
@@ -378,7 +348,8 @@ ms_sleep (100);
       else
         logd ("sl_chip_imp_pwr_on IOCTL Si4709_IOC_RDS_DISABLE success");
     }
-    ms_sleep (200);
+    ms_sleep (101);
+    ms_sleep (101);
     band_setup ();
 
 //chip_imp_vol_set (65535); Test volext; doesn't work on stock 4.3
@@ -391,7 +362,7 @@ ms_sleep (100);
     int ret = 0;
     logd ("chip_imp_pwr_off");
     if (pwr_rds) {
-//      ms_sleep (100);
+//      ms_sleep (101);
       ret = ioctl (dev_hndl, Si4709_IOC_RDS_DISABLE);
       if (ret < 0) {
         loge ("chip_imp_pwr_off IOCTL Si4709_IOC_RDS_DISABLE error: %d %d", ret, errno);
@@ -399,7 +370,7 @@ ms_sleep (100);
       else {
         logd ("chip_imp_pwr_off IOCTL Si4709_IOC_RDS_DISABLE success");
       }
-      ms_sleep (100);
+      ms_sleep (101);
     }
     chip_imp_mute_set (1);                                                         // Mute
     ret = ioctl (dev_hndl, Si4709_IOC_POWERDOWN);

@@ -1,5 +1,5 @@
 
-  #define LOGTAG "stnr_qcv"
+  #define LOGTAG "sftnrqcv"
 
 #include <dlfcn.h>
 #include <string.h>
@@ -170,7 +170,7 @@ if (0) {
       loge ("chip_imp_api_on init error 0x%x after %d milliseconds", value, i * sleep_ms);
 
 
-ms_sleep (1000);
+ms_sleep (1010);
 
     //dev_hndl = open ("/dev/radio0", O_RDONLY | O_NONBLOCK);
     dev_hndl = open ("/dev/radio0", O_RDWR   | O_NONBLOCK);
@@ -179,7 +179,7 @@ ms_sleep (1000);
       return (-1);
     }
     logd ("chip_imp_api_on qualcomm /dev/radio0: %3.3d", dev_hndl);
-ms_sleep (1000);
+ms_sleep (1010);
     return (0);
 
 
@@ -679,7 +679,7 @@ enum iris_buf_t {
     if (pwr_rds) {
 int need_at_least_one_of_these_delays_or_tx_on_may_fail = 1;
 if (need_at_least_one_of_these_delays_or_tx_on_may_fail)
-  ms_sleep (100);
+  ms_sleep (101);
 
       if (chip_ctrl_set (V4L2_CID_PRIVATE_IRIS_RDSON, 0) < 0)           // 0 = OFF, 1 = ON
         loge ("chip_imp_pwr_off PRIVATE_IRIS_RDSON 0 error");
@@ -687,7 +687,7 @@ if (need_at_least_one_of_these_delays_or_tx_on_may_fail)
         logd ("chip_imp_pwr_off PRIVATE_IRIS_RDSON 0 success");
 
 if (need_at_least_one_of_these_delays_or_tx_on_may_fail)
-  ms_sleep (100);
+  ms_sleep (101);
     }
 
     logd ("chip_imp_pwr_off RDS off done");
@@ -700,7 +700,7 @@ if (need_at_least_one_of_these_delays_or_tx_on_may_fail)
       logd ("chip_imp_pwr_off PRIVATE_IRIS_STATE 0 success");
 
 
-    ms_sleep (2000);
+    ms_sleep (2020);
     logd ("chip_imp_pwr_off done");
 
     return (0);
@@ -1112,7 +1112,7 @@ enum search_t {
       return (-1);
     }
     logd ("chip_imp_seek_start VIDIOC_S_HW_FREQ_SEEK success");
-    ms_sleep (300);                                                     // Wait a bit to ensure change  (100 ms OK normally, 500 for change end ?
+    ms_sleep (303);                                                     // Wait a bit to ensure change  (100 ms OK normally, 500 for change end ?
     int ctr = 0, new_freq = 0;
     for (ctr = 0; ctr < 50 && new_freq != orig_freq; ctr ++) {          // 5 seconds max
       if (new_freq >= 50000 && new_freq <= 150000)

@@ -1,5 +1,5 @@
 
-  #define LOGTAG "stnr_bch"
+  #define LOGTAG "sftnrbch"
 
 #include <dlfcn.h>
 #include <string.h>
@@ -189,6 +189,7 @@ int lock_open (const char * id, volatile int * lock, int tmo) {
   int start_time   = ms_get ();                                         // Set start time
   int timeout_time = start_time + tmo;                                  // Set end/timeout time
   int elapsed_time = ms_get () - start_time;
+  long alt_sleep_ctr = 0;
 
   while (ms_get () < timeout_time) {                                    // Until timeout
     if (* lock < 0) {                                                   // If negative...
@@ -199,7 +200,12 @@ int lock_open (const char * id, volatile int * lock, int tmo) {
     while ((* lock) && ms_get () < timeout_time) {                      // While the lock is NOT acquired and we have not timed out...
       if (elapsed_time > 100)
         loge ("lock_open sleep 10 ms id: %s  holder_id: %s  attempts: %d  lock_val: %d  lock: %d  elapsed_time: %d", id, holder_id, attempts, lock_val, * lock, elapsed_time);// Else we lost attempt
-      ms_sleep (10);                                                    // Sleep a while then try again
+      if (attempts) {                                                   // If not 1st try...
+        alt_sleep_ctr = 0;
+        while (alt_sleep_ctr ++ < 10000);       // !!!! Because ms_sleep was crashing ?
+      }
+      else
+        ms_sleep (10);                                                  // Sleep a while then try again
     }
     elapsed_time = ms_get () - start_time;
 
@@ -208,7 +214,7 @@ int lock_open (const char * id, volatile int * lock, int tmo) {
     if (lock_val == 1) {                                                // If success...
       if (attempts)                                                     // If not 1st try...
         loge ("lock_open %s success id: %s  holder_id: %s  attempts: %d  lock_val: %d  lock: %d  elapsed_time: %d", id, holder_id, attempts, lock_val, * lock, elapsed_time);
-      holder_id = (char *) id;
+      holder_id = (char *) id;                                          // We are last holder (though done now)
       return (0);                                                       // Lock acquired
     }
     else {
@@ -221,6 +227,32 @@ int lock_open (const char * id, volatile int * lock, int tmo) {
   loge ("lock_open timeout id: %s  holder_id: %s  attempts: %d  lock_val: %d  lock: %d  elapsed_time: %d", id, holder_id, attempts, lock_val, * lock, elapsed_time);
   return (-1);                                                          // Error, no lock
 }
+/* m@m ~/dev/s2 $ ndk-stack -sym ~/dev/s2/obj/local/armeabi/ -dump ts
+********** Crash dump: **********
+Build fingerprint: 'Sony/SGP511/SGP511:4.4.4/23.0.1.A.0.167/WP_3Rw:user/release-keys'
+pid: 25069, tid: 25081, name: libs2d.so  >>> /data/data/fm.a2d.sf/lib/libs2d.so <<<
+signal 11 (SIGSEGV), code 1 (SEGV_MAPERR), fault addr 0x0
+Stack frame #00 pc 00011630  /system/lib/libc.so (strlen+175)
+Stack frame #01 pc 00032229  /system/lib/libc.so (__vfprintf+2888)
+Stack frame #02 pc 0001390f  /system/lib/libc.so (__init_alternate_signal_stack(pthread_internal_t*)+58)
+Stack frame #03 pc fffffffd  <unknown>
+Stack frame #00 pc 00036cd4  /system/lib/libc.so (nanosleep+8)
+Stack frame #01 pc 00021d55  /system/lib/libc.so (usleep+36)
+Stack frame #02 pc 000052cf  /data/app/fm.a2d.sf-2/lib/arm/libs2t_bch.so (ms_sleep+34): Routine ms_sleep at /home/m/dev/s2/jni/utils.c:27
+Stack frame #03 pc 000077b9  /data/app/fm.a2d.sf-2/lib/arm/libs2t_bch.so (lock_open+128): Routine lock_open at /home/m/dev/s2/jni/tnr/tnr_bch.c:202
+Stack frame #04 pc 0000917f  /data/app/fm.a2d.sf-2/lib/arm/libs2t_bch.so (hci_cmd+118): Routine hci_cmd at /home/m/dev/s2/jni/tnr/tnr_bch.c:620
+Stack frame #05 pc 00009381  /data/app/fm.a2d.sf-2/lib/arm/libs2t_bch.so: Routine reg_get at /home/m/dev/s2/jni/tnr/tnr_bch.c:1064
+Stack frame #06 pc 000096c1  /data/app/fm.a2d.sf-2/lib/arm/libs2t_bch.so (reg_get+16): Routine reg_get at /home/m/dev/s2/jni/tnr/tnr_bch.c:1039
+Stack frame #07 pc 0000a665  /data/app/fm.a2d.sf-2/lib/arm/libs2t_bch.so (chip_imp_freq_get+4): Routine chip_imp_freq_get at /home/m/dev/s2/jni/tnr/tnr_bch.c:1914
+Stack frame #08 pc 0000a6bb  /data/app/fm.a2d.sf-2/lib/arm/libs2t_bch.so (chip_api_freq_get+14): Routine chip_api_freq_get at /home/m/dev/s2/jni/tnr/tnr_tnr.c:171
+Stack frame #09 pc 0000a6d7  /data/app/fm.a2d.sf-2/lib/arm/libs2t_bch.so (get_frequency+2): Routine get_frequency at /home/m/dev/s2/jni/tnr/tnr_tnr.c:844
+Stack frame #10 pc 00002f43  /data/app/fm.a2d.sf-2/lib/arm/libs2d.so
+Stack frame #11 pc 000032fd  /data/app/fm.a2d.sf-2/lib/arm/libs2d.so
+Stack frame #12 pc 0000349d  /data/app/fm.a2d.sf-2/lib/arm/libs2d.so
+Stack frame #13 pc 00003623  /data/app/fm.a2d.sf-2/lib/arm/libs2d.so
+Stack frame #14 pc 0000fbf9  /system/lib/libc.so (__libc_init+44)
+Stack frame #15 pc 00000d68  /data/app/fm.a2d.sf-2/lib/arm/libs2d.so        */
+
 
 int lock_close (const char * id, volatile int * lock) {
   //logd ("lock_close %s  lock: %d", id, (* lock));
@@ -617,7 +649,7 @@ int hci_cmd (uint8_t ogf, uint16_t ocf, unsigned char * cmd_buf, int cmd_len, un
     return (0);
   }
 
-  if (lock_open ("hci_cmd", & hci_cmd_lock, 1000))//300))              // Acquire HCI command lock within 1 (was 0.3) second
+  if (lock_open ("hci_cmd", & hci_cmd_lock, 1000))//300))               // Acquire HCI command lock within 1 (was 0.3) second
     return (-1);                                                        // Done w/ error if timeout
 
   res_buf [7] = 0xfe;                                                   // Put something in HCI error field in case no response
@@ -1412,17 +1444,17 @@ int bc_reg_aud_ctl0  = 0;                                               // BC_RE
 
 int bc_g2_pcm_set () {
 loge ("bc_g2_pcm_set");
-      ms_sleep (50);
+      ms_sleep (55);
       reg_set (0xfb | 0x20000,  0x00000000);                            // Audio PCM ????       fb 00 00 00 00 00 
-      ms_sleep (50);
+      ms_sleep (55);
 
 
 //  bc_g2_pcm_set_orig ();
 
       int inc = 100;
-      ms_sleep (50);
+      ms_sleep (55);
       reg_set (0xfd | 0x10000, inc);
-      ms_sleep (50);
+      ms_sleep (55);
       reg_set (0xf8 | 0x10000,  0x00ff);                                // Vol Max              f8 00 ff 00 
 
   bc_g2_pcm_set_orig ();
@@ -1488,7 +1520,7 @@ loge ("bc_g2_pcm_set_orig");
     else
       logd ("chip_imp_pwr_on 1 success writing 0x00");
 
-    ms_sleep (20);                                                      // We are supposed to sleep 20 milliseconds here
+    ms_sleep (22);                                                      // We are supposed to sleep 20 milliseconds here
 
     bc_reg_aud_ctl0 = 0;//0x23; //0x03;   //!! Mute for now     0x5c;   // radio-bcm2048.c also sets I2S     ROUTE_I2S_ENABLE |= 0x20 !!!! Test for Galaxy Tab etc.
 
@@ -1498,21 +1530,21 @@ loge ("bc_g2_pcm_set_orig");
     }
     else
       logd ("chip_imp_pwr_on 1 success reading 0x00  ret: %d", ret);
-    ms_sleep (20);                                                       // We are supposed to sleep 20 milliseconds here
+    ms_sleep (22);                                                       // We are supposed to sleep 20 milliseconds here
 
     if (reg_set (0x00, pwr_val) < 0) {                                  // Write power reg again. If this fails, the rest is useless.
       loge ("chip_imp_pwr_on 2 error writing 0x00");
     }
     else
       logd ("chip_imp_pwr_on 2 success writing 0x00");
-    ms_sleep (20);
+    ms_sleep (22);
     ret = reg_get (0x00);
     if (ret < 0) {                                                      // Read power reg.
       loge ("chip_imp_pwr_on 2 error reading 0x00  ret: %d", ret);
     }
     else
       logd ("chip_imp_pwr_on 2 success reading 0x00  ret: %d", ret);
-    ms_sleep (20);                                                      // We are supposed to sleep 20 milliseconds here
+    ms_sleep (22);                                                      // We are supposed to sleep 20 milliseconds here
 
     reg_set (0x10 | 0x10000, 0x0000);                                   // Write an Interrupt Mask of 0x0000 so we don't get Interrupt packets such as this on the UART: 04 ff 01 08
 
@@ -1531,7 +1563,7 @@ loge ("bc_g2_pcm_set_orig");
     }
     else
       logd ("chip_imp_pwr_on success writing 0x01");
-    ms_sleep (20);
+    ms_sleep (22);
 
         // Always get error here ; don't need ? Default anyway ?
     if (reg_set (0x14, MAX_RDS_BLOCKS * 3) < 0) {//0x78) < 0) {                                         //0x7e);  //BC_REG_RDS_WLINE,         // 0x14  FIFO water line set level
@@ -1539,7 +1571,7 @@ loge ("bc_g2_pcm_set_orig");
     }
     else
       logd ("chip_imp_pwr_on success writing 0x14");
-    ms_sleep (20);
+    ms_sleep (22);
 
     //reg_set (0xfb | 0x20000,  0x00000000);                              // Audio PCM ????       fb 00 00 00 00 00 
 
@@ -1632,25 +1664,25 @@ ms_sleep (50);
     if (is_lg2 && shim_hci_enable == 0)   // UART only; see bt-ven.c not yet in bt-hci.c
       bc_g2_pcm_set ();
     else if (is_lg2) {                                                  // Special LG G2 stuff needed, or no audio
-      ms_sleep (50);
+      ms_sleep (55);
       reg_set (0xfb | 0x20000,  0x00000000);                            // Audio PCM ????       fb 00 00 00 00 00 
-      ms_sleep (50);
+      ms_sleep (55);
       //if (shim_hci_enable == 0)   // UART only; see bt-ven.c not yet in bt-hci.c
       //  bc_g2_pcm_set ();
       int inc = 100;
-      ms_sleep (50);
+      ms_sleep (55);
       reg_set (0xfd | 0x10000, inc);
-      ms_sleep (50);
+      ms_sleep (55);
       reg_set (0xf8 | 0x10000,  0x00ff);                                // Vol Max              f8 00 ff 00 
     }
     else {  // For HTC One M7 and Sony Z2/Z3:
-      ms_sleep (50);
+      ms_sleep (55);
       reg_set (0xfb | 0x20000,  0x00000000);                            // Audio PCM ????       fb 00 00 00 00 00 
-      ms_sleep (50);
+      ms_sleep (55);
       int inc = 100;
-      ms_sleep (50);
+      ms_sleep (55);
       reg_set (0xfd | 0x10000, inc);
-      ms_sleep (50);
+      ms_sleep (55);
 
       int vol_val = 0x0040;                                             // Target max about 27,000
       if (version_sdk >= 21 && file_get ("/system/framework/htcirlibs.jar")) // If HTC One M7 GPE       (Stock Android 5 too ????)

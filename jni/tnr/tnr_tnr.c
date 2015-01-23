@@ -639,25 +639,20 @@ char g16 [256] = "";
   int spirit2_light     = 0;
   int rx_thread_running = 0;
   int rx_thread_ctr     = 0;
-  static void * rx_thread (void * arg) {
 
-    logd ("rx_thread: %p", arg);
-    int ret = 0;
-    int stereo = 0;
-    int sleep_ms = 101;
-    while (rx_thread_running) {                                         // Loop while running
+  static int rx_thread_work (int sleep_ms) {
       int ctr = 0;
       int evt = 1;
 
       while (! seek_in_progress && evt > 0 && ctr ++ < 8) {             // While NOT seeking with Broadcom HCI API AND starting or had an event AND less than 8 events processed...
         if (! rx_thread_running) {
           logd ("rx_thread done 1 rx_thread_ctr: %d", rx_thread_ctr);
-          return (NULL);
+          return (0);
         }
         evt = evt_get (0);
         if (! rx_thread_running) {
           logd ("rx_thread done 2 rx_thread_ctr: %d", rx_thread_ctr);
-          return (NULL);
+          return (0);
         }
         int seconds_disp = 60;
         int mod_factor = seconds_disp * (1010 / sleep_ms);
@@ -673,7 +668,7 @@ char g16 [256] = "";
 
       if (! rx_thread_running) {
         logd ("rx_thread done 3 rx_thread_ctr: %d", rx_thread_ctr);
-        return (NULL);
+        return (0);
       }
 
       if (! seek_in_progress && curr_af_num)                            // If NOT seeking with Broadcom HCI API AND we have AFs...
@@ -682,10 +677,22 @@ char g16 [256] = "";
 
       if (! rx_thread_running) {
         logd ("rx_thread done 4 rx_thread_ctr: %d", rx_thread_ctr);
-        return (NULL);
+        return (0);
       }
-
       rx_thread_ctr ++;
+    return (1); // 1 = Still running
+  }
+
+  static void * rx_thread (void * arg) {
+
+    logd ("rx_thread: %p", arg);
+    int ret = 0;
+    //int stereo = 0;
+    int sleep_ms = 101;
+    while (rx_thread_running) {                                         // Loop while running
+      ret = rx_thread_work (sleep_ms);
+      if (ret == 0)
+        return (NULL);
       ms_sleep (sleep_ms);                                              // 100 ms = poll 10 times per second, to maintain current fixed timing constants
     }
     logd ("rx_thread done 5 rx_thread_ctr: %d", rx_thread_ctr);
@@ -801,7 +808,9 @@ char g16 [256] = "";
       }
     }
     if (ret == 0) {                                                     // If successful chip_api_pwr_on()
-      ret = rx_thread_start ();
+//      ret = rx_thread_start ();
+      rx_thread_running = 1;
+
 /*
       if (ret) {                                                        // If thread start error
         chip_api_pwr_off (pwr_rds);
@@ -815,19 +824,21 @@ char g16 [256] = "";
     logd ("tx_start lo: %d  hi: %d  def: %d  grid: %d", low_freq, high_freq, default_freq, grid);
     return (0);
   }
-  int pause_CONFLICT (void ** session_data) {
+  int pause_CONFLICT (void ** session_data) {                           // Name will conflict with C pause() otherwise
     logd ("pause");
-    chip_api_mute_set (1);                                                       // Mute
+    chip_api_mute_set (1);                                              // Mute
     return (0);
   }
   int resume (void ** session_data) {
     logd ("resume");
-    chip_api_mute_set (0);                                                       // Unmute
+    chip_api_mute_set (0);                                              // Unmute
     return (0);
   }
   int reset (void ** session_data) {
     logd ("reset");
-    int ret = rx_thread_stop ();
+    int ret = 0;
+//    ret = rx_thread_stop ();
+    rx_thread_running = 0;
     ret = chip_api_pwr_off (pwr_rds);
     ret = chip_api_api_off ();
     return (ret);
@@ -855,6 +866,12 @@ char g16 [256] = "";
     if (command == NULL)
       logd ("send_extra_command: NULL");
     else {
+      if (! strncmp (command, "799", strlen ("799"))) {
+        if (rx_thread_running) {
+          rx_thread_work (101);
+          return (0);
+        }
+      }
       logd ("send_extra_command: %s", command);
       int ret = chip_api_extra_cmd (command, parameters);
       logd ("send_extra_command ret: %d", ret);

@@ -200,9 +200,10 @@ com_uti.logd ("FREQ CODE freq: " + freq + "  hci: " + hci + "  port: " + port);
 
         com_uti.logd ("daemon kill/start ret: " + ret);
 
-        com_uti.ms_sleep (200);   // !!!! MUST have delay here
-        com_uti.loge ("800 ms delay starting..., fix later");
-        com_uti.ms_sleep (800);    // Extra stock HTC One M7 ?
+        //com_uti.ms_sleep (200);   // !!!! MUST have at least 200 ms delay here
+        //com_uti.ms_sleep (800);    // Extra stock HTC One M7 ?
+        com_uti.loge ("1010 ms delay starting..., fix later");
+        com_uti.ms_sleep (1010);
 
         String res = com_uti.daemon_set ("tuner_state", "Start");
         com_uti.logd ("res: " + res);
@@ -221,7 +222,7 @@ com_uti.logd ("FREQ CODE freq: " + freq + "  hci: " + hci + "  port: " + port);
         String res = com_uti.daemon_set ("tuner_state", "Stop");
         com_uti.logd ("res: " + res);
 
-        com_uti.ms_sleep (500);                                         // Wait 500 ms for s2d daemon to stop, before killing (which may kill network socket or tuner access)
+        com_uti.ms_sleep (505);//500);                                         // Wait 500 ms for s2d daemon to stop, before killing (which may kill network socket or tuner access)
 
         m_com_api.tuner_state = "Stop";
 

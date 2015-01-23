@@ -1,8 +1,11 @@
 
   int daemon_cmd_log = 0;
   
+  #define DEF_LOGTAG "sfl....."
+  #define CLT_LOGTAG "sfc....."
+  #define DMN_LOGTAG "sfd....."
 
-  unsigned char logtag [16] = "sl......";   // Default "sl" = JNI library
+  unsigned char logtag [16] = DEF_LOGTAG;//"s2l.....";   // Default "2s2l...." = JNI library
 
   const char * copyright = "Copyright (c) 2011-2015 Michael A. Reid. All rights reserved.";
 
@@ -18,7 +21,6 @@
   #include <dirent.h>
   #include <termios.h>
   #include <string.h>
-  #include <signal.h>
   #include <sys/system_properties.h>
 
   #include <sys/ioctl.h>
@@ -224,7 +226,10 @@
     tv.tv_usec = (tmo % 1000) * 1000;
     int ret = setsockopt (fd, SOL_SOCKET, SO_RCVTIMEO, (struct timeval *) & tv, sizeof (struct timeval));
     if (ret != 0) {
-      loge ("timeout_set setsockopt SO_RCVTIMEO errno: %d", errno);
+      loge ("sock_rx_tmo_set setsockopt SO_RCVTIMEO errno: %d", errno);
+    }
+    else {
+      logd ("sock_rx_tmo_set setsockopt SO_RCVTIMEO Success");
     }
     //ret = setsockopt (fd, SOL_SOCKET, SO_SNDTIMEO, (struct timeval *) & tv, sizeof (struct timeval));
     //if (ret != 0) {
@@ -384,7 +389,9 @@
       loge ("server_work socket  errno: %d", errno);
       return (-1);
     }
-  
+
+sock_rx_tmo_set (sockfd, 100);
+
     bzero ((char *) & srv_addr, sizeof (srv_addr));
   #ifdef  CS_AF_UNIX
     srv_addr.sun_family = AF_UNIX;
@@ -418,6 +425,8 @@
   #endif
       loge ("Inet stream continuing despite bind error");      // OK to continue w/ Internet Stream
     }
+
+sock_rx_tmo_set (sockfd, 100);
   
   // Get command from client
   #ifndef CS_DGRAM
@@ -438,8 +447,15 @@
   #ifdef  CS_DGRAM
       cmd_len = recvfrom (sockfd, cmd_buf, sizeof (cmd_buf), 0, (struct sockaddr *) & cli_addr, & cli_len);
       if (cmd_len <= 0) {
-        loge ("Error recvfrom  errno: %d", errno);
-        ms_sleep (100);   // Sleep 0.1 second
+        if (errno == EAGAIN) {
+          //logd ("Error recvfrom EAGAIN errno: %d", errno);
+          if (tnr_funcs != NULL && tnr_funcs->send_extra_command != NULL)       // ???? Use curr_tuner_state ??
+            tnr_funcs->send_extra_command (NULL, "799", NULL, NULL);      // Poll
+        }
+        else {
+          loge ("Error recvfrom errno: %d", errno);
+          ms_sleep (101);   // Sleep 0.1 second
+        }
         continue;
       }
     #ifndef CS_AF_UNIX
@@ -453,7 +469,7 @@
       newsockfd = accept (sockfd, (struct sockaddr *) & cli_addr, & cli_len);
       if (newsockfd < 0) {
         loge ("Error accept  errno: %d", errno);
-        ms_sleep (100);   // Sleep 0.1 second
+        ms_sleep (101);   // Sleep 0.1 second
         continue;
       }
     #ifndef  CS_AF_UNIX
@@ -466,9 +482,9 @@
       cmd_len = read (newsockfd, cmd_buf, sizeof (cmd_buf));
       if (cmd_len <= 0) {
         loge ("Error read  errno: %d", errno);
-        ms_sleep (100);   // Sleep 0.1 second
+        ms_sleep (101);   // Sleep 0.1 second
         close (newsockfd);
-        ms_sleep (100);   // Sleep 0.1 second
+        ms_sleep (101);   // Sleep 0.1 second
         continue;
       }
   #endif
@@ -500,12 +516,12 @@
   #ifdef  CS_DGRAM
       if (sendto (sockfd, res_buf, res_len, 0, (struct sockaddr *) & cli_addr, cli_len) != res_len) {
         loge ("Error sendto  errno: %d  res_len: %d", errno, res_len);
-        ms_sleep (100);   // Sleep 0.1 second
+        ms_sleep (101);   // Sleep 0.1 second
       }
   #else
       if (write (newsockfd, res_buf, res_len) != res_len) {
         loge ("Error write  errno: %d", errno);
-        ms_sleep (100);   // Sleep 0.1 second
+        ms_sleep (101);   // Sleep 0.1 second
       }
       close (newsockfd);
   #endif
@@ -935,12 +951,12 @@
   int one_digital_input_on () {
     alsa_bool_set ("MultiMedia1 Mixer PRI_TX", 1);
     alsa_bool_set ("MultiMedia1 Mixer SLIM_0_TX", 0);                 // Turn off microphone path
-    ms_sleep (100);
+    ms_sleep (101);
     return (-1);
   }
   int one_digital_input_off () {
     alsa_bool_set ("MultiMedia1 Mixer PRI_TX", 0);
-    ms_sleep (100);
+    ms_sleep (101);
     return (-1);
   }
 
@@ -954,7 +970,7 @@
     }
     alsa_bool_set ("MultiMedia1 Mixer INTERNAL_FM_TX", 1);
     alsa_bool_set ("MultiMedia1 Mixer SLIM_0_TX", 0);                 // Turn off microphone path
-    ms_sleep (100);
+    ms_sleep (101);
     return (0);
   }
   int qcv_digital_input_off () {
@@ -963,7 +979,7 @@
       return (0);
     }
     alsa_bool_set ("MultiMedia1 Mixer INTERNAL_FM_TX", 0);
-    ms_sleep (100);
+    ms_sleep (101);
     return (0);
   }
 
@@ -986,7 +1002,7 @@
 
       alsa_enum_set ("SLIM_0_TX Channels", 1);            // 2/Stereo Set SLIMBus TX channels
 
-     ms_sleep (100);
+     ms_sleep (101);
 
     alsa_bool_set ("MultiMedia1 Mixer SLIM_0_TX", 1);
     alsa_bool_set ("MultiMedia1 Mixer SLIM_0_TX", 0);
@@ -1315,6 +1331,7 @@
   //#include <readline/readline.h>
   //#include <readline/history.h>
 
+/*
   #include <signal.h>
   static struct sigaction old_sa[NSIG];
   void android_sigaction (int signal, siginfo_t * info, void * reserved) {
@@ -1339,12 +1356,13 @@
     CATCHSIG (SIGSTKFLT);
     CATCHSIG (SIGPIPE);
   }
+*/
 
   int main (int argc, char ** argv) {
     if (argc > 1)
-      strncpy (logtag, "sd......", sizeof (logtag));
+      strncpy (logtag, DMN_LOGTAG, sizeof (logtag));
     else
-      strncpy (logtag, "sc......", sizeof (logtag));
+      strncpy (logtag, CLT_LOGTAG, sizeof (logtag));
 
     logd ("Spirit FM Radio daemon version 2015, Jan 16");               // !! Need automatic version
     logd (copyright);                                                   // Copyright

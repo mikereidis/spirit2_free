@@ -316,11 +316,11 @@ public class gui_gui implements gui_gap {
     if (radio_gui_start_count <= 1) {                                   // If first 1 runs...
       String cc = com_uti.country_get (m_context).toUpperCase ();//Locale.getDefault ());
       if (cc.equals ("US") || cc.equals ("CA") || cc.equals ("MX")) {   // USA, Canada or Mexico
-        com_uti.loge ("Setting band US");
+        com_uti.logd ("Setting band US");
         tuner_band_set_non_volatile ("US");
       }
       else {
-        com_uti.loge ("Setting band EU");
+        com_uti.logd ("Setting band EU");
         tuner_band_set_non_volatile ("EU");
       }
       if (m_com_api.tuner_band.equalsIgnoreCase ("US")) {
@@ -989,7 +989,7 @@ Rotate counter by 0.75 MHz = 8.766 degrees
     // Mode Buttons at bottom:
     // Mute/Unmute:
     if (m_com_api.audio_state.equalsIgnoreCase ("starting")) {
-      com_uti.loge ("Audio starting");
+      com_uti.logd ("Audio starting");
       m_iv_paupla.setImageResource (R.drawable.sel_pause);
     }
     else if (m_com_api.audio_state.equalsIgnoreCase ("start")) {

@@ -216,9 +216,11 @@ public final class com_uti  {
     int idx = tag.indexOf (".");
     if (idx > 0 && idx < max_log_char)
       tag = tag.substring (0, idx);
+    int index = 3;
+    String tag2 = tag.substring (0, index) + tag.substring (index + 1);
     String method = stack_trace_el.getMethodName ();
     //String method2 = stack_trace_el2.getMethodName ();
-    Log.d (tag_prefix_get () + tag, /*method2 + ":" +*/ method + ": " + text);
+    Log.d (tag_prefix_get () + tag2, method + ": " + text);
   }
   public static void loge (String text) {
     if (! loge_enable)
@@ -229,9 +231,11 @@ public final class com_uti  {
     int idx = tag.indexOf (".");
     if (idx > 0 && idx < max_log_char)
       tag = tag.substring (0, idx);
+    int index = 3;
+    String tag2 = tag.substring (0, index) + tag.substring (index + 1);
     String method = stack_trace_el.getMethodName ();
     //String method2 = stack_trace_el2.getMethodName ();
-    Log.e (tag_prefix_get () + tag, /*method2 + ":" +*/ method + ": " + text);
+    Log.e (tag_prefix_get () + tag2, method + ": " + text);
   }
 
 
@@ -307,15 +311,15 @@ public final class com_uti  {
     // Time:
 
   public static long ms_sleep (long ms) {
-    if (ms > 10 && ms != 101)
-      com_uti.loge ("ms: " + ms);
+    if (ms > 10 && (ms % 101 != 0) && (ms % 11 != 0))
+      com_uti.loge ("ms: " + ms);                                       // Error as a warning
     try {
       Thread.sleep (ms);                                                // Wait ms milliseconds
       return (ms);
     }
     catch (InterruptedException e) {
       //Thread.currentThread().interrupt();
-      //e.printStackTrace ();
+      e.printStackTrace ();
       loge ("Exception e: " + e);
       return (0);
     }
@@ -1542,7 +1546,10 @@ if (ds == null || rx_tmo == 100 || rx_tmo == 15000) {
       //com_uti.loge ("4444");
     }
     catch (SocketTimeoutException e) {
-      com_uti.loge ("java.net.SocketTimeoutException rx_tmo: " + rx_tmo + "  cmd: " + cmd);
+      if (cmd.equalsIgnoreCase ("s radio_nop Start"))
+        com_uti.logd ("radio_nop java.net.SocketTimeoutException rx_tmo: " + rx_tmo + "  cmd: " + cmd);
+      else
+        com_uti.loge ("java.net.SocketTimeoutException rx_tmo: " + rx_tmo + "  cmd: " + cmd);
     }
     catch (Throwable e) {
       com_uti.loge ("Exception: " + e + "  rx_tmo: " + rx_tmo + "  cmd: " + cmd);

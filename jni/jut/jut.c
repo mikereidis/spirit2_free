@@ -1,5 +1,5 @@
 
-#define LOGTAG "sjut...."
+#define LOGTAG "sfjutjni"
 
 #include <dlfcn.h>
 

@@ -10,7 +10,7 @@ a cp /sdcard/libbt-hci.so /system/lib/libbt-hci.so
 al  /system/lib/libbt-hci*
 */
 
-#define LOGTAG "shci"
+#define LOGTAG "sfbt-hci"
 
 #include <dlfcn.h>
 

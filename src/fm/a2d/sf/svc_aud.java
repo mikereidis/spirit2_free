@@ -1038,7 +1038,7 @@ dai_delay = 0;  // !! No delay ??
           }
           else {                                                        // Else, if no data could be retrieved...
             //loge ("pcm_read_runnable run() pcm_read NULL etc");
-            com_uti.ms_sleep (50);                                        // Wait 50 milli-seconds for errors to clear
+            com_uti.ms_sleep (101);//50);                                        // Wait 50 milli-seconds for errors to clear
           }
         }
 
@@ -1081,6 +1081,7 @@ dai_delay = 0;  // !! No delay ??
         // Amplify by 4
     }
     else if (com_uti.device == com_uti.DEV_GS3) {
+/*
       int ctr = 0;
       for (ctr = 0; ctr < len / 4; ctr ++) {    // Swap channels
         byte temp1 = buf [0];
@@ -1090,6 +1091,7 @@ dai_delay = 0;  // !! No delay ??
         buf [2] = temp1;
         buf [3] = temp2;
       }
+*/
     }
   }
 
@@ -1130,7 +1132,7 @@ dai_delay = 0;  // !! No delay ??
 
     if (len <= 0) {
       com_uti.loge ("get error: " + len + "  tail index: " + aud_buf_tail);
-      com_uti.ms_sleep (1000);
+      com_uti.ms_sleep (1010);
       return (false);
     }
 ///*
@@ -1436,7 +1438,7 @@ VOICE_COMMUNICATION 7       11  (Microphone audio source tuned for voice communi
     for (int cnt_src : m_srcs) {                                        // For all sources...
       src = cnt_src;
       if (src == 11) {                                                  // If special first entry...
-        com_uti.loge ("99 99 99 99 99 99 99 99 99 99 99 99 99 99 99 99 99 99 99 99 99 99 99 99 99 99 99 99 ");
+        //com_uti.loge ("99 99 99 99 99 99 99 99 99 99 99 99 99 99 99 99 99 99 99 99 99 99 99 99 99 99 99 99 ");
         String filename = "/sdcard/spirit/aud_src";
         if (com_uti.file_get (filename)) {                              // If aud_src file
           byte [] content = com_uti.file_read_16k (filename);
@@ -1470,7 +1472,7 @@ VOICE_COMMUNICATION 7       11  (Microphone audio source tuned for voice communi
             }
           }
           catch (Exception e) {
-            com_uti.loge ("Exception: " + e );
+            com_uti.logd ("Exception: " + e );  // "java.lang.IllegalArgumentException: Invalid audio source."
           }
         }
       }

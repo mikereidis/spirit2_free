@@ -10,7 +10,6 @@
 #include <stdlib.h>
 #include <termios.h>
 #include <string.h>
-#include <signal.h>
 #include <sys/system_properties.h>
 #define PROPERTY_VALUE_MAX  PROP_VALUE_MAX
 
@@ -286,7 +285,7 @@ logd ("srv_len: %d  fam: %d  addr: 0x%x  port: %d", srv_len, srv_addr.sin_family
     cmd_len = recvfrom(sockfd, cmd_buf, sizeof (cmd_buf), 0,(struct sockaddr *)&cli_addr,&cli_len);
     if (cmd_len <= 0) {
       loge ("Error recvfrom  errno: %d", errno);
-      ms_sleep (100);   // Sleep 0.1 second
+      ms_sleep (101);   // Sleep 0.1 second
       continue;
     }
   #ifndef CS_AF_UNIX
@@ -299,7 +298,7 @@ logd ("srv_len: %d  fam: %d  addr: 0x%x  port: %d", srv_len, srv_addr.sin_family
     newsockfd = accept(sockfd,(struct sockaddr *)&cli_addr,&cli_len);
     if (newsockfd < 0) {
       loge ("Error accept  errno: %d", errno);
-      ms_sleep (100);   // Sleep 0.1 second
+      ms_sleep (101);   // Sleep 0.1 second
       continue;
     }
   #ifndef  CS_AF_UNIX
@@ -311,9 +310,9 @@ logd ("srv_len: %d  fam: %d  addr: 0x%x  port: %d", srv_len, srv_addr.sin_family
     cmd_len = read (newsockfd, cmd_buf, sizeof (cmd_buf));
     if (cmd_len <= 0) {
       loge ("Error read  errno: %d", errno);
-      ms_sleep (100);   // Sleep 0.1 second
+      ms_sleep (101);   // Sleep 0.1 second
       close (newsockfd);
-      ms_sleep (100);   // Sleep 0.1 second
+      ms_sleep (101);   // Sleep 0.1 second
       continue;
     }
 #endif
@@ -341,12 +340,12 @@ logd ("srv_len: %d  fam: %d  addr: 0x%x  port: %d", srv_len, srv_addr.sin_family
 #ifdef  CS_DGRAM
     if (sendto(sockfd, res_buf, res_len, 0,(struct sockaddr *)&cli_addr,cli_len) != res_len) {
       loge ("Error sendto  errno: %d", errno);
-      ms_sleep (100);   // Sleep 0.1 second
+      ms_sleep (101);   // Sleep 0.1 second
     }
 #else
     if (write (newsockfd, res_buf, res_len) != res_len) {
       loge ("Error write  errno: %d", errno);
-      ms_sleep (100);   // Sleep 0.1 second
+      ms_sleep (101);   // Sleep 0.1 second
     }
     close (newsockfd);
 #endif
@@ -649,7 +648,7 @@ int patchram_set () {
 
   baudrate_reset (3000000);
 
-  ms_sleep (50);
+  ms_sleep (55);
   while (ret = hcd_read (hcdfile_fd, & patchram_send_buf [5], 3) > 0) { // Read 3 bytes from hcdfile until returns 0   (!! could mess up!!)
     if (ret < 0) {                                                      // If error...
       loge ("patchram_set read 2 ret: %d  errno: %d", ret, errno);
@@ -884,7 +883,7 @@ int tmo_write (int fd, unsigned char * buf, int buf_len, int tmo_ms) {
         loge ("tmo_write waiting errno: %s (%d)", strerror (errno), errno);
 
         //ms_sleep (10);                                                  // Wait 10 milliseconds
-        ms_sleep (20);  // !! Will this improve battery on Broadcom w/ RDS ???? !!!!
+        ms_sleep (22);  // !! Will this improve battery on Broadcom w/ RDS ???? !!!!
 
         continue;
       }

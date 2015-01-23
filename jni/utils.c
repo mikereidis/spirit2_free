@@ -22,7 +22,7 @@
 
 
   long ms_sleep (long ms) {
-    if (ms > 10 && ms != 101)
+    if (ms > 10 && (ms % 101 != 0) && (ms % 11 != 0))
       loge ("ms_sleep ms: %d", ms);
     usleep (ms * 1000);
     return (ms);
@@ -193,7 +193,7 @@ int hcd_num = 0;
 
 int hcd_file_find (char * path_buf, int path_len) {      // Find first file under subdir dir, with pattern pat. Put results in path_buf of size path_len.
   int ret = file_find ("/system", ".hcd", path_buf, path_len);          // Sometimes under system/vendor/firmware instead of system/etc/firmware
-  loge ("HCD hcd file_find ret: %d", ret);
+  logd ("HCD hcd file_find ret: %d", ret);
   hcd_num = 0;
 
   if (ret)                  // If we have at least one BC *.hcd or *.HCD firmware file in /system...
