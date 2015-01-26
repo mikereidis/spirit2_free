@@ -15,7 +15,7 @@ import android.graphics.Canvas;
 
 public class gui_dia extends RelativeLayout implements OnGestureListener {
 
-  private static int    stat_constrs = 1;
+  private static int    m_obinits = 1;
 
   private GestureDetector   gest_det;
   private int               m_width = 0;
@@ -47,7 +47,7 @@ public class gui_dia extends RelativeLayout implements OnGestureListener {
   public gui_dia (Context context, int dial_id, int needle_id, int width, int height) {
     super (context);
 
-    com_uti.logd ("stat_constrs: " + stat_constrs++);
+    com_uti.logd ("m_obinits: " + m_obinits++);
 
     com_uti.logd ("dial_id: " + dial_id + "  needle_id: " + needle_id + "  width: " + width + "  height: " + height);
 

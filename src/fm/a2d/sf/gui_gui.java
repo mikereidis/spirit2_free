@@ -52,7 +52,7 @@ import java.util.TimerTask;
 
 public class gui_gui implements gui_gap {
 
-  private static int    stat_constrs = 1;
+  private static int    m_obinits = 1;
   private int           audio_stream = AudioManager.STREAM_MUSIC;
 
   private Activity      m_gui_act    = null;
@@ -147,7 +147,7 @@ public class gui_gui implements gui_gap {
     // Code:
 
   public gui_gui (Context c, com_api the_com_api) {                     // Constructor
-    com_uti.logd ("stat_constrs: " + stat_constrs++);
+    com_uti.logd ("m_obinits: " + m_obinits++);
 
     m_context = c;
     m_gui_act = (Activity) c;
@@ -355,13 +355,9 @@ public class gui_gui implements gui_gap {
 
     tuner_stereo_load_prefs ();
 
-    if (com_uti.s2_tx_apk () && com_uti.s2_tx_get ()) {
-      boolean not_rcc_enabled = false;
-      if (not_rcc_enabled)  m_gui_act.startActivity (new Intent ("android.settings.ACTION_NOTIFICATION_LISTENER_SETTINGS"));
-    }
-    else {
+
+    //else
       //svc_rcc.stop ();
-    }
 
 
     return (true);
@@ -1496,8 +1492,7 @@ Rotate counter by 0.75 MHz = 8.766 degrees
     sys_run ("rm  " + dbgd + "sprt_getprop.txt " + dbgd + "sprt_logcat.txt " + dbgd + "sprt_dmesg.txt " + dbgd + "sprt_files.txt " + dbgd + "sprt_ps.txt " + dbgd + "sprt_bugreport.txt " + dbgd + "sprt_audio.txt " + dbgd + "sprt_prefs.txt ", 1);
 
         // !! Use /sdcard because /data/data/com.WHATEVER.fm/cache/ and /data/local/tmp didn't work well
-    //if (! debug_extra_logs)                                              // If logcat not already running... (But might have stopped after 60s ??)
-    //  sys_run ("/data/data/com.WHATEVER.fm/files/dologcat -v time > " + dbgd + "sprt_logcat.txt &", 1);    // Collect the logcat in the background
+    //sys_run ("/data/data/com.WHATEVER.fm/files/dologcat -v time > " + dbgd + "sprt_logcat.txt &", 1);    // Collect the logcat in the background
 
     String subject = "2013 ";
     if (fm_srvc.is_m6)
@@ -1586,10 +1581,8 @@ Rotate counter by 0.75 MHz = 8.766 degrees
     sys_run ("cat " + fm_srvc.spirit_getExternalStorageDirectory ().toString () + "/Download/spiritfm_license.gif | grep -v license_identity >> " + dbgd + "sprt_ps.txt", 1); // Record license
     sys_run ("echo  ======================================================================================================================== >> " + dbgd + "sprt_ps.txt", 1);
 
-    if (debug_extra_logs) {                                             // If debug extra logs
-      if (m_srvc.misc_str_get (6).equals ("1"))
-        sys_run ("bugreport 2>&1 > " + dbgd + "sprt_bugreport.txt", 1); // Android Bug Report tool
-    }
+    if (m_srvc.misc_str_get (6).equals ("1"))
+      sys_run ("bugreport 2>&1 > " + dbgd + "sprt_bugreport.txt", 1); // Android Bug Report tool
     sys_run ("echo  ======================================================================================================================== >> " + dbgd + "sprt_bugreport.txt", 1);
 
     sys_run ("echo  ======================================================================================================================== >> " + dbgd + "sprt_lcstart.txt", 1);
@@ -1633,8 +1626,7 @@ Rotate counter by 0.75 MHz = 8.766 degrees
     //dlg_dismiss (WAIT_DLG);
 
     boolean bret = file_email (subject, fm_srvc.spirit_getExternalStorageDirectory ().toString () + "/sprt_debug.txt");
-    if (debug_extra_logs) {  // If debug extra logs
-      //sys_run ("/data/data/com.WHATEVER.fm/files/dologcat -v time 2>&1 > " + dbgd + "sprt_logcat.txt &", 1);   // Restart logcat as daemon
+    //sys_run ("/data/data/com.WHATEVER.fm/files/dologcat -v time 2>&1 > " + dbgd + "sprt_logcat.txt &", 1);   // Restart logcat as daemon
     }
     return (bret);
   }

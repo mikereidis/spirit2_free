@@ -34,7 +34,7 @@ import java.util.Locale;
 
 public class svc_aud implements svc_aap, AudioManager.OnAudioFocusChangeListener {
 
-  private static int    stat_constrs = 1;
+  private static int    m_obinits = 1;
 
   private AudioManager  m_AM        = null;
   private Context       m_context   = null;
@@ -98,12 +98,12 @@ public class svc_aud implements svc_aap, AudioManager.OnAudioFocusChangeListener
   private int                   m_channels = 2;
   private int                   m_samplerate  = 44100;                  // Default = 8000 (Max w/ AMR)
 
-  private int                   write_stats_seconds     = 6;//10; // Over 11184 will overflow int in calcs of "stats_frames = (2 * write_stats_seconds * m_samplerate * m_channels) / len;"
-  private int                   read_stats_seconds      = 6;//00;//10; // Over 11184 will overflow int in calcs of "stats_frames = (2 *  read_stats_seconds * m_samplerate * m_channels) / len;"
+  private int                   write_stats_seconds     = 60;//10; // Over 11184 will overflow int in calcs of "stats_frames = (2 * write_stats_seconds * m_samplerate * m_channels) / len;"
+  private int                   read_stats_seconds      = 60;//00;//10; // Over 11184 will overflow int in calcs of "stats_frames = (2 *  read_stats_seconds * m_samplerate * m_channels) / len;"
 
   private boolean               pcm_write_thread_waiting= false;
 
-  private int                   pcm_priority            = -19;//-20;//-19;                                 // For both read and write
+//  private int                   pcm_priority            = -19;//-20;//-19;                                 // For both read and write
   private int                   write_ctr               = -1;   // -1 so first ++ increments to 0
 
   private int                   pcm_size_max            = 65536;//4096;//8192;//Not tunable yet !!!     65536; // 64Kbytes = 16K stereo samples    // @ 44.1K = 0.37 seconds each buffer = ~ 12 second delay (& mem alloc errors) for 32
@@ -215,24 +215,16 @@ dai_set (true);
 
   public svc_aud (Context c, svc_acb cb_aud, com_api svc_com_api) {                              // Constructor
 
-    com_uti.logd ("stat_constrs: " + stat_constrs++);
+    com_uti.logd ("m_obinits: " + m_obinits++);
 
     m_svc_acb = cb_aud;
     m_context = c;
     m_com_api = svc_com_api;
     com_uti.logd ("");
 
-    if (com_uti.s2_tx_get ())
-      s2_tx = true;
-    else
-      s2_tx = false;
-
-    if (s2_tx) {
+    s2_tx = com_uti.s2_tx_get ();
+    if (s2_tx)
       com_uti.logd ("s2_tx");
-      //audio_transmit_start ();
-      ////return;
-    }
-
 
     old_htc = false;
     if (com_uti.m_device.startsWith ("EVITA") || com_uti.m_device.startsWith ("VILLE") || com_uti.m_device.startsWith ("JEWEL")) {// || com_uti.m_device.startsWith ("M7C")) {
@@ -847,7 +839,7 @@ private final int getAndIncrement(int modulo) {
     public void run () {
       com_uti.logd ("pcm_write_runnable run()");
 
-      native_priority_set (pcm_priority);
+      //native_priority_set (pcm_priority);
 
       try {
 
@@ -924,7 +916,7 @@ private final int getAndIncrement(int modulo) {
 
 
     // Native API:
-
+/*
   static {
     System.loadLibrary ("jut");
   }
@@ -933,7 +925,7 @@ private final int getAndIncrement(int modulo) {
   private native int native_priority_set    (int priority);
 
   private native int native_prop_get        (int prop);
-
+*/
 
 
   private android.os.Handler dai_delay_handler  = new android.os.Handler ();    // Need at init else: java.lang.RuntimeException: Can't create handler inside thread that has not called Looper.prepare()
@@ -1018,7 +1010,7 @@ dai_delay = 0;  // !! No delay ??
     public void run () {
       com_uti.logd ("pcm_read_runnable run()");
 
-      native_priority_set (pcm_priority);
+      //native_priority_set (pcm_priority);
 
       try {
         buf_errs = 0;                                         // Init stats, pointers, etc

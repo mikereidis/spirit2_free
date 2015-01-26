@@ -654,15 +654,14 @@ char g16 [256] = "";
           logd ("rx_thread done 2 rx_thread_ctr: %d", rx_thread_ctr);
           return (0);
         }
+
         int seconds_disp = 60;
         int mod_factor = seconds_disp * (1010 / sleep_ms);
         if (rx_thread_ctr % mod_factor == 0)                            // Every seconds_disp seconds...
           logd ("rx_thread: %3.3d  evt: %3.3d", rx_thread_ctr, evt);
+
         if (evt >= 3 && evt <= 6) {                                     // If RDS
-          //if (rx_thread_ctr % mod_factor != 0)
-          //  logd ("rx_thread: %3.3d  evt: %3.3d", rx_thread_ctr, evt);
-          if (spirit2_light == 0 || rx_thread_ctr < 607)                // If full version or less than 60 seconds after start...
-            rds_callback ();                                            // RDS Callback
+          rds_callback ();                                              // RDS Callback
         }
       }
 

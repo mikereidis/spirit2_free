@@ -207,8 +207,7 @@
   #else                                                                   // For Address Family NETWORK sockets
   #include <netinet/in.h>
   #include <netdb.h> 
-  //#define CS_PORT     2122    //1221
-  int CS_PORT = 2122;
+  int s2d_port = 2122;
   #define CS_FAM   AF_INET
   #endif
 
@@ -241,7 +240,7 @@
 
     // IPC API
   int client_cmd (unsigned char * cmd_buf, int cmd_len, unsigned char * res_buf, int res_max) {
-    logd ("CS_PORT: %d  cmd_buf: \"%s\"  cmd_len: %d", CS_PORT, cmd_buf, cmd_len);
+    logd ("s2d_port: %d  cmd_buf: \"%s\"  cmd_len: %d", s2d_port, cmd_buf, cmd_len);
     static int sockfd = -1;
     int res_len,written;
     static socklen_t srv_len;
@@ -287,14 +286,14 @@
     srv_len = strlen (srv_addr.sun_path) + sizeof (srv_addr.sun_family);
   #else
     srv_addr.sin_family = AF_INET;
-    srv_addr.sin_addr.s_addr=htonl(INADDR_LOOPBACK);
-    //hp = gethostbyname("localhost");
-    //if (hp== 0) {
+    srv_addr.sin_addr.s_addr=htonl (INADDR_LOOPBACK);
+    //hp = gethostbyname ("localhost");
+    //if (hp == 0) {
     //  loge ("client_cmd: Error gethostbyname  errno: %d", errno);
     //  return (0);//"Error gethostbyname");
     //}
-    //bcopy((char *)hp->h_addr, (char *)&srv_addr.sin_addr, hp->h_length);
-    srv_addr.sin_port = htons(CS_PORT);
+    //bcopy ((char *) hp->h_addr, (char *) & srv_addr.sin_addr, hp->h_length);
+    srv_addr.sin_port = htons (s2d_port);
     srv_len =sizeof (struct sockaddr_in);
   #endif
   
@@ -390,7 +389,7 @@
       return (-1);
     }
 
-sock_rx_tmo_set (sockfd, 100);
+    sock_rx_tmo_set (sockfd, 100);                                      // For polling every 100 ms
 
     bzero ((char *) & srv_addr, sizeof (srv_addr));
   #ifdef  CS_AF_UNIX
@@ -400,13 +399,13 @@ sock_rx_tmo_set (sockfd, 100);
   #else
     srv_addr.sin_family = AF_INET;
     srv_addr.sin_addr.s_addr = htonl (INADDR_LOOPBACK); //INADDR_ANY;
-    //hp = gethostbyname("localhost");
-    //if (hp== 0) {
+    //hp = gethostbyname ("localhost");
+    //if (hp == 0) {
     //  loge ("Error gethostbyname  errno: %d", errno);
     //  return (-2);
     //}
-    //bcopy((char *)hp->h_addr, (char *)&srv_addr.sin_addr, hp->h_length);
-    srv_addr.sin_port = htons (CS_PORT);
+    //bcopy ((char *) hp->h_addr, (char *) & srv_addr.sin_addr, hp->h_length);
+    srv_addr.sin_port = htons (s2d_port);
     srv_len = sizeof (struct sockaddr_in);
   #endif
   
@@ -1113,10 +1112,14 @@ sock_rx_tmo_set (sockfd, 100);
           if (cval [0]) {
             strncpy (curr_tuner_band, cval,  sizeof (curr_tuner_band));
             //logd ("set_band: %d", tnr_funcs->set_band (NULL, atoi (val + klen)));         freq_inc used in tuner start
-            if (freq_inc < 200)
-              tnr_funcs->send_extra_command (NULL, "990", NULL, NULL);
-            else
-              tnr_funcs->send_extra_command (NULL, "991", NULL, NULL);
+
+            if (tuner_initialized && tnr_funcs) {
+              if (freq_inc < 200)                                       // If EU band...
+                tnr_funcs->send_extra_command (NULL, "990", NULL, NULL);
+              else
+                tnr_funcs->send_extra_command (NULL, "991", NULL, NULL);
+            }
+
           }
         }
         else if (strcpy (key, "tuner_state") && (klen = strlen (key)) && ! strncmp (ckey, key, klen)) {   // Tuner State
@@ -1378,10 +1381,12 @@ sock_rx_tmo_set (sockfd, 100);
         logd ("Server mode curr_radio_device_int: %d", curr_radio_device_int);
 
         s2_tx = 0;
-        //if (file_get ("/data/data/fm.a2d.sf/files/s2_tx"))
-        if (argc > 2)
+        if (argc > 2) {
           s2_tx = 1;
+          s2d_port = 2132;
+        }
 //tuner_state
+
         int ret = daemon (0, 0);
         logd ("daemon() ret: %d", ret);
 

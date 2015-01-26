@@ -49,7 +49,7 @@ import java.net.InetAddress;
 
 public final class com_uti  {
 
-  private static int    stat_constrs = 1;
+  private static int    m_obinits = 0;
 
   public static boolean ssd_via_sys_run = false;
   private static String ssd_cmd = "";
@@ -107,24 +107,96 @@ public final class com_uti  {
 
 
   public com_uti () {                                                    // Default constructor
-    com_uti.logd ("stat_constrs: " + stat_constrs++);
+    //com_uti.logd ("m_obinits: " + m_obinits++);   // !! Can't log from internal code, class is not set up yet !!
+    final String tag = tag_prefix_get () + "comuti";
+    m_obinits ++;
+    Log.d (tag, "m_obinits: " + m_obinits);
+
 
     Thread.setDefaultUncaughtExceptionHandler (new Thread.UncaughtExceptionHandler () {
       public void uncaughtException (Thread aThread, Throwable aThrowable) {
-        com_uti.loge ("!!!!!!!! Uncaught exception: " + aThrowable);
+        //com_uti.loge ("!!!!!!!! Uncaught exception: " + aThrowable);
+        Log.e (tag, "!!!!!!!! Uncaught exception: " + aThrowable);
       }
     });
-    com_uti.loge ("!!!!");
+    //com_uti.loge ("done");
+    Log.e (tag, "done");
+  }
+
+
+  private static final int max_log_char = 7;//8;
+
+  private static final boolean logv_enable = false;
+  //private static final boolean logv_enable = true;
+  private static final boolean logd_enable = true;
+  private static final boolean loge_enable = true;
+
+  private static String tag_prefix = "";
+
+  private static String tag_prefix_get () {
+    try {
+      if (tag_prefix != null && ! tag_prefix.equals (""))
+        return (tag_prefix);
+      String pkg = "fm.a2d.sf";
+      tag_prefix = pkg.substring (7);
+      if (tag_prefix.equals (""))
+        tag_prefix = "s!";
+    }
+    catch (Throwable e) {
+      //com_uti.loge ("Throwable e: " + e);
+      Log.e ("s2comuti", "Throwable e: " + e);
+      e.printStackTrace ();
+      tag_prefix = "E!";
+    }
+    return (tag_prefix);
+  }
+
+  private static void log (int level, String text) {
+
+    final StackTraceElement   stack_trace_el = new Exception ().getStackTrace () [2];
+    //final StackTraceElement   stack_trace_el2 = new Exception ().getStackTrace () [3];
+    String tag = stack_trace_el.getFileName ().substring (0, max_log_char);
+
+    int idx = tag.indexOf (".");
+    if (idx > 0 && idx < max_log_char)
+      tag = tag.substring (0, idx);
+    int index = 3;
+    String tag2 = tag.substring (0, index) + tag.substring (index + 1);
+    String method = stack_trace_el.getMethodName ();
+    //String method2 = stack_trace_el2.getMethodName ();
+
+    String full_tag = tag_prefix_get () + tag2;
+    String full_txt = method + ": " + text;
+
+    if (level == Log.ERROR)
+      Log.e (full_tag, full_txt);
+    else if (level == Log.DEBUG)
+      Log.d (full_tag, full_txt);
+    else if (level == Log.VERBOSE)
+      Log.v (full_tag, full_txt);
+  }
+
+  public static void logv (String text) {
+    if (logv_enable)
+      log (Log.VERBOSE, text);
+  }
+  public static void logd (String text) {
+    if (logd_enable)
+      log (Log.DEBUG, text);
+  }
+  public static void loge (String text) {
+    if (loge_enable)
+      log (Log.ERROR, text);
   }
 
 
 
-  public static String country_get (Context m_context) {
+  public static String country_get (Context context) {
 
     String cc = "DE";//"CA";   // Canada
         // getSubscriberId() function Returns the unique subscriber ID, for example, the IMSI for a GSM phone.
         //http://developer.samsung.com/android/technical-docs/How-to-retrieve-the-Device-Unique-ID-from-android-device
-    TelephonyManager mngr = (TelephonyManager) m_context.getSystemService (Context.TELEPHONY_SERVICE);
+    TelephonyManager mngr = (TelephonyManager) context.getSystemService (Context.TELEPHONY_SERVICE);
 
     //String number = ""
     //if (mngr.getLine1Number () != null)
@@ -182,60 +254,6 @@ public final class com_uti  {
       //.penaltyDeath ()
       //.penaltyDialog ()   ????
       .build () );
-  }
-
-
-  private static final int max_log_char = 7;//8;
-  public static void logx (String text) {                               // Extra logs
-    if (! logx_enable)
-      return;
-    logd (text);
-  }
-  public static boolean logx_enable = false;//true;
-  public static boolean logd_enable = true;
-  public static boolean loge_enable = true;
-
-  private static String tag_prefix = "";
-
-  private static String tag_prefix_get () {
-    if (! tag_prefix.equals (""))
-      return (tag_prefix);
-    String pkg = "fm.a2d.sf";
-    tag_prefix = pkg.substring (7);
-    if (tag_prefix.equals (""))
-      tag_prefix = "s!";
-    return (tag_prefix);
-  }
-
-  public static void logd (String text) {
-    if (! logd_enable)
-      return;
-    final StackTraceElement   stack_trace_el = new Exception ().getStackTrace () [1];
-    //final StackTraceElement   stack_trace_el2 = new Exception ().getStackTrace () [2];
-    String tag = stack_trace_el.getFileName ().substring (0, max_log_char);
-    int idx = tag.indexOf (".");
-    if (idx > 0 && idx < max_log_char)
-      tag = tag.substring (0, idx);
-    int index = 3;
-    String tag2 = tag.substring (0, index) + tag.substring (index + 1);
-    String method = stack_trace_el.getMethodName ();
-    //String method2 = stack_trace_el2.getMethodName ();
-    Log.d (tag_prefix_get () + tag2, method + ": " + text);
-  }
-  public static void loge (String text) {
-    if (! loge_enable)
-      return;
-    final StackTraceElement   stack_trace_el = new Exception ().getStackTrace () [1];
-    //final StackTraceElement   stack_trace_el2 = new Exception ().getStackTrace () [2];
-    String tag = stack_trace_el.getFileName ().substring (0, max_log_char);
-    int idx = tag.indexOf (".");
-    if (idx > 0 && idx < max_log_char)
-      tag = tag.substring (0, idx);
-    int index = 3;
-    String tag2 = tag.substring (0, index) + tag.substring (index + 1);
-    String method = stack_trace_el.getMethodName ();
-    //String method2 = stack_trace_el2.getMethodName ();
-    Log.e (tag_prefix_get () + tag2, method + ": " + text);
   }
 
 
@@ -1489,9 +1507,9 @@ Evo 4G LTE  jewel
 //      DatagramSocket ds = null;
       DatagramPacket dps = null;
 
-if (ds == null || rx_tmo == 100 || rx_tmo == 15000) {
-        ds = new DatagramSocket (0);//2122);
-}
+      if (ds == null || rx_tmo == 100 || rx_tmo == 15000) {
+        ds = new DatagramSocket (0);//s2d_port);
+      }
       ds.setSoTimeout (rx_tmo);
 
       //if (! loop_set) {
@@ -1499,7 +1517,7 @@ if (ds == null || rx_tmo == 100 || rx_tmo == 15000) {
         loop = InetAddress.getByName ("127.0.0.1");
       //}
 
-      dps = new DatagramPacket (cmd_buf, cmd_len, loop, 2122);     // Send
+      dps = new DatagramPacket (cmd_buf, cmd_len, loop, s2d_port);     // Send
 
       //com_uti.logd ("Before send() cmd: " + cmd + "  res_len: " + res_len);
       ds.send (dps);
@@ -1656,6 +1674,25 @@ if (ds == null || rx_tmo == 100 || rx_tmo == 15000) {
 
     // !! Use native_priority_set() instead !!
 /*
+
+  #include <sys/time.h>
+  #include <sys/resource.h>
+
+  jint Java_fm_a2d_s2_svc_1aud_native_1priority_1set (JNIEnv * env, jobject thiz, jint new_priority) {
+    logd ("native_priority_set new_priority: %d", new_priority);
+    int priority = 0;
+    priority = getpriority (PRIO_PROCESS, 0);
+    logd ("native_priority_set priority: %d  errno: %d", priority, errno);
+
+    priority = setpriority (PRIO_PROCESS, 0, new_priority);//-19);
+    logd ("native_priority_set priority: %d  errno: %d", priority, errno);
+
+    priority = getpriority (PRIO_PROCESS, 0);
+    logd ("native_priority_set priority: %d  errno: %d", priority, errno);
+    return (0);
+  }
+
+
   private static void old_thread_priority_set () {
 
     int tid = -5;
@@ -1765,13 +1802,19 @@ http://www.netmite.com/android/mydroid/frameworks/base/include/utils/threads.h
 
     // Tuner FM utility functions:
 
+  private static int s2d_port = 2122;
+
   public static boolean s2_tx_apk () {
     String tx_name = "fm.a2d.s";
     tx_name += "t";                                                     // Protect name against build sed change
-    if (tx_name.equals ("fm.a2d.sf"))                                   // String gets modified to "fm.a2d.st" for transmit APK
+    if (tx_name.equals ("fm.a2d.sf")) {                                 // If equals string which gets modified to "fm.a2d.st" for transmit APK
+      s2d_port = 2132;                                                  // Transmit APK s2d port
       return (true);
-    else
+    }
+    else {
+      s2d_port = 2122;                                                  // Receive APK s2d port (Should SpiritF Free/Open use a different port ?)
       return (false);
+    }
   }
 
   public static boolean s2_tx_get () {
@@ -2330,7 +2373,9 @@ It should be noted that operation in this region is the same as it is for all RD
     return (false);
   }
   public static boolean shim_files_possible_get () {
-    if (com_uti.file_get ("/system/lib/libbt-hci.so") || com_uti.file_get ("/system/vendor/lib/libbt-vendor.so"))
+    if (com_uti.file_get ("/system/lib/libbt-hci.so"))
+      return (true);
+    if (com_uti.file_get ("/system/vendor/lib/libbt-vendor.so") && device != DEV_LG2)   // Disable libbt-vendor for LG2 due to Audio enable issue !!!!
       return (true);
     return (false);
   }
@@ -2379,7 +2424,7 @@ It should be noted that operation in this region is the same as it is for all RD
     //com_uti.ms_sleep (1000);                                              // Extra 1 second delay to ensure
 
   private static void shim_remove_log (String log) {
-    //Toast.makeText (m_context, log, Toast.LENGTH_LONG).show ();
+    //Toast.makeText (context, log, Toast.LENGTH_LONG).show ();
     loge (log);
   }
 

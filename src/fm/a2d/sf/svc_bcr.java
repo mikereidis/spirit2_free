@@ -15,25 +15,23 @@ import android.view.KeyEvent;
 
 public class svc_bcr extends BroadcastReceiver {                        // !! Operates in same process as gui_act !!
 
-  private static int    stat_constrs = 1;
+  private static    int                 m_obinits   = 0;
+  //private static    int                 m_creates   = 0;
   //private static com_api gui_act.m_com_api = null;                    // Static: Need to maintain state across broadcasts !!
 
-  private static final boolean extra_log = true;//false;
-
   public svc_bcr () {                                                   // Need empty constructor since system will start via AndroidManifest.xml, before app ever starts
-    com_uti.logx ("");    // Regular creation
+    m_obinits ++;
+    com_uti.logd ("m_obinits: " + m_obinits);
 
-    com_uti.logd ("stat_constrs: " + stat_constrs++);
+    com_uti.logd ("this: " + this);
   }
 
-
-
     // Media buttons:
+
   @Override
   public void onReceive (Context context, Intent intent) {
     try {
-      if (extra_log)
-        com_uti.logd ("gui_act.m_com_api: " + gui_act.m_com_api);
+      com_uti.logv ("gui_act.m_com_api: " + gui_act.m_com_api);
 
       if (gui_act.m_com_api == null) {
         gui_act.m_com_api = new com_api (context);                      // !! Operates in same process as gui_act !!
@@ -44,12 +42,10 @@ public class svc_bcr extends BroadcastReceiver {                        // !! Op
         com_uti.loge ("gui_act.m_com_api == null, no action");
         return;
       }
-      if (extra_log)
-        com_uti.logd ("tuner_state: " + gui_act.m_com_api.tuner_state);
+      com_uti.logv ("tuner_state: " + gui_act.m_com_api.tuner_state);
 
       String action = intent.getAction ();
-      if (extra_log)
-        com_uti.logd ("context: " + context + "  intent: " + intent + "  action: " + action);
+      com_uti.logv ("context: " + context + "  intent: " + intent + "  action: " + action);
       if (action == null)
         return;
 //      if (action.equalsIgnoreCase ("fm.a2d.sf.result.get")) {
@@ -77,8 +73,7 @@ public class svc_bcr extends BroadcastReceiver {                        // !! Op
   }
 /*
   private void radio_update (Context context, Intent intent) {
-    if (extra_log)
-      com_uti.logd ("");
+    com_uti.logv ("");
 
     if (gui_act.m_com_api == null) {
       gui_act.m_com_api = new com_api (context);
@@ -87,8 +82,7 @@ public class svc_bcr extends BroadcastReceiver {                        // !! Op
 
     gui_act.m_com_api.radio_update (intent);                                    // Context change issues between broadcasts ???
 
-    if (extra_log)
-      com_uti.logd ("tuner_state: " + gui_act.m_com_api.tuner_state + "  audio_state: " + gui_act.m_com_api.audio_state);
+    com_uti.logv ("tuner_state: " + gui_act.m_com_api.tuner_state + "  audio_state: " + gui_act.m_com_api.audio_state);
   }
 */
 

@@ -9,10 +9,12 @@ import android.os.Bundle;
 
 public class com_api {
 
-  private static int    stat_constrs = 1;
-  public  static Context       m_context   = null;
+  private static    int                 m_obinits   = 0;
+  //private static    int                 m_creates   = 0;
 
-  private static int curr_pending_intent_num = 0;
+  public  static    Context             m_context   = null;
+
+  private static    int                 m_intent_ctr= 0;
 
     // Radio statuses:
   public String     radio_phase         = "Pre Init";
@@ -79,7 +81,8 @@ public class com_api {
     // Code:
 
   public com_api (Context context) {                                    // Context constructor
-    com_uti.logd ("stat_constrs: " + stat_constrs++);
+    m_obinits ++;
+    com_uti.logd ("m_obinits: " + m_obinits);
     m_context = context;
     com_uti.logd ("context: " + context);
   }
@@ -87,14 +90,15 @@ public class com_api {
 
   public static PendingIntent pend_intent_get (Context context, String key, String val) {
     Intent intent = new Intent ("fm.a2d.sf.action.set");
-    com_uti.logx ("context: " + context + "  m_context: " + m_context + "  intent: " + intent + "  key: " + key + "  val: " + val);
+    com_uti.logv ("context: " + context + "  m_context: " + m_context + "  intent: " + intent + "  key: " + key + "  val: " + val);
     /*if (intent == null) {
       com_uti.loge ("intent == null");
       return (null);
     }*/
     intent.setClass (context, svc_svc.class);                         // !! Note possible different context and m_context !!
     intent.putExtra (key, val);
-    PendingIntent pi = PendingIntent.getService (context, ++ curr_pending_intent_num, intent, PendingIntent.FLAG_UPDATE_CURRENT);// Different 2nd parameter
+    m_intent_ctr ++;
+    PendingIntent pi = PendingIntent.getService (context, m_intent_ctr, intent, PendingIntent.FLAG_UPDATE_CURRENT);// Different 2nd parameter
     return (pi);
   }
   public void key_set (String key, String val, String key2, String val2) {  // Presets currently require simultaneous preset frequency and name
@@ -135,7 +139,7 @@ public class com_api {
 
 
   public void radio_update (Intent intent) {
-    com_uti.logx ("intent: " + intent);
+    com_uti.logv ("intent: " + intent);
 
     Bundle extras = intent.getExtras ();
 

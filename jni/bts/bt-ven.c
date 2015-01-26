@@ -103,7 +103,7 @@ int extra_logs = 0;//1;
   static volatile uint8_t     thread_state = 0;                         // 0 = stopped, 1 = started, 2 = not needed but thread still alive
 
   void * bfm_send (char * buf, int len);
-
+/*
 int bc_g2_pcm_set () {
   unsigned char res_buf [MAX_HCI];
   int res_len;
@@ -119,25 +119,13 @@ void * res_ptr = bfm_send (& hci_g2 [5], hci_len + 3);    // 5 + 3 = 8
 //hci_buf [7] = 5;    // ?
 //void * res_ptr = bfm_send (& hci_buf [5], sizeof (hci_buf) - 5);
 
-
-
-/*?? bad:
-12-12 04:02:27.149 D/sven   ( 2847): bfm_send buf: 0xa1eedbe1  len: 8
-12-12 04:02:27.149 D/bt_userial( 2847): Entering userial_read_thread()
-12-12 04:02:27.149 D/sven   ( 2847): bfm_send ogf: 0x3f  ocf: 0x0  opcode: 0xfc00  hci_data: 0xa1eedbe4  hci_len: 5
-12-12 04:02:27.149 D/sven   ( 2847): TXB 00 20 08 00 00 00 00 fc 00 fc 05 f3 88 01 02 05 
-
-Good:                                 TXB 00 20 08 00 00 00 00 fc 00 fc 05 f3 88 01 02 05 
-
-12-12 04:02:27.149 E/sven   ( 2847): !!!!!! NULL cback !!!
-12-12 04:02:27.149 D/sven   ( 2847): bfm_send ret: 1
-*/
-
   if (res_ptr == NULL)
     loge ("bc_g2_pcm_set hci_cmd error res_ptr: %p", res_ptr);
   else 
     loge ("bc_g2_pcm_set OK");
   return (0);
+}
+*/
 
 /*
   res_len = hci_cmd (0x3f, 0x00, hci_buf, sizeof (hci_buf), res_buf, sizeof (res_buf));
@@ -150,7 +138,17 @@ Good:                                 TXB 00 20 08 00 00 00 00 fc 00 fc 05 f3 88
   else 
     loge ("bc_g2_pcm_set OK");
 */
-}
+/*?? bad:
+12-12 04:02:27.149 D/sven   ( 2847): bfm_send buf: 0xa1eedbe1  len: 8
+12-12 04:02:27.149 D/bt_userial( 2847): Entering userial_read_thread()
+12-12 04:02:27.149 D/sven   ( 2847): bfm_send ogf: 0x3f  ocf: 0x0  opcode: 0xfc00  hci_data: 0xa1eedbe4  hci_len: 5
+12-12 04:02:27.149 D/sven   ( 2847): TXB 00 20 08 00 00 00 00 fc 00 fc 05 f3 88 01 02 05 
+
+Good:                                 TXB 00 20 08 00 00 00 00 fc 00 fc 05 f3 88 01 02 05 
+
+12-12 04:02:27.149 E/sven   ( 2847): !!!!!! NULL cback !!!
+12-12 04:02:27.149 D/sven   ( 2847): bfm_send ret: 1
+*/
 
 
 

@@ -19,11 +19,11 @@ LOCAL_SRC_FILES := s2d/s2d.c
 include $(BUILD_EXECUTABLE)
 
     # JNI utilities
-include $(CLEAR_VARS)
-LOCAL_MODULE:= jut
-LOCAL_SRC_FILES:= jut/jut.c
-#LOCAL_LDLIBS += -l OpenSLES
-include $(BUILD_SHARED_LIBRARY)
+#include $(CLEAR_VARS)
+#LOCAL_MODULE:= jut
+#LOCAL_SRC_FILES:= jut/jut.c
+##LOCAL_LDLIBS += -l OpenSLES
+#include $(BUILD_SHARED_LIBRARY)
 
 
     # 5 Tuner Plugins:

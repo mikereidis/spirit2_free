@@ -1441,26 +1441,18 @@ int bc_reg_aud_ctl0  = 0;                                               // BC_RE
 01-15 19:46:40.194 D/fm_hrdw ( 2104): bc_rbds_set: 1
 */
 
-
+/*
 int bc_g2_pcm_set () {
 loge ("bc_g2_pcm_set");
       ms_sleep (55);
       reg_set (0xfb | 0x20000,  0x00000000);                            // Audio PCM ????       fb 00 00 00 00 00 
       ms_sleep (55);
-
-
-//  bc_g2_pcm_set_orig ();
-
       int inc = 100;
       ms_sleep (55);
       reg_set (0xfd | 0x10000, inc);
       ms_sleep (55);
       reg_set (0xf8 | 0x10000,  0x00ff);                                // Vol Max              f8 00 ff 00 
 
-  bc_g2_pcm_set_orig ();
-}
-
-int bc_g2_pcm_set_orig () {
 loge ("bc_g2_pcm_set_orig");
   unsigned char res_buf [MAX_HCI];
   int res_len;
@@ -1479,6 +1471,7 @@ loge ("bc_g2_pcm_set_orig");
     loge ("bc_g2_pcm_set OK");
   return (0);
 }
+*/
 
 
   int version_sdk;
@@ -1661,43 +1654,42 @@ ms_sleep (50);
     version_sdk = atoi (version_sdk_prop_buf);
 
 
-    if (is_lg2 && shim_hci_enable == 0)   // UART only; see bt-ven.c not yet in bt-hci.c
-      bc_g2_pcm_set ();
-    else if (is_lg2) {                                                  // Special LG G2 stuff needed, or no audio
-      ms_sleep (55);
-      reg_set (0xfb | 0x20000,  0x00000000);                            // Audio PCM ????       fb 00 00 00 00 00 
-      ms_sleep (55);
-      //if (shim_hci_enable == 0)   // UART only; see bt-ven.c not yet in bt-hci.c
-      //  bc_g2_pcm_set ();
-      int inc = 100;
-      ms_sleep (55);
-      reg_set (0xfd | 0x10000, inc);
-      ms_sleep (55);
-      reg_set (0xf8 | 0x10000,  0x00ff);                                // Vol Max              f8 00 ff 00 
-    }
-    else {  // For HTC One M7 and Sony Z2/Z3:
-      ms_sleep (55);
-      reg_set (0xfb | 0x20000,  0x00000000);                            // Audio PCM ????       fb 00 00 00 00 00 
-      ms_sleep (55);
-      int inc = 100;
-      ms_sleep (55);
-      reg_set (0xfd | 0x10000, inc);
-      ms_sleep (55);
+    ms_sleep (55);
+    reg_set (0xfb | 0x20000,  0x00000000);                            // Audio PCM ????       fb 00 00 00 00 00 
+    ms_sleep (55);
+    int inc = 100;
+    ms_sleep (55);
+    reg_set (0xfd | 0x10000, inc);
+    ms_sleep (55);
 
-      int vol_val = 0x0040;                                             // Target max about 27,000
-      if (version_sdk >= 21 && file_get ("/system/framework/htcirlibs.jar")) // If HTC One M7 GPE       (Stock Android 5 too ????)
+    if (is_lg2) {                                                       // If LG G2 and SHIM:   Special LG G2 stuff needed, or no audio
+      if (shim_hci_enable == 0) {                               // If LG G2 and UART:   See bt-ven.c not yet in bt-hci.c
+        unsigned char res_buf [MAX_HCI];
+        int res_len;
+        //logd ("bc_g2_pcm_set 1");     // hcitool cmd 3f 00 f3 88 01 02 05
+        unsigned char hci_buf [] = {0, 0, 0, 0, 0, 0, 0, 0, 0xf3, 0x88, 0x01, 0x02, 0x05};
+        res_len = hci_cmd (0x3f, 0x00, hci_buf, sizeof (hci_buf), res_buf, sizeof (res_buf));
+        if (res_buf [7]) {
+          loge ("WAS bc_g2_pcm_set hci error: %d %s", res_buf [7], hci_err_get (res_buf [7]));
+          //return (res_buf [7]);
+        }
+        if (res_len < 1 + 8)
+          loge ("WAS bc_g2_pcm_set hci_cmd error res_len: %d", res_len);
+        else 
+          loge ("WAS bc_g2_pcm_set OK");
+      }
+    }
+
+    int vol_val = 0x00ff;//40;                                             // Target max about 27,000
+    if (is_m7 && version_sdk >= 21) {                                   // For HTC One M7 Lollipop
+      vol_val = 0x0040;                                                 // Target max about 27,000
+      if (file_get ("/system/framework/htcirlibs.jar"))                 // If HTC One M7 GPE       (Stock Android 5 too ????)
         vol_val = 0x0060;
-      else if (version_sdk >= 21 && is_m7)
-        vol_val = 0x0040;
-      //else if (version_sdk >= 21 && is_xz2)   // Early ROM needed 0x0040 but FXP-cm-12-20150102-UNOFFICIAL-castor_windy does not
-      //  vol_val = 0x0040;
-      else
-        vol_val = 0x00ff;
-
-      if (vol_val != 0x00ff)
-        reg_set (0xf8 | 0x10000,  vol_val);                               // Vol Max              f8 00 ff 00 
     }
 
+    //if (vol_val != 0x00ff || is_lg2)
+    if (vol_val != 0x00ff)
+      reg_set (0xf8 | 0x10000,  vol_val);                               // Vol Max              f8 00 ff 00 
 
     //bc_reg_dump (0x00, 0x7f, 1);
 
@@ -2240,7 +2232,7 @@ int regional_set (int lo, int hi, int inc, int odd, int emph75, int rbds) {
         reg_set (0xf8 | 0x10000,  vol_reg_val);//0x000f);//0x00ff);                                // Vol Max              f8 00 ff 00 
       }
       else if (full_val == 230000) {
-        bc_g2_pcm_set ();
+        //bc_g2_pcm_set ();
       }
 
     return (0);

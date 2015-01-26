@@ -67,6 +67,8 @@ public class svc_svc extends Service implements svc_tcb, svc_acb {  // Service c
 
   private AudioManager          m_AM = null;
 
+  private boolean s2_tx = false;
+
   @Override
   public void onCreate () {                                             // When service newly created...
     com_uti.logd ("stat_creates: " + stat_creates++);
@@ -76,6 +78,10 @@ public class svc_svc extends Service implements svc_tcb, svc_acb {  // Service c
       com_uti.strict_mode_set (false);                                  // !!!! Disable strict mode so we can send network packets from Java
 
       m_AM = (AudioManager) m_context.getSystemService (Context.AUDIO_SERVICE);
+
+      s2_tx = com_uti.s2_tx_get ();
+      if (s2_tx)
+        com_uti.logd ("s2_tx");
 
       if (m_com_api == null) {
         m_com_api = new com_api (this);                                 // Instantiate Common API   class
@@ -276,7 +282,7 @@ public class svc_svc extends Service implements svc_tcb, svc_acb {  // Service c
       m_com_api.tuner_freq = ("" + (double) ifreq / 1000);
       m_com_api.int_tuner_freq = ifreq;
     }
-    com_uti.logx ("m_com_api.tuner_freq: " + m_com_api.tuner_freq + "  m_com_api.int_tuner_freq: " + m_com_api.int_tuner_freq);
+    com_uti.logv ("m_com_api.tuner_freq: " + m_com_api.tuner_freq + "  m_com_api.int_tuner_freq: " + m_com_api.int_tuner_freq);
     send_intent.putExtra ("tuner_freq",         m_com_api.tuner_freq);
 
     //send_intent.putExtra ("tuner_stereo",       m_svc_tap.tuner_get ("tuner_stereo"));
@@ -314,7 +320,7 @@ public class svc_svc extends Service implements svc_tcb, svc_acb {  // Service c
 
     m_svc_aap.audio_sessid_get (); // Better to update here ?
 
-    com_uti.logx ("audio_state: " + m_com_api.audio_state + "  audio_output: " + m_com_api.audio_output +
+    com_uti.logv ("audio_state: " + m_com_api.audio_state + "  audio_output: " + m_com_api.audio_output +
                 "  audio_stereo: " + m_com_api.audio_stereo + "  audio_record_state: " + m_com_api.audio_record_state);
 
     Intent send_intent = new Intent ("fm.a2d.sf.result.get");
@@ -468,7 +474,7 @@ public class svc_svc extends Service implements svc_tcb, svc_acb {  // Service c
     if (audio_state.equalsIgnoreCase ("start")) {                       // If audio state = Start...
 
       String audio_output = com_uti.prefs_get (m_context, "audio_output", "headset");
-      m_svc_aap.audio_output_set (audio_output);                      // Set Audio Output from prefs
+      m_svc_aap.audio_output_set (audio_output);                        // Set Audio Output from prefs
 
     }
     else if (audio_state.equalsIgnoreCase ("stop")) {                   // If audio state = Stop...
@@ -617,7 +623,7 @@ public class svc_svc extends Service implements svc_tcb, svc_acb {  // Service c
     // Single Tuner Sub-Service callback expands to other functions:
 
   public void cb_tuner_key (String key, String val) {
-    com_uti.logx ("key: " + key + "  val: " + val);
+    com_uti.logv ("key: " + key + "  val: " + val);
 ///*
     if (com_uti.device == com_uti.DEV_QCV && m_svc_aap.audio_blank_get ()) {   // If we need to kickstart audio...
       com_uti.loge ("!!!!!!!!!!!!!!!!!!!!!!!!! Kickstarting stalled audio !!!!!!!!!!!!!!!!!!!!!!!!!!");

@@ -144,12 +144,13 @@ if (0) {
     }
 */
 
-    sys_run ((char *) "setprop hw.fm.mode normal >/dev/null 2>/dev/null ; setprop hw.fm.version 0 >/dev/null 2>/dev/null ; setprop ctl.start fm_dl >/dev/null 2>/dev/null");
+
+//    sys_run ((char *) "setprop hw.fm.mode normal >/dev/null 2>/dev/null ; setprop hw.fm.version 0 >/dev/null 2>/dev/null ; setprop ctl.start fm_dl >/dev/null 2>/dev/null");
 
     if (file_get ("/system/lib/modules/radio-iris-transport.ko"))
       sys_run ((char *) "insmod /system/lib/modules/radio-iris-transport.ko >/dev/null 2>/dev/null");
 
-
+/*
     char value [4] = {0x41,0x42,0x43,0x44};//"z";//'z';//0;    //char prop_buf [DEF_BUF] = "";
     int i = 0, init_success = 0;
     int sleep_ms = 10;
@@ -168,7 +169,7 @@ if (0) {
       logd ("chip_imp_api_on init success after %d milliseconds", i * sleep_ms);
     else
       loge ("chip_imp_api_on init error 0x%x after %d milliseconds", value, i * sleep_ms);
-
+*/
 
 ms_sleep (1010);
 
@@ -179,7 +180,9 @@ ms_sleep (1010);
       return (-1);
     }
     logd ("chip_imp_api_on qualcomm /dev/radio0: %3.3d", dev_hndl);
+
 ms_sleep (1010);
+
     return (0);
 
 
@@ -497,11 +500,11 @@ enum iris_buf_t {
 
     int ret = ioctl (dev_hndl, VIDIOC_S_CTRL, & v4l_ctrl);
     if (ret < 0) {
-      loge ("chip_ctrl_set VIDIOC_S_CTRL error: %d  id: 0x%x  value: %d", errno, id, value);
+      loge ("chip_ctrl_set VIDIOC_S_CTRL Error id: 0x%x  value: %d", id, value, errno);
       //return (-1);
     }
     else
-      logd ("chip_ctrl_set VIDIOC_S_CTRL OK id: %d  value: %d", id, value);
+      logd ("chip_ctrl_set VIDIOC_S_CTRL OK    id: 0x%x  value: %d", id, value);
     return (ret);
   }
 
@@ -651,14 +654,25 @@ enum iris_buf_t {
       else
         logd ("chip_imp_pwr_on PRIVATE_IRIS_RDSON 1 success");
 
-      chip_ctrl_set (V4L2_CID_PRIVATE_IRIS_RDSGROUP_PROC, -1);
-      chip_ctrl_set (V4L2_CID_PRIVATE_IRIS_PSALL, -1);
-      chip_ctrl_set (V4L2_CID_PRIVATE_IRIS_RDSD_BUF, 128);
-      chip_ctrl_get (V4L2_CID_PRIVATE_IRIS_RDSGROUP_PROC);              // 0x08000010 = 56 = 0x38 = 0x07 << RDS_CONFIG_OFFSET (3)
-      chip_ctrl_get (V4L2_CID_PRIVATE_IRIS_RDSD_BUF);
-      chip_ctrl_get (V4L2_CID_PRIVATE_IRIS_PSALL);                      // 0x8000014 = 56, ? Bug, copied RDSGROUP_PROC instead of boolean "pass all ps strings"
+      if (s2_tx) {
+        rds_pi_set (34357); // WSTX
+        rds_pt_set (9); // Varioed/Top 40
+        rds_ps_set ("SpiritTx");
+        rds_rt_set ("rt34567890123456rt34567890123456rt34567890123456rt34567890123456");
+      }
+      else {
+        chip_ctrl_set (V4L2_CID_PRIVATE_IRIS_RDSGROUP_PROC, -1);
+        chip_ctrl_set (V4L2_CID_PRIVATE_IRIS_PSALL, -1);
+        chip_ctrl_set (V4L2_CID_PRIVATE_IRIS_RDSD_BUF, 128);
+            // Test ??
+        chip_ctrl_get (V4L2_CID_PRIVATE_IRIS_RDSGROUP_PROC);              // 0x08000010 = 56 = 0x38 = 0x07 << RDS_CONFIG_OFFSET (3)
+        chip_ctrl_get (V4L2_CID_PRIVATE_IRIS_PSALL);                      // 0x8000014 = 56, ? Bug, copied RDSGROUP_PROC instead of boolean "pass all ps strings"
+        chip_ctrl_get (V4L2_CID_PRIVATE_IRIS_RDSD_BUF);
+      }
     }
-//ms_sleep (200);
+
+    //ms_sleep (200);
+
     band_setup ();
 
     logd ("chip_imp_pwr_on done");
@@ -677,17 +691,17 @@ enum iris_buf_t {
     logd ("chip_imp_pwr_off chip_imp_mute_set done");
 
     if (pwr_rds) {
-int need_at_least_one_of_these_delays_or_tx_on_may_fail = 1;
-if (need_at_least_one_of_these_delays_or_tx_on_may_fail)
-  ms_sleep (101);
+      int need_at_least_one_of_these_delays_or_tx_on_may_fail = 1;
+      if (need_at_least_one_of_these_delays_or_tx_on_may_fail)
+        ms_sleep (101);
 
       if (chip_ctrl_set (V4L2_CID_PRIVATE_IRIS_RDSON, 0) < 0)           // 0 = OFF, 1 = ON
         loge ("chip_imp_pwr_off PRIVATE_IRIS_RDSON 0 error");
       else
         logd ("chip_imp_pwr_off PRIVATE_IRIS_RDSON 0 success");
 
-if (need_at_least_one_of_these_delays_or_tx_on_may_fail)
-  ms_sleep (101);
+       if (need_at_least_one_of_these_delays_or_tx_on_may_fail)
+         ms_sleep (101);
     }
 
     logd ("chip_imp_pwr_off RDS off done");
@@ -1371,17 +1385,41 @@ int chip_get () {
   }*/
 
 
-  void pi_set (int pi) {
+extern int curr_pi;// = 0;         // Program ID. Canada non-national = 0xCxxx.   // 88.5: 0x163e, 106.1: 0xc448, 105.3: 0xc87d, 106.9: 0xdc09, 91.5: 0xb102, 89.1: 0, 89.9: 0x15d6, 93.9: 0xccb6
+extern int cand_pi;// = 0;
+extern int conf_pi;// = 0;
+
+extern int curr_pt;// = -1;         // 88.5: 5 = Rock   106.1: 6 = Classic Rock
+extern int cand_pt;// = -1;
+extern int conf_pt;// = -1;
+
+extern int need_pi_chngd;//       = 0;
+extern int need_pt_chngd;//       = 0;
+extern int need_ps_chngd;//       = 0;
+extern int need_rt_chngd;//       = 0;
+
+extern char conf_ps[9];// ="        ";  // Confirmed PS: When a new Current PS matches Candidate PS, the candidate is considered confirmed and copied here where the App can retrieve it.
+extern char conf_rt[65];// ="                                                                ";     // Confirmed RT.
+
+
+  int rds_pi_set (int pi) {
     if (chip_ctrl_set (V4L2_CID_RDS_TX_PI, pi) < 0)
-      loge ("pi_set PRIVATE_IRIS_EMPHASIS error pi: %d", pi);
+      loge ("rds_pi_set RDS_TX_PI error pi: %d", pi);
     else
-      logd ("pi_set PRIVATE_IRIS_EMPHASIS success pi: %d", pi);
+      logd ("rds_pi_set RDS_TX_PI success pi: %d", pi);
+
+    curr_pi = cand_pi = conf_pi = pi;
+    need_pi_chngd = 1;
+    return (0);
   }
-  void pt_set (int pt) {
+  int rds_pt_set (int pt) {
     if (chip_ctrl_set (V4L2_CID_RDS_TX_PTY, pt) < 0)
-      loge ("pt_set PRIVATE_IRIS_EMPHASIS error pt: %d", pt);
+      loge ("rds_pt_set RDS_TX_PTY error pt: %d", pt);
     else
-      logd ("pt_set PRIVATE_IRIS_EMPHASIS success pt: %d", pt);
+      logd ("rds_pt_set RDS_TX_PTY success pt: %d", pt);
+    curr_pt = cand_pt = conf_pt = pt;
+    need_pt_chngd = 1;
+    return (0);
   }
 ///*
   struct mr_v4l2_ext_control {
@@ -1403,26 +1441,41 @@ int chip_get () {
     struct mr_v4l2_ext_control * controls;
   };
 //*/ 
-  void ps_set_rds (const char * ps) {
+/*
+   public static final int FM_TX_MAX_PS_LEN           =  (96+1);
+   public static final int FM_TX_MAX_RT_LEN           =  (64-1); // One space to include NULL
+
+   private static final int MAX_PS_CHARS = 97;
+   private static final int MAX_PS_REP_COUNT = 15;
+   private static final int MAX_RDS_GROUP_BUF_SIZE = 62;
+
+#define MASK_TXREPCOUNT            (0x0000000F)
+*/
+
+  int rds_ps_set (const char * ps) {       // chip_ctrl_set (V4L2_CID_PRIVATE_IRIS_STOP_RDS_TX_PS_NAME, 0);
+
+    chip_ctrl_set (V4L2_CID_PRIVATE_IRIS_TX_SETPSREPEATCOUNT, 15);
+
     struct mr_v4l2_ext_control ext_ctl;
     struct mr_v4l2_ext_controls v4l2_ctls;
 
     ext_ctl.id     = V4L2_CID_RDS_TX_PS_NAME;
     ext_ctl.string = (char *) ps;
-    ext_ctl.size   = 9;//strlen (ps) + 1;
+    ext_ctl.size   = strlen (ps) + 1;//8;//9;//!! Must be 9 !! ?? //strlen (ps) + 1;//8;//9;//strlen (ps) + 1;
 
     // Ctrls data struct:
     v4l2_ctls.ctrl_class = V4L2_CTRL_CLASS_FM_TX;
-    v4l2_ctls.count      = 1;//15;//
+    v4l2_ctls.count      = 1;//15;//1;//15;//
     v4l2_ctls.controls   = & ext_ctl;
 
     int ret = ioctl (dev_hndl, VIDIOC_S_EXT_CTRLS, & v4l2_ctls);
     if (ret < 0)
-      loge ("ps_set_rds error ps: %s  ret: %d  errno: %d", ps, ret, errno);
+      loge ("rds_ps_set error ps: %s  ret: %d  errno: %d", ps, ret, errno);
     else
-      logd ("ps_set_rds success ps: %s  ret: %d", ps, ret);
+      logd ("rds_ps_set success ps: %s  ret: %d", ps, ret);
+    return (0);
   }
-  void rt_set_rds (const char * rt) {
+  int rds_rt_set (const char * rt) {   // chip_ctrl_set (V4L2_CID_PRIVATE_IRIS_STOP_RDS_TX_RT, 0);
     struct mr_v4l2_ext_control ext_ctl;
     struct mr_v4l2_ext_controls v4l2_ctls;
 
@@ -1437,9 +1490,10 @@ int chip_get () {
 
     int ret = ioctl (dev_hndl, VIDIOC_S_EXT_CTRLS, & v4l2_ctls);
     if (ret < 0)
-      loge ("rt_set_rds error rt: %s  ret: %d  errno: %d", rt, ret, errno);
+      loge ("rds_rt_set error rt: %s  ret: %d  errno: %d", rt, ret, errno);
     else
-      logd ("rt_set_rds success rt: %s  ret: %d", rt, ret);
+      logd ("rds_rt_set success rt: %s  ret: %d", rt, ret);
+    return (0);
   }
 
   extern int RSSI_FACTOR;// = 16;//20; // 62.5/50 -> 1000  (See 60)     Highest seen locally = 57, 1000 / 62.5 = 16
@@ -1452,19 +1506,19 @@ int chip_get () {
     if (strlen (command) < 5) {
     }
     else if (! strncmp (command, "PI: ", strlen ("PI: "))) {
-      pi_set (atoi (data));
+      rds_pi_set (atoi (data));
       return (0);
     }
     else if (! strncmp (command, "PT: ", strlen ("PT: "))) {
-      pt_set (atoi (data));
+      rds_pt_set (atoi (data));
       return (0);
     }
     else if (! strncmp (command, "PS: ", strlen ("PS: "))) {
-      ps_set_rds (data);
+      rds_ps_set (data);
       return (0);
     }
     else if (! strncmp (command, "RT: ", strlen ("RT: "))) {
-      rt_set_rds (data);
+      rds_rt_set (data);
       return (0);
     }
 

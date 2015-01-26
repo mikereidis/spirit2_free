@@ -14,7 +14,7 @@ import java.io.FileReader;
 
 public class svc_tnr implements svc_tap {
 
-  private static int    stat_constrs = 1;
+  private static int    m_obinits = 1;
 
   private svc_tcb   m_svc_tcb   = null;
   private com_api   m_com_api   = null;
@@ -33,7 +33,7 @@ public class svc_tnr implements svc_tap {
   private String    last_poll_rds_rt    = "-1";
 
   public svc_tnr (Context c, svc_tcb cb_tnr, com_api svc_com_api) {     // Context & Tuner API callback constructor
-    com_uti.logd ("stat_constrs: " + stat_constrs++);
+    com_uti.logd ("m_obinits: " + m_obinits++);
 
     com_uti.logd ("constructor context: " + c + "  cb_tnr: " + cb_tnr);
     m_svc_tcb = cb_tnr;
