@@ -126,10 +126,10 @@ public final class com_uti  {
 
   private static final int max_log_char = 7;//8;
 
-  private static final boolean logv_enable = false;
-  //private static final boolean logv_enable = true;
-  private static final boolean logd_enable = true;
-  private static final boolean loge_enable = true;
+  public static final boolean ena_verbo_log = false;
+  public static final boolean ena_debug_log = false;
+  public static final boolean ena_warni_log = false;
+  public static final boolean ena_error_log = true;
 
   private static String tag_prefix = "";
 
@@ -170,6 +170,8 @@ public final class com_uti  {
 
     if (level == Log.ERROR)
       Log.e (full_tag, full_txt);
+    else if (level == Log.WARN)
+      Log.w (full_tag, full_txt);
     else if (level == Log.DEBUG)
       Log.d (full_tag, full_txt);
     else if (level == Log.VERBOSE)
@@ -177,15 +179,19 @@ public final class com_uti  {
   }
 
   public static void logv (String text) {
-    if (logv_enable)
+    if (ena_verbo_log)
       log (Log.VERBOSE, text);
   }
   public static void logd (String text) {
-    if (logd_enable)
+    if (ena_debug_log)
       log (Log.DEBUG, text);
   }
+  public static void logw (String text) {
+    if (ena_warni_log)
+      log (Log.WARN, text);
+  }
   public static void loge (String text) {
-    if (loge_enable)
+    if (ena_error_log)
       log (Log.ERROR, text);
   }
 
@@ -1302,8 +1308,8 @@ Evo 4G LTE  jewel
     }
     return (content);
   }
-  /*private static byte[] str_to_ba (String str) {                                     // String to byte array
-    byte[] ba = new byte [str.length ()];
+  /*private static byte [] str_to_ba (String str) {                                     // String to byte array
+    byte [] ba = new byte [str.length ()];
     //for (int i = 0; i < str.length (); i++ ) {
     //  ba [i] = Byte.parseByte (str [i]);
     //}
@@ -1474,22 +1480,16 @@ Evo 4G LTE  jewel
     // Datagram command API:
 
   private static DatagramSocket ds = null;
+  private static DatagramPacket dps = null;
+  private static int last_tmo = -1;
 
-  private static int dg_daemon_cmd (int cmd_len, byte[] cmd_buf, int res_len, byte[] res_buf, int rx_tmo) {
+  private static int dg_daemon_cmd (int cmd_len, byte [] cmd_buf, int res_len, byte [] res_buf, int rx_tmo) {
     int len = 0;
-/*
-    if (rx_tmo != 1002 && ! enable_non_audio) {
-      return (-1);
-    }
-    else if (rx_tmo == 1002 && enable_non_audio) {
-      enable_non_audio = false;
-    }
-*/
     String cmd = (com_uti.ba_to_str (cmd_buf)).substring (0, cmd_len);
-
+/*
     if (com_uti.file_get ("/sdcard/spirit/daemon_log", false))
       dg_daemon_log = true;
-    else
+    else*/
       dg_daemon_log = false;
 
     if (dg_daemon_log)
@@ -1504,64 +1504,51 @@ Evo 4G LTE  jewel
     }
 
     try {
-//      DatagramSocket ds = null;
       DatagramPacket dps = null;
 
       if (ds == null || rx_tmo == 100 || rx_tmo == 15000) {
         ds = new DatagramSocket (0);//s2d_port);
+        last_tmo = -2;  // Force new timeout setting
       }
-      ds.setSoTimeout (rx_tmo);
+      if (last_tmo != rx_tmo) {
+        ds.setSoTimeout (rx_tmo);
+        last_tmo = rx_tmo;
+      }
 
-      //if (! loop_set) {
+
+      if (! loop_set) {
         loop_set = true;
         loop = InetAddress.getByName ("127.0.0.1");
-      //}
+      }
 
       dps = new DatagramPacket (cmd_buf, cmd_len, loop, s2d_port);     // Send
-
       //com_uti.logd ("Before send() cmd: " + cmd + "  res_len: " + res_len);
       ds.send (dps);
       //com_uti.logd ("After  send() cmd: " + cmd);
-
 
       ds.receive (dps);                     // java.net.PortUnreachableException        Caused by: libcore.io.ErrnoException: recvfrom failed: ECONNREFUSED (Connection refused)
                                             // java.net.SocketTimeoutException
       //com_uti.logd ("After  receive() cmd: " + cmd);
 
-      byte[] rcv_buf = dps.getData ();
-
+      byte [] rcv_buf = dps.getData ();
       //com_uti.logd ("After  getData() cmd: " + cmd);
 
       len = dps.getLength ();
 
       if (dg_daemon_log) {
         com_uti.logd ("After  getLength() cmd: " + cmd + "  len: " + len);
-        if (rx_tmo == 1002)
-          com_uti.logd ("hexstr res: " + (com_uti.ba_to_hexstr (rcv_buf)).substring (0, len * 2));
-        else
-          com_uti.logd ("   str res: " + (com_uti.ba_to_str (rcv_buf)).substring (0, len));
+        //com_uti.logd ("hexstr res: " + (com_uti.ba_to_hexstr (rcv_buf)).substring (0, len * 2));
+        com_uti.logd ("   str res: " + (com_uti.ba_to_str (rcv_buf)).substring (0, len));
       }
 
       if (len < 0) {    // 0 is valid length, eg empty RT
         com_uti.loge ("cmd: " + cmd + "  len: " + len);
       }
       else {
-        //com_uti.loge ("1111");
         int ctr = 0;
         for (ctr = 0; ctr < len; ctr ++)
           res_buf [ctr] = rcv_buf [ctr];
-        //com_uti.loge ("2222 rx_tmo: " + rx_tmo);
-/*
-        if (rx_tmo == 1002) {
-          //com_uti.loge ("cmd: " + cmd + "  audio len: " + len + "  res: " + (com_uti.ba_to_hexstr (res_buf)).substring (0, len * 2));
-          com_uti.loge ("cmd: " + cmd + "  audio len: " + len + "  res: " + (com_uti.ba_to_hexstr (res_buf)).substring (0, 320 * 2));       // !! Why does this hang ??
-        }
-        else
-          com_uti.logd ("cmd: " + cmd + "  len: " + len + "  res: " + (com_uti.ba_to_str (res_buf)).substring (0, len));
-*/
-        //com_uti.loge ("3333");
       }
-      //com_uti.loge ("4444");
     }
     catch (SocketTimeoutException e) {
       if (cmd.equalsIgnoreCase ("s radio_nop Start"))
@@ -1574,10 +1561,7 @@ Evo 4G LTE  jewel
       e.printStackTrace ();
     };
 
-    //com_uti.loge ("5555");
-
     dg_daemon_cmd_sem --;
-
     return (len);
   }
 
@@ -1639,7 +1623,7 @@ Evo 4G LTE  jewel
 
 
 /*
-  public static int daemon_audio_data_get (int device, int samplerate, int channels, int buf_len, byte[] buffer) {
+  public static int daemon_audio_data_get (int device, int samplerate, int channels, int buf_len, byte [] buffer) {
     int len = 0;
     //if (daemon_audio_data_get_num % 10 == 0)
     //  daemon_audio_data_get_log = true;

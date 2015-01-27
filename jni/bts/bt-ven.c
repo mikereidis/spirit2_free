@@ -31,45 +31,6 @@ int extra_logs = 0;//1;
 #include "halhci.h"
 #include "bt-gen.h" //"bt_hci_bdroid.h"
 
-#include <android/log.h>
-#define  loge(...)  fm_log_print(ANDROID_LOG_ERROR, LOGTAG,__VA_ARGS__)
-#define  logd(...)  fm_log_print(ANDROID_LOG_DEBUG, LOGTAG,__VA_ARGS__)
-
-  //int __android_log_print(int prio, const char *tag, const char *fmt, ...);
-  //int __android_log_vprint(int prio, const char *tag, const char *fmt, va_list ap);
-
-  int no_log = 0;
-  void * log_handle = NULL;
-
-  int (* do_log) (int prio, const char * tag, const char * fmt, va_list ap);
-  #include <stdarg.h>
-  int fm_log_print (int prio, const char * tag, const char * fmt, ...) {
-
-        //Disable debug logs
-//    if (prio == ANDROID_LOG_DEBUG)
-//      return (-1);
-
-    if (no_log)
-      return (-1);
-
-    va_list ap;
-    va_start ( ap, fmt ); 
-
-    if (log_handle == NULL) {
-      log_handle = dlopen ("liblog.so", RTLD_LAZY);
-      if (log_handle == NULL) {
-        no_log = 1;
-        return (-1);
-      }
-      do_log = dlsym (log_handle, "__android_log_vprint");
-      if (do_log == NULL) {
-        no_log = 1;
-        return (-1);
-      }
-    }
-    //__android_log_vprint (prio, tag, fmt, ap);
-    do_log (prio, tag, fmt, ap);
-  }
 
   const char * copyright = "Copyright (c) 2011-2015 Michael A. Reid. All rights reserved.";
 

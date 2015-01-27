@@ -5,6 +5,8 @@
   #define CLT_LOGTAG "sfc....."
   #define DMN_LOGTAG "sfd....."
 
+  #define LOGTAG "sfd....."
+
   unsigned char logtag [16] = DEF_LOGTAG;//"s2l.....";   // Default "2s2l...." = JNI library
 
   const char * copyright = "Copyright (c) 2011-2015 Michael A. Reid. All rights reserved.";
@@ -29,43 +31,8 @@
   #define DEF_BUF 512    // Raised from 256 so we can add headers to 255-256 byte buffers
 
 
-  #include <android/log.h>
-  #define  loge(...)  fm_log_print(ANDROID_LOG_ERROR,logtag,__VA_ARGS__)
-  #define  logd(...)  fm_log_print(ANDROID_LOG_DEBUG,logtag,__VA_ARGS__)
-
-  int fm_log_print (int prio, const char * tag, const char * fmt, ...);
-
   #include "utils.c"
 
-
-  int no_log = 0;
-  void * log_hndl = NULL;
-
-  int (* do_log) (int prio, const char * tag, const char * fmt, va_list ap);
-  #include <stdarg.h>
-  int fm_log_print (int prio, const char * tag, const char * fmt, ...) {
-
-    if (no_log)
-      return -1;
-
-    va_list ap;
-    va_start (ap, fmt); 
-
-    if (log_hndl == NULL) {
-      log_hndl = dlopen ("liblog.so", RTLD_LAZY);
-      if (log_hndl == NULL) {
-        no_log = 1;                                                     // Don't try again
-        return (-1);
-      }
-      do_log = dlsym (log_hndl, "__android_log_vprint");
-      if (do_log == NULL) {
-        no_log = 1;                                                     // Don't try again
-        return (-1);
-      }
-    }
-    do_log (prio, tag, fmt, ap);
-    return (0);
-  }
 
     //
 
@@ -447,9 +414,8 @@ sock_rx_tmo_set (sockfd, 100);
       cmd_len = recvfrom (sockfd, cmd_buf, sizeof (cmd_buf), 0, (struct sockaddr *) & cli_addr, & cli_len);
       if (cmd_len <= 0) {
         if (errno == EAGAIN) {
-          //logd ("Error recvfrom EAGAIN errno: %d", errno);
-          if (tnr_funcs != NULL && tnr_funcs->send_extra_command != NULL)       // ???? Use curr_tuner_state ??
-            tnr_funcs->send_extra_command (NULL, "799", NULL, NULL);      // Poll
+          if (tnr_funcs != NULL && tnr_funcs->send_extra_command != NULL)   // ???? Use curr_tuner_state ??
+            tnr_funcs->send_extra_command (NULL, "799", NULL, NULL);        // Poll
         }
         else {
           loge ("Error recvfrom errno: %d", errno);
@@ -541,7 +507,7 @@ sock_rx_tmo_set (sockfd, 100);
 
   int   curr_tuner_freq_int         = -7;
   int   curr_tuner_rssi_int         = -7;
-  int   curr_tuner_stereo_int       = 0;
+  int   curr_tuner_most_int         = 0;
   int   curr_tuner_rds_pi_int       = -7;
   int   curr_tuner_rds_pt_int       = -7;
 
@@ -608,18 +574,18 @@ sock_rx_tmo_set (sockfd, 100);
     return str;
   }
 
-  char * itostereo (int stereo) {
-    if (stereo)
+  char * itomost (int most) {
+    if (most)
       return ("Stereo");
     else
       return ("Mono");
   }
-  void cb_tnr_stereo (int stereo) {
-    //logd ("cb_tnr_stereo stereo: %d", stereo);
-    if (curr_tuner_stereo_int != stereo) {
-      curr_tuner_stereo_int = stereo;
-      strncpy (curr_tuner_stereo, itostereo (stereo), sizeof (curr_tuner_stereo));
-      cb_tuner_change ("tuner_stereo", curr_tuner_stereo);
+  void cb_tnr_most (int most) {
+    //logd ("cb_tnr_most most: %d", most);
+    if (curr_tuner_most_int != most) {
+      curr_tuner_most_int = most;
+      strncpy (curr_tuner_most, itomost (most), sizeof (curr_tuner_most));
+      cb_tuner_change ("tuner_most", curr_tuner_most);
     }
   }
   void cb_tnr_rds (struct fmradio_rds_bundle_t * rb, int freq) {
@@ -706,7 +672,7 @@ sock_rx_tmo_set (sockfd, 100);
     g_cbp = calloc (1, sizeof (struct fmradio_vendor_callbacks_t));     // Setup callbacks
     if (g_cbp == NULL)
       return (-1);
-    g_cbp->on_playing_in_stereo_changed   = cb_tnr_stereo;
+    g_cbp->on_playing_in_stereo_changed   = cb_tnr_most;
     g_cbp->on_rds_data_found              = cb_tnr_rds;
     g_cbp->on_signal_strength_changed     = cb_tnr_rssi;
     g_cbp->on_automatic_switch            = cb_tnr_rds_af;
@@ -1240,6 +1206,8 @@ sock_rx_tmo_set (sockfd, 100);
       if (cmd_buf != NULL && strlen (cmd_buf) > 2 && cmd_buf [0] == 'g') {       // Get (or Set response)
         strncpy (res_buf, "-9999", res_max);                           // Default = "g key -9999"
         if (0);
+    // Values we can just read from memory:
+// !! Should just use strlcat() instead of snprintf() !!
         else if (strcpy (key, "radio_dai_state")    && (klen = strlen (key)) && ! strncmp (ckey, key, klen))
           snprintf (res_buf, res_max -1, "%s",          curr_radio_dai_state);
         else if (strcpy (key, "tuner_band")         && (klen = strlen (key)) && ! strncmp (ckey, key, klen))
@@ -1252,35 +1220,10 @@ sock_rx_tmo_set (sockfd, 100);
           snprintf (res_buf, res_max -1, "%s",          curr_tuner_rds_state);
         else if (strcpy (key, "tuner_rds_af_state") && (klen = strlen (key)) && ! strncmp (ckey, key, klen))
           snprintf (res_buf, res_max -1, "%s",          curr_tuner_rds_af_state);
-        else if (strcpy (key, "tuner_extra_cmd") && (klen = strlen (key)) && ! strncmp (ckey, key, klen))
+        else if (strcpy (key, "tuner_extra_cmd")    && (klen = strlen (key)) && ! strncmp (ckey, key, klen))
           snprintf (res_buf, res_max -1, "%s",          curr_tuner_extra_cmd);
-
-        else if (strcpy (key, "tuner_freq")         && (klen = strlen (key)) && ! strncmp (ckey, key, klen)) {
-          if (tuner_initialized)
-            curr_tuner_freq_int  = tnr_funcs->get_frequency (NULL);
-          strncpy (curr_tuner_freq, itoa (curr_tuner_freq_int),  sizeof (curr_tuner_freq));
-          snprintf (res_buf, res_max -1, "%s",          curr_tuner_freq);
-        }
-        else if (strcpy (key, "tuner_stereo") && (klen = strlen (key)) && ! strncmp (ckey, key, klen)) {
+        else if (strcpy (key, "tuner_stereo")       && (klen = strlen (key)) && ! strncmp (ckey, key, klen))
           snprintf (res_buf, res_max -1, "%s",          curr_tuner_stereo);
-        }
-        else if (strcpy (key, "tuner_thresh") && (klen = strlen (key)) && ! strncmp (ckey, key, klen)) {
-          if (tuner_initialized)
-            strncpy (curr_tuner_thresh, itoa (tnr_funcs->get_threshold (NULL)),  sizeof (curr_tuner_thresh));
-          snprintf (res_buf, res_max -1, "%s",          curr_tuner_thresh);
-        }
-        else if (strcpy (key, "tuner_rssi") && (klen = strlen (key)) && ! strncmp (ckey, key, klen)) {
-          if (tuner_initialized)
-            curr_tuner_freq_int = tnr_funcs->get_signal_strength (NULL);
-          strncpy (curr_tuner_rssi, itoa (curr_tuner_freq_int),  sizeof (curr_tuner_rssi));
-          snprintf (res_buf, res_max -1, "%s",          curr_tuner_rssi);
-        }
-        else if (strcpy (key, "tuner_most") && (klen = strlen (key)) && ! strncmp (ckey, key, klen)) {
-          if (tuner_initialized)
-            strncpy (curr_tuner_most, itostereo (tnr_funcs->is_playing_in_stereo (NULL)),  sizeof (curr_tuner_most));
-          snprintf (res_buf, res_max -1, "%s",          curr_tuner_most);
-        }
-
         else if (strcpy (key, "tuner_rds_pi")       && (klen = strlen (key)) && ! strncmp (ckey, key, klen))
           snprintf (res_buf, res_max -1, "%s",          curr_tuner_rds_pi);
         else if (strcpy (key, "tuner_rds_pt")       && (klen = strlen (key)) && ! strncmp (ckey, key, klen))
@@ -1290,18 +1233,58 @@ sock_rx_tmo_set (sockfd, 100);
         else if (strcpy (key, "tuner_rds_rt")       && (klen = strlen (key)) && ! strncmp (ckey, key, klen))
           snprintf (res_buf, res_max -1, "%s",          curr_tuner_rds_rt);
 
-/*
-        if (strlen (res_buf) <= 0)
-          //strncpy (res_buf, "-4949", res_max);
-          strncpy (res_buf, "", res_max);
-*/
+    // Values we get from the FM chip:
+        else if (strcpy (key, "tuner_thresh") && (klen = strlen (key)) && ! strncmp (ckey, key, klen)) {    // Don't really need this one as threshold is just what we set (besides errors/out of range)
+          if (tuner_initialized)
+            strncpy (curr_tuner_thresh, itoa (tnr_funcs->get_threshold (NULL)),  sizeof (curr_tuner_thresh));
+          snprintf (res_buf, res_max -1, "%s",          curr_tuner_thresh);
+        }
+        else if (strcpy (key, "tuner_freq")         && (klen = strlen (key)) && ! strncmp (ckey, key, klen)) {
+          if (tuner_initialized)
+            curr_tuner_freq_int  = tnr_funcs->get_frequency (NULL);
+          strncpy (curr_tuner_freq, itoa (curr_tuner_freq_int),  sizeof (curr_tuner_freq));
+          snprintf (res_buf, res_max -1, "%s",          curr_tuner_freq);
+        }
+        else if (strcpy (key, "tuner_rssi") && (klen = strlen (key)) && ! strncmp (ckey, key, klen)) {
+          if (tuner_initialized)
+            curr_tuner_freq_int = tnr_funcs->get_signal_strength (NULL);
+          strncpy (curr_tuner_rssi, itoa (curr_tuner_freq_int),  sizeof (curr_tuner_rssi));
+          snprintf (res_buf, res_max -1, "%s",          curr_tuner_rssi);
+        }
+        else if (strcpy (key, "tuner_most") && (klen = strlen (key)) && ! strncmp (ckey, key, klen)) {
+          if (tuner_initialized)
+            strncpy (curr_tuner_most, itomost (tnr_funcs->is_playing_in_stereo (NULL)),  sizeof (curr_tuner_most));
+          snprintf (res_buf, res_max -1, "%s",          curr_tuner_most);
+        }
+
+        else if (strcpy (key, "tuner_bulk")         && (klen = strlen (key)) && ! strncmp (ckey, key, klen)) {
+          if (tuner_initialized)
+            curr_tuner_freq_int  = tnr_funcs->get_frequency (NULL);
+          strncpy (curr_tuner_freq, itoa (curr_tuner_freq_int),  sizeof (curr_tuner_freq));
+          //snprintf (res_buf, res_max -1, "%s",          curr_tuner_freq);
+          if (tuner_initialized)
+            curr_tuner_freq_int = tnr_funcs->get_signal_strength (NULL);
+          strncpy (curr_tuner_rssi, itoa (curr_tuner_freq_int),  sizeof (curr_tuner_rssi));
+          //snprintf (res_buf, res_max -1, "%s",          curr_tuner_rssi);
+          if (tuner_initialized)
+            strncpy (curr_tuner_most, itomost (tnr_funcs->is_playing_in_stereo (NULL)),  sizeof (curr_tuner_most));
+          //snprintf (res_buf, res_max -1, "%s",          curr_tuner_most);
+
+          //snprintf (res_buf, res_max -1, "%s",          curr_tuner_rds_pi);
+          //snprintf (res_buf, res_max -1, "%s",          curr_tuner_rds_pt);
+          //snprintf (res_buf, res_max -1, "%s",          curr_tuner_rds_ps);
+          //snprintf (res_buf, res_max -1, "%s",          curr_tuner_rds_rt);
+// !! Should just use strlcat() instead of snprintf() !!
+          snprintf (res_buf, res_max -1, "%s-mR-%s-mR-%s-mR-%s-mR-%s-mR-%s-mR-%s", curr_tuner_freq, curr_tuner_rssi, curr_tuner_most, curr_tuner_rds_pi, curr_tuner_rds_pt, curr_tuner_rds_ps, curr_tuner_rds_rt);
+        }
+
+
+
         return (strlen (res_buf));
       }
 
-      //strncpy (res_buf, cmd_buf, res_max);
-      //strncat (res_buf, " -555", res_max);
-      strncpy (res_buf, "-555", res_max);
-      return (strlen (res_buf));
+    strncpy (res_buf, "-555", res_max);                                 // If unknown command...
+    return (strlen (res_buf));
   }
 
 

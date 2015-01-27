@@ -24,6 +24,7 @@ public class svc_tnr implements svc_tap {
   private boolean need_polling = true;
   private boolean is_polling = false;
   private Timer poll_tmr;
+  private String    last_poll_state     = "-1";
   private int       last_poll_freq      = -1;
   private int       last_poll_rssi      = -1;
   private String    last_poll_most      = "-1";
@@ -246,7 +247,7 @@ com_uti.logd ("FREQ CODE freq: " + freq + "  hci: " + hci + "  port: " + port);
       return;
     poll_tmr = new Timer ("Poll", true);                                // Start poll timer so volume will be set before FM chip power up, and applied at chip power up.
     if (poll_tmr != null) {
-      poll_tmr.schedule (new poll_tmr_hndlr (), 3000, 500);             // After 3 seconds every 500 ms
+      poll_tmr.schedule (new poll_tmr_hndlr (), 3000, poll_ms);         // After 3 seconds every poll_ms ms
     }
     //ms_sleep (10);                                                    // Wait 10 milliseconds.
     is_polling = true;
@@ -261,62 +262,111 @@ com_uti.logd ("FREQ CODE freq: " + freq + "  hci: " + hci + "  port: " + port);
     is_polling = false;
   }
 
+  private static final  int poll_ms  = 500;                             // Called every 500 ms
+  private static final  int min_freq = 65000;                           // !! Broadcom sometimes returns 64000, so suppress this as it writes frequency to settings
+  private static final  boolean tuner_state_callbacks = false;
+
+  private int       new_rds_pi      = -1;
+  private int       new_rds_pt      = -1;
+  private String    new_freq_str    = "-1";
+  private int       new_freq_int    = -1;
   private class poll_tmr_hndlr extends TimerTask {
     public void run () {
-      if (! m_com_api.tuner_state.equalsIgnoreCase ("start"))                                             // Done if state not started
-        return;
-
       //if (com_uti.file_get ("/sdcard/spirit/tnr_pof"))
       //  return;
 
+      if (tuner_state_callbacks) {
+        m_com_api.tuner_state = com_uti.daemon_get ("tuner_state");
+        if (! last_poll_state.equals (m_com_api.tuner_state))
+          m_svc_tcb.cb_tuner_key ("tuner_state", last_poll_state = m_com_api.tuner_state);
+      }
+
+      if (! m_com_api.tuner_state.equalsIgnoreCase ("start"))                                             // Done if state not started
+        return;
+if (false) {
+      new_freq_str          = com_uti.daemon_get ("tuner_freq");
+      m_com_api.tuner_rssi  = com_uti.daemon_get ("tuner_rssi");
+      m_com_api.tuner_most  = com_uti.daemon_get ("tuner_most");
+      m_com_api.tuner_rds_pi= com_uti.daemon_get ("tuner_rds_pi");
+      m_com_api.tuner_rds_pt= com_uti.daemon_get ("tuner_rds_pt");
+      m_com_api.tuner_rds_ps= com_uti.daemon_get ("tuner_rds_ps");
+      m_com_api.tuner_rds_rt= com_uti.daemon_get ("tuner_rds_rt                                                                    ").trim ();    // !!!! Must have ~ 64 characters due to s2d design.
+}
+{                // 16 spaces: 16*6 + 64 + 4 * 6 = 96 + 64 + 24 = 184
+try {
+      String bulk = com_uti.daemon_get ("tuner_bulk                                                                                                                                                                                            ").trim ();
+      String [] buar = {""};
+      buar = bulk.split ("-mR-", 7);
+      if (buar.length > 0)
+        new_freq_str        = buar [0];
+      if (buar.length > 1)
+        m_com_api.tuner_rssi  = buar [1];
+      if (buar.length > 2)
+        m_com_api.tuner_most  = buar [2];
+      if (buar.length > 3)
+        m_com_api.tuner_rds_pi= buar [3];
+      if (buar.length > 4)
+        m_com_api.tuner_rds_pt= buar [4];
+      if (buar.length > 5)
+        m_com_api.tuner_rds_ps= buar [5];
+      if (buar.length > 6)
+        m_com_api.tuner_rds_rt= buar [6].trim ();
+}
+    catch (Throwable e) {
+      com_uti.loge ("Throwable: " + e);
+      e.printStackTrace ();
+    }
+}
+
+
+
         // Freq:
-      int min_freq = 65000; //50000;    // !! Broadcom sometimes returns 64000, so suppress this as it writes frequency to settings
-      String temp_freq_str = com_uti.daemon_get ("tuner_freq");
-      int    temp_freq_int = com_uti.int_get (temp_freq_str);
-      if (temp_freq_int >= min_freq) {
-        m_com_api.tuner_freq = temp_freq_str;
-        m_com_api.int_tuner_freq = com_uti.int_get (m_com_api.tuner_freq);
-        if (m_com_api.int_tuner_freq >= min_freq && last_poll_freq != m_com_api.int_tuner_freq) {
-          last_poll_freq = m_com_api.int_tuner_freq;
+      //new_freq_str = com_uti.daemon_get ("tuner_freq");
+      new_freq_int = com_uti.int_get (new_freq_str);
+      if (new_freq_int >= min_freq) {
+        if (last_poll_freq != new_freq_int) {
+          m_com_api.tuner_freq = new_freq_str;
+          m_com_api.int_tuner_freq = new_freq_int;
+          last_poll_freq = new_freq_int;
           m_svc_tcb.cb_tuner_key ("tuner_freq", m_com_api.tuner_freq);   // Inform change
         }
       }
 
         // RSSI:
-      m_com_api.tuner_rssi = com_uti.daemon_get ("tuner_rssi");
+      //m_com_api.tuner_rssi = com_uti.daemon_get ("tuner_rssi");
       if (last_poll_rssi != (last_poll_rssi = com_uti.int_get (m_com_api.tuner_rssi)))
-        m_svc_tcb.cb_tuner_key ("tuner_rssi", m_com_api.tuner_rssi);                        // Inform change
+//        m_svc_tcb.cb_tuner_key ("tuner_rssi", m_com_api.tuner_rssi);                        // Inform change
 
         // MOST:
-      m_com_api.tuner_most = com_uti.daemon_get ("tuner_most");
+      //m_com_api.tuner_most = com_uti.daemon_get ("tuner_most");
       if (! last_poll_most.equals (m_com_api.tuner_most))
-        m_svc_tcb.cb_tuner_key ("tuner_most", last_poll_most = m_com_api.tuner_most);       // Inform change
+//        m_svc_tcb.cb_tuner_key ("tuner_most", last_poll_most = m_com_api.tuner_most);       // Inform change
 
         // RDS ps:
-      m_com_api.tuner_rds_ps = com_uti.daemon_get ("tuner_rds_ps");
+      //m_com_api.tuner_rds_ps = com_uti.daemon_get ("tuner_rds_ps");
       if (! last_poll_rds_ps.equals (m_com_api.tuner_rds_ps))
         m_svc_tcb.cb_tuner_key ("tuner_rds_ps", last_poll_rds_ps = m_com_api.tuner_rds_ps); // Inform change
 
         // RDS rt:
-      m_com_api.tuner_rds_rt = com_uti.daemon_get ("tuner_rds_rt                                                                    ").trim ();    // !!!! Must have ~ 64 characters due to s2d design.
+      //m_com_api.tuner_rds_rt = com_uti.daemon_get ("tuner_rds_rt                                                                    ").trim ();    // !!!! Must have ~ 64 characters due to s2d design.
       if (! last_poll_rds_rt.equals (m_com_api.tuner_rds_rt))
         m_svc_tcb.cb_tuner_key ("tuner_rds_rt", last_poll_rds_rt = m_com_api.tuner_rds_rt); // Inform change
 
         // RDS pi:
-      m_com_api.tuner_rds_pi = com_uti.daemon_get ("tuner_rds_pi");
-      int rds_pi = com_uti.int_get (m_com_api.tuner_rds_pi);
-      if (last_poll_rds_pi != rds_pi) {
-        last_poll_rds_pi = rds_pi;
-        m_com_api.tuner_rds_picl = com_uti.tnru_rds_picl_get (m_com_api.tuner_band, rds_pi);
+      //m_com_api.tuner_rds_pi = com_uti.daemon_get ("tuner_rds_pi");
+      new_rds_pi = com_uti.int_get (m_com_api.tuner_rds_pi);
+      if (last_poll_rds_pi != new_rds_pi) {
+        last_poll_rds_pi = new_rds_pi;
+        m_com_api.tuner_rds_picl = com_uti.tnru_rds_picl_get (m_com_api.tuner_band, new_rds_pi);
         m_svc_tcb.cb_tuner_key ("tuner_rds_pi", m_com_api.tuner_rds_pi);                    // Inform change
       }
 
         // RDS pt:
-      m_com_api.tuner_rds_pt = com_uti.daemon_get ("tuner_rds_pt");
-      int rds_pt = com_uti.int_get (m_com_api.tuner_rds_pt);
-      if (last_poll_rds_pt != rds_pt) {
-        last_poll_rds_pt = rds_pt;
-        m_com_api.tuner_rds_pt = m_com_api.tuner_rds_ptyn = com_uti.tnru_rds_ptype_get (m_com_api.tuner_band, rds_pt);
+      //m_com_api.tuner_rds_pt = com_uti.daemon_get ("tuner_rds_pt");
+      new_rds_pt = com_uti.int_get (m_com_api.tuner_rds_pt);
+      if (last_poll_rds_pt != new_rds_pt) {
+        last_poll_rds_pt = new_rds_pt;
+        m_com_api.tuner_rds_pt = m_com_api.tuner_rds_ptyn = com_uti.tnru_rds_ptype_get (m_com_api.tuner_band, new_rds_pt);
         m_svc_tcb.cb_tuner_key ("tuner_rds_pt", m_com_api.tuner_rds_pt);                    // Inform change
       }
     }

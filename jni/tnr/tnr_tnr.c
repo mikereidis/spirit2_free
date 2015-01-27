@@ -218,41 +218,9 @@
 
     // Generic utilities:
 
-  #define  loge(...)  fm_log_print(ANDROID_LOG_ERROR, LOGTAG,__VA_ARGS__)
-  #define  logd(...)  fm_log_print(ANDROID_LOG_DEBUG, LOGTAG,__VA_ARGS__)
-
-  int no_log = 0;
-  int extra_log = 0;
-  void * log_handle = NULL;
-
-  typedef int (* do_log_t) (int prio, const char * tag, const char * fmt, va_list ap);
-  do_log_t do_log;
-
-  int fm_log_print (int prio, const char * tag, const char * fmt, ...) {
-
-    if (no_log)
-      return (-1);
-
-    va_list ap;
-    va_start ( ap, fmt ); 
-
-    if (log_handle == NULL) {
-      log_handle = dlopen ("liblog.so", RTLD_LAZY);
-      if (log_handle == NULL) {
-        no_log = 1;
-        return (-1);
-      }
-      do_log = (do_log_t) dlsym (log_handle, "__android_log_vprint");
-      if (do_log == NULL) {
-        no_log = 1;
-        return (-1);
-      }
-    }
-    //__android_log_vprint (prio, tag, fmt, ap);
-    do_log (prio, tag, fmt, ap);
-  }
-
   #include "utils.c"
+
+
 
   int noblock_set (int fd) {
     //#define IOCTL_METH
@@ -864,17 +832,14 @@ char g16 [256] = "";
   int send_extra_command (void ** session_data, const char * command, char ** parameters, struct fmradio_extra_command_ret_item_t ** out_parameters) {
     if (command == NULL)
       logd ("send_extra_command: NULL");
-    else {
-      if (! strncmp (command, "799", strlen ("799"))) {
-        if (rx_thread_running) {
-          rx_thread_work (101);
-          return (0);
-        }
-      }
-      logd ("send_extra_command: %s", command);
-      int ret = chip_api_extra_cmd (command, parameters);
-      logd ("send_extra_command ret: %d", ret);
+    else if (! strncmp (command, "799", strlen ("799"))) {
+      if (rx_thread_running)
+        rx_thread_work (101);
+      return (0);
     }
+    logd ("send_extra_command: %s", command);
+    int ret = chip_api_extra_cmd (command, parameters);
+    logd ("send_extra_command ret: %d", ret);
     return (0);
   }
 

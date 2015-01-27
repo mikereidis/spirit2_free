@@ -1,6 +1,55 @@
 
     // Utilities: Used by many
 
+  #include <android/log.h>
+
+  #define  loge(...)  fm_log_print(ANDROID_LOG_ERROR, LOGTAG,__VA_ARGS__)
+  #define  logd(...)  fm_log_print(ANDROID_LOG_DEBUG, LOGTAG,__VA_ARGS__)
+
+  int extra_log = 0;
+
+  int ena_verbo_log = 0;
+  int ena_debug_log = 0;
+  int ena_error_log = 1;
+  void * log_hndl = NULL;
+
+  int (* do_log) (int prio, const char * tag, const char * fmt, va_list ap);
+  #include <stdarg.h>
+  int fm_log_print (int prio, const char * tag, const char * fmt, ...) {
+
+    if (! ena_error_log && prio == ANDROID_LOG_ERROR)
+      return -1;
+
+    if (! ena_debug_log && prio == ANDROID_LOG_DEBUG)
+      return -1;
+
+    //if (! ena_verbo_log)
+    //  return -1;
+
+    va_list ap;
+    va_start (ap, fmt); 
+
+    if (log_hndl == NULL) {
+      log_hndl = dlopen ("liblog.so", RTLD_LAZY);
+      if (log_hndl == NULL) {
+        ena_verbo_log = 0;                                              // Don't try again
+        ena_debug_log = 0;
+        ena_error_log = 1;
+        return (-1);
+      }
+      do_log = dlsym (log_hndl, "__android_log_vprint");
+      if (do_log == NULL) {
+        ena_verbo_log = 0;                                              // Don't try again
+        ena_debug_log = 0;
+        ena_error_log = 1;
+        return (-1);
+      }
+    }
+    do_log (prio, tag, fmt, ap);
+    return (0);
+  }
+
+
     // !!!! Eliminate duplicates, such as ms_get, hcd_file_find, ...
 
 #ifndef DEF_BUF

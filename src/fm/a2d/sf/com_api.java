@@ -139,7 +139,7 @@ public class com_api {
 
 
   public void radio_update (Intent intent) {
-    com_uti.logv ("intent: " + intent);
+    com_uti.logw ("intent: " + intent);
 
     Bundle extras = intent.getExtras ();
 

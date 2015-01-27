@@ -91,8 +91,11 @@ public class svc_aud implements svc_aap, AudioManager.OnAudioFocusChangeListener
 //head  3   3   3   3
 
 
-  private int                   bytes_processed = 0;
   private int                   writes_processed = 0;
+  private int                   reads_processed  = 0;
+  private int                   buf_errs = 0;
+  private int                   max_bufs = 0;
+
   private int                   min_pcm_write_buffers = 1;//2;          // Runs if at least 1 buffers are ready...
 
   private int                   m_channels = 2;
@@ -103,15 +106,10 @@ public class svc_aud implements svc_aap, AudioManager.OnAudioFocusChangeListener
 
   private boolean               pcm_write_thread_waiting= false;
 
-//  private int                   pcm_priority            = -19;//-20;//-19;                                 // For both read and write
-  private int                   write_ctr               = -1;   // -1 so first ++ increments to 0
+  //private int                   pcm_priority            = -19;//-20;//-19;                                 // For both read and write
 
   private int                   pcm_size_max            = 65536;//4096;//8192;//Not tunable yet !!!     65536; // 64Kbytes = 16K stereo samples    // @ 44.1K = 0.37 seconds each buffer = ~ 12 second delay (& mem alloc errors) for 32
   private int                   pcm_size_min            = 320;
-
-  private int                   buf_errs = 0;
-  private int                   max_bufs = 0;
-  private int                   read_ctr = 0;
 
   private int                   max_sample = -1000000;
   private int                   min_sample =  1000000;
@@ -811,7 +809,7 @@ if (intent != null)
     avg /= samples;             // This smooths average to about -700 on GS3.
     //if ( (max - avg) > max_avg)   // Avg means we don't have to test min
       max_avg = max - avg; 
-    com_uti.logd (prefix + "  offset: " + offset + " read_ctr: " + read_ctr + " write_ctr: " + write_ctr + "  len: " + len + "  samples: " + samples + "  max: " + max + "  min: " + min + "  avg: " + avg + "  max_avg: " + max_avg);
+    com_uti.logd (prefix + "  offset: " + offset + " reads_processed: " + reads_processed + " writes_processed: " + writes_processed + "  len: " + len + "  samples: " + samples + "  max: " + max + "  min: " + min + "  avg: " + avg + "  max_avg: " + max_avg);
   }
   private void pcm_stat_logs (String prefix, int channels, int len, byte [] buf) {         // Length in bytes
     if (channels == 1) {
@@ -841,67 +839,58 @@ private final int getAndIncrement(int modulo) {
 
       //native_priority_set (pcm_priority);
 
+                                                                        // Setup temp vars before loop to minimize garbage collection
+      byte [] aud_buf;
+      int bufs = 0;
+      int len = 0;
+      int len_written = 0;
+
       try {
 
         while (pcm_write_thread_active) {                               // While PCM Write Thread should be active...
+          bufs = aud_buf_tail - aud_buf_head;
+          //com_uti.loge ("pcm_write_runnable run() bufs: " + bufs + "  tail: " + aud_buf_tail + "  head: " + aud_buf_head);
 
-          write_ctr ++; // -1 so first ++ increments to 0 because easier to inc at start; bottom indeterminate with continue()
-
-            int bufs = aud_buf_tail - aud_buf_head;
-            //com_uti.loge ("pcm_write_runnable run() bufs: " + bufs + "  tail: " + aud_buf_tail + "  head: " + aud_buf_head);
-
-            if (bufs < 0)
-              bufs += aud_buf_num;                                      // Fix underflow
-            if (bufs < min_pcm_write_buffers) {                         // If minimum number of buffers is not ready... (Currently at least 2)
-
-              try {
-                pcm_write_thread_waiting = true;
-                //Thread.sleep (1);                                    // Wait ms milliseconds
-                //Thread.sleep (2000);                                    // Wait ms milliseconds   More efficient
-                Thread.sleep (3);                                    // Wait ms milliseconds    3 matches Spirit1
-                pcm_write_thread_waiting = false;
-              }
-              catch (InterruptedException e) {
-                pcm_write_thread_waiting = false;
-                //Thread.currentThread().interrupt();
-                //e.printStackTrace ();
-              }
-
-
-              write_ctr --;
-              continue;                                                 // Restart loop
+          if (bufs < 0)
+            bufs += aud_buf_num;                                        // Fix underflow
+          if (bufs < min_pcm_write_buffers) {                           // If minimum number of buffers is not ready... (Currently at least 2)
+            try {
+              pcm_write_thread_waiting = true;
+              //Thread.sleep (1);                                       // Wait ms milliseconds
+              //Thread.sleep (2000);                                    // Wait ms milliseconds   More efficient
+              Thread.sleep (3);                                         // Wait ms milliseconds    3 matches Spirit1
+              pcm_write_thread_waiting = false;
             }
-                                                                        // Here when at least 2 buffers are ready to write, so we write the 1st at the head...
-
-            //com_uti.loge ("pcm_write_runnable run() ready to write bufs: " + bufs + "  tail: " + aud_buf_tail + "  head: " + aud_buf_head);
-
-            int len = aud_buf_len [aud_buf_head];                // Length of head buffer in bytes
-            byte [] aud_buf = aud_buf_data [aud_buf_head];   // Pointer to head buffer
-
-            int len_written = 0;
-            //com_uti.loge ("pcm_write_runnable run() ready to write bufs: " + bufs + "  len: " + len + "  tail: " + aud_buf_tail + "  head: " + aud_buf_head);
-
-            len_written = m_audiotrack.write (aud_buf, 0, len);  // Write head buffer to audiotrack  All parameters in bytes (but could be all in shorts)
-
-            //com_uti.loge ("pcm_write_runnable run() len_written: " + len_written);
-
-            bytes_processed += len;                                     // Stats++
-
-
-            int stats_frames = (2 * write_stats_seconds * m_samplerate * m_channels) / len;
-            if (writes_processed % stats_frames == 0) {    // Every stats_seconds
-              pcm_stat_logs ("Write", m_channels, len, aud_buf);
+            catch (InterruptedException e) {
+              pcm_write_thread_waiting = false;
+              //Thread.currentThread().interrupt();
+              //e.printStackTrace ();
             }
-
-            writes_processed ++;                                        // Update pointers etc
-            aud_buf_head ++;
-            if (aud_buf_head < 0 || aud_buf_head > aud_buf_num - 1)
-              aud_buf_head &= aud_buf_num - 1;
             continue;                                                   // Restart loop
+          }
+                                                                        // Here when at least 2 buffers are ready to write, so we write the 1st at the head...
+          //com_uti.loge ("pcm_write_runnable run() ready to write bufs: " + bufs + "  tail: " + aud_buf_tail + "  head: " + aud_buf_head);
+          len = aud_buf_len [aud_buf_head];                             // Length of head buffer in bytes
+          aud_buf = aud_buf_data [aud_buf_head];                        // Pointer to head buffer
+          if (aud_buf == null) {
+            com_uti.loge ("pcm_write_runnable run() len: " + len + "  len_written: " + len_written + "  aud_buf: " + aud_buf);
+            continue;
+          }
+          //com_uti.loge ("pcm_write_runnable run() ready to write bufs: " + bufs + "  len: " + len + "  tail: " + aud_buf_tail + "  head: " + aud_buf_head);
+          len_written = m_audiotrack.write (aud_buf, 0, len);  // Write head buffer to audiotrack  All parameters in bytes (but could be all in shorts)
+          if (len_written != len)
+            com_uti.loge ("pcm_write_runnable run() len: " + len + "  len_written: " + len_written + "  aud_buf: " + aud_buf);
 
 
-        }   // while (...
+          if (com_uti.ena_debug_log && writes_processed % ((2 * write_stats_seconds * m_samplerate * m_channels) / len) == 0)   // Every stats_seconds
+            pcm_stat_logs ("Write", m_channels, len, aud_buf);
+          writes_processed ++;                                          // Update pointers etc
+          aud_buf_head ++;
+          if (aud_buf_head < 0 || aud_buf_head > aud_buf_num - 1)
+            aud_buf_head &= aud_buf_num - 1;
+          continue;                                                     // Restart loop
 
+        }   // while (pcm_write_thread_active) {
                                                                         // Here when thread is finished...
         com_uti.logd ("pcm_write_runnable run() done writes_processed: " + writes_processed);
       }
@@ -1011,26 +1000,84 @@ dai_delay = 0;  // !! No delay ??
       com_uti.logd ("pcm_read_runnable run()");
 
       //native_priority_set (pcm_priority);
+                                                                        // Setup temp vars before loop to minimize garbage collection
+      byte [] aud_buf;
+      int bufs = 0;
+      int len = 0;
+      //int len_written = 0;
+      int ctr = 0;
 
       try {
-        buf_errs = 0;                                         // Init stats, pointers, etc
-        aud_buf_tail = aud_buf_head = 0;                        // Drop all buffers
+        buf_errs = 0;                                                   // Init stats, pointers, etc
+        aud_buf_tail = aud_buf_head = 0;                                // Drop all buffers
         com_uti.logd ("pcm_read_runnable run() m_samplerate: " +  m_samplerate + "  m_channels: " + m_channels);
 
         while (pcm_read_thread_active) {                                // While PCM Read Thread should be active...
-          if (aud_buf_read (m_samplerate, m_channels, m_hw_size)) {    // Fill a PCM read buffer, If filled...
-            int bufs = aud_buf_tail - aud_buf_head;
+
+          bufs = aud_buf_tail - aud_buf_head;
+          if (bufs < 0)                                                 // If underflowed...
+            bufs += aud_buf_num;                                        // Wrap
+          //logd ("bufs: " + bufs + "  tail: " + aud_buf_tail + "  head: " + aud_buf_head);
+
+          if (bufs > max_bufs)                                          // If new maximum buffers in progress...
+            max_bufs = bufs;                                            // Save new max
+
+          if (bufs >= (aud_buf_num * 3) / 4)
+            com_uti.ms_sleep (300);                                     // 0.1s = 20KBytes @ 48k stereo  (2.5 8k buffers)
+
+          if (bufs >= aud_buf_num - 1) {                                // If NOT 6 or less buffers in progress, IE if room to write another (max = 7)
+            com_uti.loge ("Out of aud_buf");
+            buf_errs ++;
+            aud_buf_tail = aud_buf_head = 0;                            // Drop all buffers
+          }
+
+          if (aud_buf_data [aud_buf_tail] == null)                      // If audio buffer not yet allocated...
+            aud_buf_data [aud_buf_tail] = new byte [pcm_size_max];      // Allocate memory to pcm_size_max. Could use m_hw_size but that prevents live tuning unless re-allocate while running.
+
+          aud_buf = aud_buf_data [aud_buf_tail];
+
+          len = -555;                                                   // Default = error if no m_audiorecorder (shouldn't happen except at shutdown)
+          if (m_audiorecorder != null)
+            len = m_audiorecorder.read (aud_buf, 0, m_hw_size);
+
+          if (len <= 0) {
+            com_uti.loge ("get error: " + len + "  tail index: " + aud_buf_tail);
+            com_uti.ms_sleep (1010);                                    // Wait for errors to clear
+          }
+          else {
+            if (com_uti.device == com_uti.DEV_QCV) {                    // Detect all 0's in audio to kickstart Xperia Z audio (by doing any FM chip function); Why does Z do this ?? !!!!
+              for (ctr = 0; ctr < len; ctr ++) {
+                if (aud_buf [ctr] != 0)
+                  break;
+              }
+              audio_blank = false;
+              if (ctr >= len)
+                audio_blank = true;
+            }
+
+            if (need_aud_mod)
+              aud_mod (len, aud_buf);
+
+            if (com_uti.ena_debug_log && reads_processed % ((2 * read_stats_seconds * m_samplerate * m_channels) / len) == 0)   // Every stats_seconds
+              pcm_stat_logs ("Read ", m_channels, len, aud_buf);
+
+            if (aud_buf_tail < 0 || aud_buf_tail > aud_buf_num - 1)     // Protect from ArrayIndexOutOfBoundsException
+              aud_buf_tail &= aud_buf_num - 1;
+
+            aud_buf_len [aud_buf_tail] = len;                           // On shutdown: java.lang.ArrayIndexOutOfBoundsException: length=32; index=32
+
+            aud_buf_tail ++;
+            if (aud_buf_tail < 0 || aud_buf_tail > aud_buf_num - 1)
+              aud_buf_tail &= aud_buf_num - 1;
+            reads_processed ++;
+
+            bufs = aud_buf_tail - aud_buf_head;
             //com_uti.loge ("pcm_read_runnable run() bufs: " + bufs + "  tail: " + aud_buf_tail + "  head: " + aud_buf_head);
             if (bufs < 0)
-              bufs += aud_buf_num;                                // Fix underflow
+              bufs += aud_buf_num;                                      // Fix underflow
             if (bufs >= min_pcm_write_buffers)                          // If minimum number of buffers is ready... (Currently at least 2)
-              if (pcm_write_thread != null)
-                if (pcm_write_thread_waiting)
-                  pcm_write_thread.interrupt ();                          // Wake up pcm_write_thread sooner than usual
-          }
-          else {                                                        // Else, if no data could be retrieved...
-            //loge ("pcm_read_runnable run() pcm_read NULL etc");
-            com_uti.ms_sleep (101);//50);                                        // Wait 50 milli-seconds for errors to clear
+              if (pcm_write_thread != null && pcm_write_thread_waiting)
+                pcm_write_thread.interrupt ();                          // Wake up pcm_write_thread sooner than usual
           }
         }
 
@@ -1040,7 +1087,7 @@ dai_delay = 0;  // !! No delay ??
         e.printStackTrace ();
       }                                                                 // Fall through to terminate if exception
 
-      com_uti.logd ("pcm_read_runnable run() read_ctr: " + read_ctr + "  write_ctr: " + write_ctr + "  buf_errs: " + buf_errs + "  max_bufs: " + max_bufs);
+      com_uti.logd ("pcm_read_runnable run() reads_processed: " + reads_processed + "  writes_processed: " + writes_processed + "  buf_errs: " + buf_errs + "  max_bufs: " + max_bufs);
 
       return;
     }
@@ -1068,6 +1115,7 @@ dai_delay = 0;  // !! No delay ??
   }
 */
 
+  private boolean need_aud_mod = false;
   void aud_mod (int len, byte [] buf) {   // Modify read audio, such as amplification
     if (com_uti.device == com_uti.DEV_GS1) {
         // Amplify by 4
@@ -1086,9 +1134,14 @@ dai_delay = 0;  // !! No delay ??
 */
     }
   }
-
-  private boolean aud_buf_read (int samplerate, int channels, int len_max) {    // Fill a PCM read buffer for PCM Read thread
-    int bufs = aud_buf_tail - aud_buf_head;
+/*
+  private boolean aud_buf_read () {                                     // Fill a PCM read buffer for PCM Read thread
+                                                                        // Setup temp vars before loop to minimize garbage collection
+    int bufs = 0;
+    int len = 0;
+    byte [] aud_buf;
+    int ctr = 0;
+    bufs = aud_buf_tail - aud_buf_head;
     if (bufs < 0)                                                       // If underflowed...
       bufs += aud_buf_num;                                        // Wrap
     //logd ("bufs: " + bufs + "  tail: " + aud_buf_tail + "  head: " + aud_buf_head);
@@ -1105,68 +1158,61 @@ dai_delay = 0;  // !! No delay ??
       aud_buf_tail = aud_buf_head = 0;                        // Drop all buffers
     }
 
-    //int buf_tail = aud_buf_tail;  !!
-    int len = 0;
-
+    len = 0;
     try {
-      //buf_tail = aud_buf_tail;
-      if (aud_buf_data [aud_buf_tail] == null)
-        aud_buf_data [aud_buf_tail] = new byte [pcm_size_max];    // Allocate memory to pcm_size_max. Could use len_max but that prevents live tuning unless re-allocate while running.
+      aud_buf = aud_buf_data [aud_buf_tail];
+      if (aud_buf == null)                          // If audio buffer not yet allocated...
+        aud_buf = new byte [pcm_size_max];    // Allocate memory to pcm_size_max. Could use m_hw_size but that prevents live tuning unless re-allocate while running.
 
       if (m_audiorecorder != null)
-        len = m_audiorecorder.read (aud_buf_data [aud_buf_tail], 0, len_max);
+        len = m_audiorecorder.read (aud_buf, 0, m_hw_size);
       else
         len = -555;
+
+      if (len <= 0) {
+        com_uti.loge ("get error: " + len + "  tail index: " + aud_buf_tail);
+        com_uti.ms_sleep (1010);
+        return (false);
+      }
+
+      if (com_uti.device == com_uti.DEV_QCV && len > 0) {                 // Detect all 0's in audio to kickstart Xperia Z audio (by doing any FM chip function); Why does Z do this ?? !!!!
+        for (ctr = 0; ctr < len; ctr ++) {
+          if (aud_buf [ctr] != 0)
+            break;
+        }
+        if (ctr >= len)
+          audio_blank = true;
+        else
+          audio_blank = false;
+      }
+
+      if (need_aud_mod)
+        aud_mod (len, aud_buf);
+
+      if (com_uti.ena_debug_log && reads_processed % ((2 * read_stats_seconds * m_samplerate * m_channels) / len) == 0)   // Every stats_seconds
+        pcm_stat_logs ("Read ", m_channels, len, aud_buf);
+
+      if (aud_buf_tail < 0 || aud_buf_tail > aud_buf_num - 1)     // Protect from ArrayIndexOutOfBoundsException
+        aud_buf_tail &= aud_buf_num - 1;
+
+      if (len >= 0)
+        aud_buf_len [aud_buf_tail] = len;    // On shutdown: java.lang.ArrayIndexOutOfBoundsException: length=32; index=32
+      else
+        com_uti.loge ("len: " + len);
+
+      aud_buf_tail ++;
+      if (aud_buf_tail < 0 || aud_buf_tail > aud_buf_num - 1)
+        aud_buf_tail &= aud_buf_num - 1;
+      reads_processed ++;
+
     }
     catch (Throwable e) {
       e.printStackTrace ();
     }
 
-    if (len <= 0) {
-      com_uti.loge ("get error: " + len + "  tail index: " + aud_buf_tail);
-      com_uti.ms_sleep (1010);
-      return (false);
-    }
-///*
-    if (com_uti.device == com_uti.DEV_QCV && len > 0) {
-      int ctr = 0;
-      for (ctr = 0; ctr < len; ctr ++) {
-        if (aud_buf_data [aud_buf_tail] [ctr] != 0)
-          break;
-      }
-      if (ctr >= len)
-        audio_blank = true;
-      else
-        audio_blank = false;
-    }
-//*/
-
-    aud_mod (len, aud_buf_data [aud_buf_tail]);
-
-    int stats_frames = (2 * read_stats_seconds * samplerate * channels) / len;
-    int reads_processed = read_ctr;
-    if (reads_processed % stats_frames == 0) {    // Every stats_seconds
-      pcm_stat_logs ("Read ", channels, len, aud_buf_data [aud_buf_tail]);
-    }
-
-    if (aud_buf_tail < 0 || aud_buf_tail > aud_buf_num - 1)     // Protect from ArrayIndexOutOfBoundsException
-      aud_buf_tail &= aud_buf_num - 1;
-
-    if (len >= 0)
-      aud_buf_len [aud_buf_tail] = len;    // On shutdown: java.lang.ArrayIndexOutOfBoundsException: length=32; index=32
-    else
-      com_uti.loge ("len: " + len);
-
-    aud_buf_tail ++;
-    if (aud_buf_tail < 0 || aud_buf_tail > aud_buf_num - 1)
-      aud_buf_tail &= aud_buf_num - 1;
-    read_ctr ++;
-
-    //aud_buf_tail = buf_tail;
-
     return (true);
   }
-
+*/
   public String audio_stereo_set (String new_audio_stereo) {
     if (s2_tx) {
       com_uti.logd ("s2_tx");
