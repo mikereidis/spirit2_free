@@ -1506,7 +1506,7 @@ Evo 4G LTE  jewel
     try {
       DatagramPacket dps = null;
 
-      if (ds == null || rx_tmo == 100 || rx_tmo == 15000) {
+      if (ds == null /*|| rx_tmo < 100 */|| rx_tmo > 5000) {
         ds = new DatagramSocket (0);//s2d_port);
         last_tmo = -2;  // Force new timeout setting
       }
@@ -1598,11 +1598,13 @@ Evo 4G LTE  jewel
     int res_len = DEF_BUF;
     byte [] res_buf = new byte [res_len];
 
-    int rx_tmo = 3000;
+    int rx_tmo = 800;//500;//300;
     if (cmd.equalsIgnoreCase ("s tuner_state Start"))
-      rx_tmo = 15000;
+      rx_tmo = 20000;
     else if (cmd.equalsIgnoreCase ("s radio_nop Start"))
-      rx_tmo = 100; // Always fails so make it short
+      rx_tmo = 200;//10; // Always fails so make it short
+    else if (cmd.equalsIgnoreCase ("s radio_dai_state Start"))           // Still show: rx_tmo: 500  cmd: s radio_dai_state Start
+      rx_tmo = 2000;
     res_len = dg_daemon_cmd (cmd_len, cmd_buf, res_len, res_buf, rx_tmo);
 
     String res = "";//Avoid showing 999 for RT when result is zero length string "" (actually 1 byte long for zero)      "999";

@@ -55,8 +55,8 @@ public class svc_tnr implements svc_tap {
     else if (key.equalsIgnoreCase ("tuner_state"))
       return (m_com_api.tuner_state);
 
-    else if (m_com_api.tuner_state.equalsIgnoreCase ("start"))
-      return (com_uti.daemon_get (key));
+    else if (m_com_api.tuner_state.equalsIgnoreCase ("start"))          // If tuner started...
+      return (com_uti.daemon_get (key));                                // Get value from daemon
 
         // Else if not on, use cached info:
     else if (key.equalsIgnoreCase ("tuner_band"))
@@ -211,7 +211,9 @@ com_uti.logd ("FREQ CODE freq: " + freq + "  hci: " + hci + "  port: " + port);
 
         m_com_api.tuner_state = res;//"Start";         // State = Start
         com_uti.logd ("start tuner_state: " + m_com_api.tuner_state);
-        poll_start ();                                                  // Start polling for changes
+
+        if (! com_uti.s2_tx_get ())                                     // If not transmit mode...
+          poll_start ();                                                // Start polling for changes
       }
     }
     // STOP:
@@ -262,7 +264,7 @@ com_uti.logd ("FREQ CODE freq: " + freq + "  hci: " + hci + "  port: " + port);
     is_polling = false;
   }
 
-  private static final  int poll_ms  = 500;                             // Called every 500 ms
+  private static final  int poll_ms  = 800;//500;                             // Called every 800/500 ms
   private static final  int min_freq = 65000;                           // !! Broadcom sometimes returns 64000, so suppress this as it writes frequency to settings
   private static final  boolean tuner_state_callbacks = false;
 
@@ -294,23 +296,49 @@ if (false) {
 }
 {                // 16 spaces: 16*6 + 64 + 4 * 6 = 96 + 64 + 24 = 184
 try {
-      String bulk = com_uti.daemon_get ("tuner_bulk                                                                                                                                                                                            ").trim ();
+      String bulk = com_uti.daemon_get ("tuner_bulk                                                                                                                                                                                            ")
+            ;//.trim ();
+
+com_uti.logv ("bulk: \"" + bulk + "\"");
+
       String [] buar = {""};
-      buar = bulk.split ("-mR-", 7);
-      if (buar.length > 0)
-        new_freq_str        = buar [0];
-      if (buar.length > 1)
+      buar = bulk.split ("mArK", 7);
+
+// Still get these on Galaxies: E/s2comuti(21003): int_get: Exception e: java.lang.NumberFormatException: Invalid double: "88500mArK704"
+if (buar.length <= 1)
+  return;
+
+      if (buar.length > 0) {
+        new_freq_str          = buar [0];
+        com_uti.logv ("new_freq_str: \"" + new_freq_str + "\"");
+      }
+if (buar.length <= 1)
+  return;
+
+      if (buar.length > 1) {
         m_com_api.tuner_rssi  = buar [1];
-      if (buar.length > 2)
+        com_uti.logv ("m_com_api.tuner_rssi: \"" + m_com_api.tuner_rssi + "\"");
+      }
+      if (buar.length > 2) {
         m_com_api.tuner_most  = buar [2];
-      if (buar.length > 3)
+        com_uti.logv ("m_com_api.tuner_most: \"" + m_com_api.tuner_most + "\"");
+      }
+      if (buar.length > 3) {
         m_com_api.tuner_rds_pi= buar [3];
-      if (buar.length > 4)
+        com_uti.logv ("m_com_api.tuner_rds_pi: \"" + m_com_api.tuner_rds_pi + "\"");
+      }
+      if (buar.length > 4) {
         m_com_api.tuner_rds_pt= buar [4];
-      if (buar.length > 5)
+        com_uti.logv ("m_com_api.tuner_rds_pt: \"" + m_com_api.tuner_rds_pt + "\"");
+      }
+      if (buar.length > 5) {
         m_com_api.tuner_rds_ps= buar [5];
-      if (buar.length > 6)
+        com_uti.logv ("m_com_api.tuner_rds_ps: \"" + m_com_api.tuner_rds_ps + "\"");
+      }
+      if (buar.length > 6) {
         m_com_api.tuner_rds_rt= buar [6].trim ();
+        com_uti.logv ("m_com_api.tuner_rds_rt: \"" + m_com_api.tuner_rds_rt + "\"");
+      }
 }
     catch (Throwable e) {
       com_uti.loge ("Throwable: " + e);

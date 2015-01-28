@@ -844,6 +844,8 @@ private final int getAndIncrement(int modulo) {
       int bufs = 0;
       int len = 0;
       int len_written = 0;
+      long ms_start = 0;
+      long ms_time  = 0;
 
       try {
 
@@ -858,7 +860,8 @@ private final int getAndIncrement(int modulo) {
               pcm_write_thread_waiting = true;
               //Thread.sleep (1);                                       // Wait ms milliseconds
               //Thread.sleep (2000);                                    // Wait ms milliseconds   More efficient
-              Thread.sleep (3);                                         // Wait ms milliseconds    3 matches Spirit1
+              //Thread.sleep (3);                                         // Wait ms milliseconds    3 matches Spirit1
+              Thread.sleep (100);       // 100 ms compromise ?
               pcm_write_thread_waiting = false;
             }
             catch (InterruptedException e) {
@@ -877,9 +880,13 @@ private final int getAndIncrement(int modulo) {
             continue;
           }
           //com_uti.loge ("pcm_write_runnable run() ready to write bufs: " + bufs + "  len: " + len + "  tail: " + aud_buf_tail + "  head: " + aud_buf_head);
+          ms_start = com_uti.ms_get ();
           len_written = m_audiotrack.write (aud_buf, 0, len);  // Write head buffer to audiotrack  All parameters in bytes (but could be all in shorts)
+          ms_time = com_uti.ms_get () - ms_start;
+          if (ms_time >= 300)   // GS1 shows over 140 ms
+            com_uti.loge ("pcm_write_runnable run() m_audiotrack.write too long ms_time: " + ms_time + "  len: " + len + "  len_written: " + len_written + "  aud_buf: " + aud_buf);
           if (len_written != len)
-            com_uti.loge ("pcm_write_runnable run() len: " + len + "  len_written: " + len_written + "  aud_buf: " + aud_buf);
+            com_uti.loge ("pcm_write_runnable run() ms_time: " + ms_time + "  len: " + len + "  len_written: " + len_written + "  aud_buf: " + aud_buf);
 
 
           if (com_uti.ena_debug_log && writes_processed % ((2 * write_stats_seconds * m_samplerate * m_channels) / len) == 0)   // Every stats_seconds
@@ -1022,10 +1029,12 @@ dai_delay = 0;  // !! No delay ??
           if (bufs > max_bufs)                                          // If new maximum buffers in progress...
             max_bufs = bufs;                                            // Save new max
 
-          if (bufs >= (aud_buf_num * 3) / 4)
-            com_uti.ms_sleep (300);                                     // 0.1s = 20KBytes @ 48k stereo  (2.5 8k buffers)
-
-          if (bufs >= aud_buf_num - 1) {                                // If NOT 6 or less buffers in progress, IE if room to write another (max = 7)
+          if (bufs >= (aud_buf_num * 3) / 4) {                          // If 75% or more or buffers still in progress (If write thread is getting backed up)
+            if (pcm_write_thread != null && pcm_write_thread_waiting)
+              pcm_write_thread.interrupt ();                            // Wake up pcm_write_thread sooner than usual
+            com_uti.ms_sleep (300);                                     // Sleep to let write thread process.   0.1s/0.3s = 20/60KBytes @ 48k stereo  (2.5/8 8k buffers)
+          }
+          if (bufs >= aud_buf_num - 1) {                                // If room to write another buffer (max = aud_buf_num - 1 to prevent wrap-around)
             com_uti.loge ("Out of aud_buf");
             buf_errs ++;
             aud_buf_tail = aud_buf_head = 0;                            // Drop all buffers
@@ -1038,7 +1047,7 @@ dai_delay = 0;  // !! No delay ??
 
           len = -555;                                                   // Default = error if no m_audiorecorder (shouldn't happen except at shutdown)
           if (m_audiorecorder != null)
-            len = m_audiorecorder.read (aud_buf, 0, m_hw_size);
+            len = m_audiorecorder.read (aud_buf, 0, at_min_size);//m_hw_size);
 
           if (len <= 0) {
             com_uti.loge ("get error: " + len + "  tail index: " + aud_buf_tail);
@@ -1134,85 +1143,7 @@ dai_delay = 0;  // !! No delay ??
 */
     }
   }
-/*
-  private boolean aud_buf_read () {                                     // Fill a PCM read buffer for PCM Read thread
-                                                                        // Setup temp vars before loop to minimize garbage collection
-    int bufs = 0;
-    int len = 0;
-    byte [] aud_buf;
-    int ctr = 0;
-    bufs = aud_buf_tail - aud_buf_head;
-    if (bufs < 0)                                                       // If underflowed...
-      bufs += aud_buf_num;                                        // Wrap
-    //logd ("bufs: " + bufs + "  tail: " + aud_buf_tail + "  head: " + aud_buf_head);
 
-    if (bufs > max_bufs)                                                // If new maximum buffers in progress...
-      max_bufs = bufs;                                                  // Save new max
-
-    if (bufs >= (aud_buf_num * 3) / 4)
-      com_uti.ms_sleep (300);     // 0.1s = 20KBytes @ 48k stereo  (2.5 8k buffers)
-
-    if (bufs >= aud_buf_num - 1) {                                // If NOT 6 or less buffers in progress, IE if room to write another (max = 7)
-      com_uti.loge ("Out of aud_buf");
-      buf_errs ++;
-      aud_buf_tail = aud_buf_head = 0;                        // Drop all buffers
-    }
-
-    len = 0;
-    try {
-      aud_buf = aud_buf_data [aud_buf_tail];
-      if (aud_buf == null)                          // If audio buffer not yet allocated...
-        aud_buf = new byte [pcm_size_max];    // Allocate memory to pcm_size_max. Could use m_hw_size but that prevents live tuning unless re-allocate while running.
-
-      if (m_audiorecorder != null)
-        len = m_audiorecorder.read (aud_buf, 0, m_hw_size);
-      else
-        len = -555;
-
-      if (len <= 0) {
-        com_uti.loge ("get error: " + len + "  tail index: " + aud_buf_tail);
-        com_uti.ms_sleep (1010);
-        return (false);
-      }
-
-      if (com_uti.device == com_uti.DEV_QCV && len > 0) {                 // Detect all 0's in audio to kickstart Xperia Z audio (by doing any FM chip function); Why does Z do this ?? !!!!
-        for (ctr = 0; ctr < len; ctr ++) {
-          if (aud_buf [ctr] != 0)
-            break;
-        }
-        if (ctr >= len)
-          audio_blank = true;
-        else
-          audio_blank = false;
-      }
-
-      if (need_aud_mod)
-        aud_mod (len, aud_buf);
-
-      if (com_uti.ena_debug_log && reads_processed % ((2 * read_stats_seconds * m_samplerate * m_channels) / len) == 0)   // Every stats_seconds
-        pcm_stat_logs ("Read ", m_channels, len, aud_buf);
-
-      if (aud_buf_tail < 0 || aud_buf_tail > aud_buf_num - 1)     // Protect from ArrayIndexOutOfBoundsException
-        aud_buf_tail &= aud_buf_num - 1;
-
-      if (len >= 0)
-        aud_buf_len [aud_buf_tail] = len;    // On shutdown: java.lang.ArrayIndexOutOfBoundsException: length=32; index=32
-      else
-        com_uti.loge ("len: " + len);
-
-      aud_buf_tail ++;
-      if (aud_buf_tail < 0 || aud_buf_tail > aud_buf_num - 1)
-        aud_buf_tail &= aud_buf_num - 1;
-      reads_processed ++;
-
-    }
-    catch (Throwable e) {
-      e.printStackTrace ();
-    }
-
-    return (true);
-  }
-*/
   public String audio_stereo_set (String new_audio_stereo) {
     if (s2_tx) {
       com_uti.logd ("s2_tx");
@@ -1503,7 +1434,7 @@ VOICE_COMMUNICATION 7       11  (Microphone audio source tuned for voice communi
             com_uti.logd ("src: " + src + "  rate: " + rate + "  audioFormat: " + audioFormat + "  channelConfig: " + channelConfig + "  bufferSize: " + bufferSize);
             //if (bufferSize = AudioRecord.ERROR_BAD_VALUE)
             //continue; / break;
-            AudioRecord recorder = new AudioRecord (src, rate, channelConfig, audioFormat, m_hw_size);//bufferSize);
+            AudioRecord recorder = new AudioRecord (src, rate, channelConfig, audioFormat, at_min_size);//m_hw_size);//bufferSize);    // at_min_size
             if (recorder.getState() == AudioRecord.STATE_INITIALIZED) { // If works, then done
               m_aud_src = src;
               return (recorder);

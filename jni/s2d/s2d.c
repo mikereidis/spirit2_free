@@ -1275,7 +1275,23 @@ sock_rx_tmo_set (sockfd, 100);
           //snprintf (res_buf, res_max -1, "%s",          curr_tuner_rds_ps);
           //snprintf (res_buf, res_max -1, "%s",          curr_tuner_rds_rt);
 // !! Should just use strlcat() instead of snprintf() !!
-          snprintf (res_buf, res_max -1, "%s-mR-%s-mR-%s-mR-%s-mR-%s-mR-%s-mR-%s", curr_tuner_freq, curr_tuner_rssi, curr_tuner_most, curr_tuner_rds_pi, curr_tuner_rds_pt, curr_tuner_rds_ps, curr_tuner_rds_rt);
+          //snprintf (res_buf, res_max -1, "%smArK%smArK%smArK%smArK%smArK%smArK%s", curr_tuner_freq, curr_tuner_rssi, curr_tuner_most, curr_tuner_rds_pi, curr_tuner_rds_pt, curr_tuner_rds_ps, curr_tuner_rds_rt);
+
+          strncpy (res_buf, curr_tuner_freq, res_max -1);
+          strlcat (res_buf, "mArK", res_max -1);
+          strlcat (res_buf, curr_tuner_rssi, res_max -1);
+          strlcat (res_buf, "mArK", res_max -1);
+          strlcat (res_buf, curr_tuner_most, res_max -1);
+          strlcat (res_buf, "mArK", res_max -1);
+          strlcat (res_buf, curr_tuner_rds_pi, res_max -1);
+          strlcat (res_buf, "mArK", res_max -1);
+          strlcat (res_buf, curr_tuner_rds_pt, res_max -1);
+          strlcat (res_buf, "mArK", res_max -1);
+          strlcat (res_buf, curr_tuner_rds_ps, res_max -1);
+          strlcat (res_buf, "mArK", res_max -1);
+          strlcat (res_buf, curr_tuner_rds_rt, res_max -1);
+          //strlcat (res_buf, "mArK", res_max -1);
+//loge ("res_buf: \"%s\"", res_buf);
         }
 
 

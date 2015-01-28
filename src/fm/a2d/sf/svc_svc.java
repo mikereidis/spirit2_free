@@ -275,7 +275,14 @@ public class svc_svc extends Service implements svc_tcb, svc_acb {  // Service c
 
     send_intent.putExtra ("tuner_state",        m_com_api.tuner_state);//m_svc_tap.tuner_get ("tuner_state"));
     send_intent.putExtra ("tuner_band",         m_com_api.tuner_band);//m_svc_tap.tuner_get ("tuner_band"));
-    String freq_khz = m_svc_tap.tuner_get ("tuner_freq");
+
+
+
+//Just Use cached value now; don't go to daemon
+//    String freq_khz = m_svc_tap.tuner_get ("tuner_freq");
+
+    String freq_khz = m_com_api.tuner_freq;
+
     int ifreq = com_uti.int_get (freq_khz);
 //!! ifreq = com_uti.tnru_freq_fix (ifreq + 25);
     if (ifreq >= 50000 && ifreq < 500000) {
@@ -284,6 +291,8 @@ public class svc_svc extends Service implements svc_tcb, svc_acb {  // Service c
     }
     com_uti.logv ("m_com_api.tuner_freq: " + m_com_api.tuner_freq + "  m_com_api.int_tuner_freq: " + m_com_api.int_tuner_freq);
     send_intent.putExtra ("tuner_freq",         m_com_api.tuner_freq);
+
+
 
     //send_intent.putExtra ("tuner_stereo",       m_svc_tap.tuner_get ("tuner_stereo"));
     //send_intent.putExtra ("tuner_thresh",       m_svc_tap.tuner_get ("tuner_thresh"));
