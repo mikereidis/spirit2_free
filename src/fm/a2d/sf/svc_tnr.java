@@ -21,9 +21,10 @@ public class svc_tnr implements svc_tap {
   private Handler   m_hndlr     = new Handler ();                       // Instantiate handler object for events/Service callbacks
   private Context   m_context   = null;
 
-  private boolean need_polling = true;
-  private boolean is_polling = false;
-  private Timer poll_tmr;
+  private boolean   need_polling        = true;
+  private boolean   is_polling          = false;
+  private Timer     poll_tmr            = null;
+
   private String    last_poll_state     = "-1";
   private int       last_poll_freq      = -1;
   private int       last_poll_rssi      = -1;
@@ -203,7 +204,7 @@ com_uti.logd ("FREQ CODE freq: " + freq + "  hci: " + hci + "  port: " + port);
 
         //com_uti.ms_sleep (200);   // !!!! MUST have at least 200 ms delay here
         //com_uti.ms_sleep (800);    // Extra stock HTC One M7 ?
-        com_uti.loge ("1010 ms delay starting..., fix later");
+        com_uti.logd ("1010 ms delay starting before tuner_state = start");
         com_uti.ms_sleep (1010);
 
         String res = com_uti.daemon_set ("tuner_state", "Start");

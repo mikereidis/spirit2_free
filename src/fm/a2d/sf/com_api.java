@@ -76,6 +76,8 @@ public class com_api {
   public  String tuner_rds_ta       = "";                               // ro ... ... Values:   0 - 65535   TA Traffic Announcement code
   public  String tuner_rds_taf      = "";                               // ro ... ... Values:   0 - 2^32-1  TAF TA Frequency
 
+  public int num_radio_update   = 0;
+  public int num_key_set        = 0;
 
 
     // Code:
@@ -102,6 +104,7 @@ public class com_api {
     return (pi);
   }
   public void key_set (String key, String val, String key2, String val2) {  // Presets currently require simultaneous preset frequency and name
+    num_key_set ++;
     com_uti.logd ("key: " + key + "  val: " + val + "  key2: " + key2 + "  val2: " + val2);
     Intent intent = new Intent ("fm.a2d.sf.action.set");
     /*if (intent == null) {
@@ -114,23 +117,24 @@ public class com_api {
     m_context.startService (intent);
   }
   public void key_set (String key, String val) {
+    num_key_set ++;
     try {
-    com_uti.logd ("key: " + key + "  val: " + val);
-    Intent intent = new Intent ("fm.a2d.sf.action.set");
-    /*if (intent == null) {
-      com_uti.loge ("intent == null");
-      return;
-    }*/
+      com_uti.logd ("key: " + key + "  val: " + val);
+      Intent intent = new Intent ("fm.a2d.sf.action.set");
+      /*if (intent == null) {
+        com_uti.loge ("intent == null");
+        return;
+      }*/
 
-//    intent.setClass (m_context, svc_svc.class);
-    intent.setComponent (new android.content.ComponentName ("fm.a2d.sf",
+      //intent.setClass (m_context, svc_svc.class);
+      intent.setComponent (new android.content.ComponentName ("fm.a2d.sf",
             "fm.a2d.sf.svc_svc"));  // Seperate lines for single pass sed
 
-    intent.putExtra (key, val);
-    if (m_context != null)
-      m_context.startService (intent);
-    else
-      com_uti.loge ("m_context == null");
+      intent.putExtra (key, val);
+      if (m_context != null)
+        m_context.startService (intent);
+      else
+        com_uti.loge ("m_context == null");
     }
     catch (Throwable e) {
       e.printStackTrace ();
@@ -139,6 +143,7 @@ public class com_api {
 
 
   public void radio_update (Intent intent) {
+    num_radio_update ++;
     com_uti.logw ("intent: " + intent);
 
     Bundle extras = intent.getExtras ();

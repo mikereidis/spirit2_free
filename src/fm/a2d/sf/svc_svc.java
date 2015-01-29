@@ -114,7 +114,15 @@ public class svc_svc extends Service implements svc_tcb, svc_acb {  // Service c
   public void onDestroy () {
     com_uti.logd ("");
 
-      stopForeground (true);
+    com_uti.logd ("com_uti.num_daemon_get:       " + com_uti.num_daemon_get);
+    com_uti.logd ("com_uti.num_daemon_set:       " + com_uti.num_daemon_set);
+
+    if (m_com_api != null) {
+      com_uti.logd ("m_com_api.num_key_set:      " + m_com_api.num_key_set);
+      com_uti.logd ("m_com_api.num_radio_update: " + m_com_api.num_radio_update);
+    }
+
+
 
     //tuner_state_set ("stop");
     //m_svc_tap = null;
@@ -154,20 +162,8 @@ public class svc_svc extends Service implements svc_tcb, svc_acb {  // Service c
       return (start_type);
 
     String val = "";
-    for (int ctr = 0; ctr < com_api.max_presets; ctr ++) {              // Get Presets
-      val = extras.getString ("radio_name_prst_" + ctr, "");
 
-      if (! val.equals ("")) {
-        String freq = extras.getString ("radio_freq_prst_" + ctr, "0");
-        int ifreq = com_uti.tnru_freq_fix (25 + com_uti.tnru_khz_get (freq));
-        com_uti.logd ("Set preset val: " + val + "  freq: " + freq);
-        if (ifreq >= 50000 && ifreq <= 499999) {
-        }
-        presets_init ();                                                // Load presets
-      }
-    }
-
-    val = extras.getString ("param", "");
+    val = extras.getString ("param", "");                               // !! Audio setParameters() access !!
     if (! val.equalsIgnoreCase ("")) {
       com_uti.setParameters (val);
     }
@@ -584,15 +580,6 @@ public class svc_svc extends Service implements svc_tcb, svc_acb {  // Service c
     com_uti.prefs_set (m_context, "tuner_rds_af_state", val);
   }
 
-  private void presets_init () {                                        // Load presets
-    preset_num = 0;
-    for (int ctr = 0; ctr < com_api.max_presets; ctr ++) {      // ?? Should use com_api copy !!
-      plst_freq [ctr] = com_uti.prefs_get (m_context, "radio_freq_prst_" + ctr,  "");
-      plst_name [ctr] = com_uti.prefs_get (m_context, "radio_name_prst_" + ctr,  "");
-      if (! plst_freq [ctr].equals (""))
-        preset_num = ctr + 1;
-    }
-  }
 
   private void tuner_prefs_init () {                                    // Load tuner prefs
     String band = com_uti.prefs_get (m_context, "tuner_band", "EU");
@@ -605,7 +592,6 @@ public class svc_svc extends Service implements svc_tcb, svc_acb {  // Service c
 
     tuner_rds_af_state_set (com_uti.prefs_get (m_context, "tuner_rds_af_state", "stop")); // !! Always rewrites pref
 
-    presets_init ();                                                    // Load presets
 
     int freq = com_uti.prefs_get (m_context, "tuner_freq", 88500);
     tuner_freq_set ("" + freq);                                         // Set initial frequency
@@ -635,10 +621,15 @@ public class svc_svc extends Service implements svc_tcb, svc_acb {  // Service c
     com_uti.logv ("key: " + key + "  val: " + val);
 ///*
     if (com_uti.device == com_uti.DEV_QCV && m_svc_aap.audio_blank_get ()) {   // If we need to kickstart audio...
-      com_uti.loge ("!!!!!!!!!!!!!!!!!!!!!!!!! Kickstarting stalled audio !!!!!!!!!!!!!!!!!!!!!!!!!!");
+      com_uti.loge ("!!!!!!!!!!!!!!!!!!!!!!!!! Kickstarting stalled audio m_com_api.tuner_freq: " + m_com_api.tuner_freq);
       //m_svc_tap.tuner_set ("tuner_stereo", m_com_api.tuner_stereo);     // Set Stereo (Frequency also works, and others ?)
-      m_svc_tap.tuner_set ("tuner_freq", m_com_api.tuner_freq);     // Set Frequency
+
       m_svc_aap.audio_blank_set (false);
+
+String temp_freq = m_com_api.tuner_freq;
+      m_svc_tap.tuner_set ("tuner_freq", "88800");     // Set Frequency to 88.8
+m_com_api.tuner_freq = temp_freq;
+      m_svc_tap.tuner_set ("tuner_freq", m_com_api.tuner_freq);     // Set Frequency
     }
 //*/
     if (key == null)

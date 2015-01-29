@@ -885,7 +885,8 @@ private final int getAndIncrement(int modulo) {
           ms_time = com_uti.ms_get () - ms_start;
           if (ms_time >= 300)   // GS1 shows over 140 ms
             com_uti.loge ("pcm_write_runnable run() m_audiotrack.write too long ms_time: " + ms_time + "  len: " + len + "  len_written: " + len_written + "  aud_buf: " + aud_buf);
-          if (len_written != len)
+
+          if (len_written != len)   // !! Note2: run: pcm_write_runnable run() ms_time: 0  len: 23040  len_written: 8448  aud_buf: [B@3147d103
             com_uti.loge ("pcm_write_runnable run() ms_time: " + ms_time + "  len: " + len + "  len_written: " + len_written + "  aud_buf: " + aud_buf);
 
 
@@ -1179,13 +1180,14 @@ dai_delay = 0;  // !! No delay ??
     if (include_read)
       pcm_read_stop ();
     pcm_write_stop ();
+    com_uti.logd ("reads_processed: " + reads_processed + " writes_processed: " + writes_processed);
   }
   private void pcm_audio_stop (boolean include_read) {
     pcm_audio_pause (include_read);
     if (m_audiotrack != null)
       m_audiotrack.release ();
     m_audiotrack = null;
-
+    com_uti.logd ("reads_processed: " + reads_processed + " writes_processed: " + writes_processed);
   }
 
   private void audio_output_off () {                                                    // Called only from audio_pause, after pcm read and write stopped

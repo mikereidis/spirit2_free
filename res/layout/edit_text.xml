@@ -7,11 +7,11 @@ android:orientation="vertical">
 
   <EditText
   android:id="@+id/edit_text"
-  android:contentDescription="NOT USED"
+  android:contentDescription="Preset rename"
   android:layout_height="wrap_content"
   android:layout_width="match_parent"
   android:scrollHorizontally="true"
-  android:hint = "Enter a name / NOT USED"
+  android:hint = "Enter a name"
   android:singleLine="true"
   android:inputType="text"
   android:autoText="false"

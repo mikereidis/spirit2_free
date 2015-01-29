@@ -737,7 +737,12 @@ enum iris_buf_t {
     memset (v4l_freq.reserved, 0, sizeof (v4l_freq.reserved));
     ret = ioctl (dev_hndl, VIDIOC_S_FREQUENCY, & v4l_freq);
     if (ret < 0) {
-      loge ("chip_imp_freq_set VIDIOC_S_FREQUENCY errno: %d", errno);
+      //loge ("chip_imp_freq_set VIDIOC_S_FREQUENCY errno: %d", errno);
+      loge ("chip_imp_freq_set VIDIOC_S_FREQUENCY errno: %d  freq: %d  v4l_freq.frequency: %d", errno, freq, v4l_freq.frequency);
+// Get these errors every 3-4 seconds But set frequency from UI works !
+//  01-28 18:43:01.749 E/s2svcsvc( 2667): cb_tuner_key: !!!!!!!!!!!!!!!!!!!!!!!!! Kickstarting stalled audio !!!!!!!!!!!!!!!!!!!!!!!!!!
+//  01-28 18:43:01.799 E/s2tnrqcv(11401): chip_imp_freq_set VIDIOC_S_FREQUENCY errno: 22
+
       return (-1);
     }
     curr_freq_val = freq;

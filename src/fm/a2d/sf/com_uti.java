@@ -127,7 +127,7 @@ public final class com_uti  {
   private static final int max_log_char = 7;//8;
 
   public static final boolean ena_verbo_log = false;
-  public static final boolean ena_debug_log = false;
+  public static final boolean ena_debug_log = true;
   public static final boolean ena_warni_log = false;
   public static final boolean ena_error_log = true;
 
@@ -1081,7 +1081,9 @@ Evo 4G LTE  jewel
 
     // Prefs:
   private static final String prefs_file = "s2_prefs";
-  private static final int MODE_MULTI_PROCESS = 4;
+  //private static final int prefs_mode = Context.MODE_WORLD_WRITEABLE | Context.MODE_WORLD_READABLE;//MotoG settings don't work sometimes    Context.MODE_PRIVATE | Context.MODE_MULTI_PROCESS;
+  private static final int prefs_mode = Context.MODE_WORLD_WRITEABLE | Context.MODE_WORLD_READABLE | Context.MODE_MULTI_PROCESS;
+  //private static final int MODE_MULTI_PROCESS = 4;
 
     // Prefs Get:
   public static int prefs_get (Context context, String key, int int_def) {
@@ -1094,7 +1096,7 @@ Evo 4G LTE  jewel
   public static String prefs_get (Context context, String key, String def) {
     String res = def;
     try {
-      SharedPreferences sp = context.getSharedPreferences (prefs_file, Context.MODE_PRIVATE | MODE_MULTI_PROCESS);
+      SharedPreferences sp = context.getSharedPreferences (prefs_file, prefs_mode);
       res = sp.getString (key, def);   // java.lang.ClassCastException if wrong type !!
     }
     catch (Exception e) {
@@ -1105,19 +1107,9 @@ Evo 4G LTE  jewel
 /*
   public static long prefs_get (Context context, String key, long def) {
     long res = def;
-    SharedPreferences sp = context.getSharedPreferences (prefs_file, Context.MODE_PRIVATE | MODE_MULTI_PROCESS);
+    SharedPreferences sp = context.getSharedPreferences (prefs_file, prefs_mode);
     try {
       res = sp.getLong (key, def);
-    }
-    catch (Exception e) {
-    }
-    return (res);
-  }
-  public static String prefs_get (Context context, String prefs_file, String key, String def) {
-    String res = def;
-    try {
-      SharedPreferences sp = context.getSharedPreferences (prefs_file, Context.MODE_PRIVATE | MODE_MULTI_PROCESS);
-      res = sp.getString (key, def);
     }
     catch (Exception e) {
     }
@@ -1126,7 +1118,7 @@ Evo 4G LTE  jewel
   public static boolean prefs_get (Context context, String key, boolean def) {
     boolean res = def;
     try {
-      SharedPreferences sp = context.getSharedPreferences (prefs_file, Context.MODE_PRIVATE | MODE_MULTI_PROCESS);
+      SharedPreferences sp = context.getSharedPreferences (prefs_file, prefs_mode);
       res = sp.getBoolean (key, def);
     }
     catch (Exception e) {
@@ -1137,7 +1129,7 @@ Evo 4G LTE  jewel
     double resd = def;
     String res = "" + def;
     try {
-      SharedPreferences sp = context.getSharedPreferences (prefs_file, Context.MODE_PRIVATE | MODE_MULTI_PROCESS);
+      SharedPreferences sp = context.getSharedPreferences (prefs_file, prefs_mode);
       res = sp.getString (key, Double.toString (def));
     }
     catch (Exception e) {
@@ -1163,7 +1155,7 @@ Evo 4G LTE  jewel
   public static void prefs_set (Context context, String prefs_file, String key, String val) {
     com_uti.logd ("String: " + key + " = " + val);
     try {
-      SharedPreferences sp = context.getSharedPreferences (prefs_file, Context.MODE_PRIVATE | MODE_MULTI_PROCESS);
+      SharedPreferences sp = context.getSharedPreferences (prefs_file, prefs_mode);
       SharedPreferences.Editor ed = sp.edit ();
       ed.putString (key, val);
       ed.commit ();
@@ -1178,7 +1170,7 @@ Evo 4G LTE  jewel
   public static void prefs_set (Context context, String prefs_file, String key, long val) {
     com_uti.logd ("long: " + key + " = " + val);
     try {
-      SharedPreferences sp = context.getSharedPreferences (prefs_file, Context.MODE_PRIVATE | MODE_MULTI_PROCESS);
+      SharedPreferences sp = context.getSharedPreferences (prefs_file, prefs_mode);
       SharedPreferences.Editor ed = sp.edit ();
       ed.putLong (key, val);
       ed.commit ();
@@ -1192,7 +1184,7 @@ Evo 4G LTE  jewel
   public static void prefs_set (Context context, String prefs_file, String key, boolean val) {
     com_uti.logd ("boolean: " + key + " = " + val);
     try {
-      SharedPreferences sp = context.getSharedPreferences (prefs_file, Context.MODE_PRIVATE | MODE_MULTI_PROCESS);
+      SharedPreferences sp = context.getSharedPreferences (prefs_file, prefs_mode);
       SharedPreferences.Editor ed = sp.edit ();
       ed.putBoolean (key, val);
       ed.commit ();
@@ -1565,12 +1557,16 @@ Evo 4G LTE  jewel
     return (len);
   }
 
+  public static int num_daemon_get = 0;
+  public static int num_daemon_set = 0;
   public static String daemon_get (String key) {
+    num_daemon_get ++;
     String res = daemon_cmd ("g " + key);
     //com_uti.logd ("key: " + key + "  res: " + res);
     return (res);
   }
   public static String daemon_set (String key, String val) {
+    num_daemon_set ++;
     String res = daemon_cmd ("s " + key + " " + val);
     com_uti.logd ("key: " + key + "  val: " + val + "  res: " + res);
     return (res);

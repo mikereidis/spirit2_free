@@ -129,6 +129,14 @@ public class gui_act extends Activity {     //public class gui_act extends Fragm
     api_bcr_stop ();
     gui_stop ();
 
+    com_uti.logd ("com_uti.num_daemon_get:       " + com_uti.num_daemon_get);
+    com_uti.logd ("com_uti.num_daemon_set:       " + com_uti.num_daemon_set);
+
+    if (m_com_api != null) {
+      com_uti.logd ("m_com_api.num_key_set:      " + m_com_api.num_key_set);
+      com_uti.logd ("m_com_api.num_radio_update: " + m_com_api.num_radio_update);
+    }
+
     // super.onDestroy dismisses any dialogs or cursors the activity was managing. If the logic in onDestroy has something to do with these things, then order may matter.
     super.onDestroy ();
 
@@ -214,7 +222,7 @@ public class gui_act extends Activity {     //public class gui_act extends Fragm
     // Dialog methods:
 
   @Override
-  protected Dialog onCreateDialog (int id, Bundle args) {                            // Create a dialog by calling specific *_dialog_create function    ; Triggered by showDialog (int id);
+  protected Dialog onCreateDialog (int id, Bundle args) {               // Create a dialog by calling specific *_dialog_create function    ; Triggered by showDialog (int id);
     com_uti.logd ("id: " + id + "  args: " + args);
     Dialog ret = m_gui_gap.gap_dialog_create (id, args);
     com_uti.logd ("dialog: " + ret);

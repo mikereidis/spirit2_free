@@ -48,7 +48,7 @@ import android.widget.TextView;
 
 import java.util.Timer;
 import java.util.TimerTask;
-
+import java.util.ArrayList;
 
 public class gui_gui implements gui_gap {
 
@@ -295,7 +295,7 @@ public class gui_gui implements gui_gap {
     m_tv_rt.setTextColor (lite_clr);
     m_tv_ps.setTextColor (lite_clr);
 
-    preset_setup (lite_clr);
+    presets_setup (lite_clr);
 
     gui_pwr_update (false);
 
@@ -323,24 +323,20 @@ public class gui_gui implements gui_gap {
         com_uti.logd ("Setting band EU");
         tuner_band_set_non_volatile ("EU");
       }
-      if (m_com_api.tuner_band.equalsIgnoreCase ("US")) {
-        rb_band_eu.setChecked (false);
-        rb_band_us.setChecked (true);
-      }
-
       m_gui_act.showDialog (DLG_INTRO);                                 // Show the intro dialog
     }
-    else {
-      String band = com_uti.prefs_get (m_context, "tuner_band", "EU");
-      tuner_band_set (band);
-
-      if (m_com_api.tuner_band.equalsIgnoreCase ("US")) {
-        rb_band_eu.setChecked (false);
-        rb_band_us.setChecked (true);
-      }
+    //else {
+    else if (radio_gui_start_count <= 3) {                              // If first 3 runs...
 
       m_gui_act.showDialog (DLG_POWER);                                 // Show the power dialog
       //starting_gui_dlg_show (true);
+    }
+
+    String band = com_uti.prefs_get (m_context, "tuner_band", "EU");
+    tuner_band_set (band);
+    if (m_com_api.tuner_band.equalsIgnoreCase ("US")) {
+      rb_band_eu.setChecked (false);
+      rb_band_us.setChecked (true);
     }
 
     m_com_api.key_set ("audio_state", "start");                         // Start audio service
@@ -516,7 +512,7 @@ Rotate counter by 0.75 MHz = 8.766 degrees
     // Visualizer:
 
 
-  private void preset_setup (int clr) {
+  private void presets_setup (int clr) {    // preset_
 
     // 16 Max Preset Buttons hardcoded
     m_preset_tv [0] = (TextView) m_gui_act.findViewById (R.id.tv_preset_0);
@@ -562,8 +558,8 @@ Rotate counter by 0.75 MHz = 8.766 degrees
     for (int idx = 0; idx < com_api.max_presets; idx ++) {               // For all presets...
       String name = com_uti.prefs_get (m_context, "radio_name_prst_" + idx, "");
       String freq = com_uti.prefs_get (m_context, "radio_freq_prst_" + idx, "");
-      if (freq != null && ! freq.equals ("")) {
-        m_presets_curr = idx + 1;                                       // Allow blanks
+      if (freq != null && ! freq.equals ("")) {                         // If non empty frequency (if setting exists)
+        m_presets_curr = idx + 1;                                       // Update number of presets
         m_preset_freq [idx] = freq;
         m_preset_name [idx] = name;
 
@@ -618,12 +614,14 @@ Rotate counter by 0.75 MHz = 8.766 degrees
 
     // Dialog methods:
 
-  private static final int DLG_INTRO     = 1;    // First time show this
-  private static final int DLG_POWER     = 2;    // Every subsequent startup show this
-  private static final int DLG_FREQ_SET  = 3;
-  private static final int DLG_MENU      = 4;
+  private static final int DLG_INTRO    = 1;                            // First time show this
+  private static final int DLG_POWER    = 2;                            // Every subsequent startup show this
+  private static final int DLG_FREQ_SET = 3;
+  private static final int DLG_MENU     = 4;
+  private static final int DLG_PRST     = 5;
+  private static final int DLG_PRST_REN = 6;
 
-  public Dialog gap_dialog_create (int id, Bundle args) {                            // Create a dialog by calling specific *_dialog_create function    ; Triggered by showDialog (int id);
+  public Dialog gap_dialog_create (int id, Bundle args) {               // Create a dialog by calling specific *_dialog_create function    ; Triggered by showDialog (int id);
   //public DialogFragment gap_dialog_create (int id, Bundle args) {
     //com_uti.logd ("id: " + id + "  args: " + args);
     Dialog ret = null;
@@ -639,6 +637,12 @@ Rotate counter by 0.75 MHz = 8.766 degrees
         break;
       case DLG_FREQ_SET:
         ret = freq_set_dialog_create  (id);
+        break;
+      case DLG_PRST:
+        ret = prst_dialog_create  (id);
+        break;
+      case DLG_PRST_REN:
+        ret = prst_ren_dialog_create  (id);
         break;
     }
     //com_uti.logd ("dialog: " + ret);
@@ -807,16 +811,16 @@ Rotate counter by 0.75 MHz = 8.766 degrees
   private Dialog freq_set_dialog_create (final int id) {                   // Set new frequency
     com_uti.logd ("id: " + id);
     LayoutInflater factory = LayoutInflater.from (m_context);
-    final View textEntryView = factory.inflate (R.layout.edit_number, null);
+    final View edit_text_view = factory.inflate (R.layout.edit_number, null);
     AlertDialog.Builder dlg_bldr = new AlertDialog.Builder (m_context);
     dlg_bldr.setTitle ("Set Frequency"/*R.string.dialog_freqset_title*/);
-    dlg_bldr.setView (textEntryView);
+    dlg_bldr.setView (edit_text_view);
     dlg_bldr.setPositiveButton ("OK"/*R.string.alert_dialog_ok*/, new DialogInterface.OnClickListener () {
 
       public void onClick (DialogInterface dialog, int whichButton) {
 
-        EditText mTV = (EditText) textEntryView.findViewById (R.id.edit_number);
-        CharSequence newFreq = mTV.getEditableText ();
+        EditText edit_text = (EditText) edit_text_view.findViewById (R.id.edit_number);
+        CharSequence newFreq = edit_text.getEditableText ();
         String nFreq = String.valueOf (newFreq);                        // Get entered text as String
         freq_set (nFreq);
 
@@ -827,6 +831,87 @@ Rotate counter by 0.75 MHz = 8.766 degrees
       public void onClick (DialogInterface dialog, int whichButton) {
       }
     });                         
+    return (dlg_bldr.create ());
+  }
+
+// _PRST
+  private Dialog prst_ren_dialog_create (final int id) {                 // Rename preset
+    com_uti.logd ("id: " + id);
+    LayoutInflater factory = LayoutInflater.from (m_context);
+    final View edit_text_view = factory.inflate (R.layout.edit_text, null);
+    AlertDialog.Builder dlg_bldr = new AlertDialog.Builder (m_context);
+    dlg_bldr.setTitle ("Preset Rename");//R.string.dialog_presetlist_rename_title);
+    dlg_bldr.setView (edit_text_view);
+    dlg_bldr.setPositiveButton ("OK"/*R.string.alert_dialog_ok*/, new DialogInterface.OnClickListener () {
+      public void onClick (DialogInterface dialog, int whichButton) {
+        EditText edit_text = (EditText) edit_text_view.findViewById (R.id.edit_text);
+        CharSequence new_name = edit_text.getEditableText ();
+        String name = String.valueOf (new_name);
+        preset_rename (cur_preset_idx, name);
+      }
+    });
+    dlg_bldr.setNegativeButton ("Cancel"/*R.string.alert_dialog_cancel*/, new DialogInterface.OnClickListener () {
+      public void onClick (DialogInterface dialog, int whichButton) {
+      }
+    });
+    return (dlg_bldr.create ());
+  }
+
+
+  private Dialog prst_dialog_create (final int id) {
+    com_uti.logd ("id: " + id);
+    AlertDialog.Builder dlg_bldr = new AlertDialog.Builder (m_context);
+    dlg_bldr.setTitle ("m_preset");//_button_sttn.name_get ());                        // Title = Station Name !! Variable
+    ArrayList <String> array_list = new ArrayList <String> ();
+    array_list.add ("Tune");//getResources ().getString (R.string.preset_tune));
+    array_list.add ("Replace");//getResources ().getString (R.string.preset_replace));
+    array_list.add ("Rename");//getResources ().getString (R.string.preset_rename));
+    array_list.add ("Delete");//getResources ().getString (R.string.preset_delete));
+
+    dlg_bldr.setOnCancelListener (new DialogInterface.OnCancelListener () {
+      public void onCancel (DialogInterface dialog) {
+      }
+    });
+    String [] items = new String [array_list.size ()];
+    array_list.toArray (items);
+
+    dlg_bldr.setItems (items, new DialogInterface.OnClickListener () {
+      public void onClick (DialogInterface dialog, int item) {
+
+        switch (item) {
+          case 0:                                                       // Tune to station
+            com_uti.logd ("prst_dialog_create onClick Tune freq: " + m_preset_freq [cur_preset_idx]);
+            com_uti.logd ("prst_dialog_create onClick Tune name: " + m_preset_name [cur_preset_idx]);
+            freq_set ("" + m_preset_freq [cur_preset_idx]);             // Change to preset frequency
+            break;
+          case 1:                                                       // Replace preset with currently tuned station
+            com_uti.logd ("prst_dialog_create onClick Replace freq: " + m_preset_freq [cur_preset_idx]);
+            com_uti.logd ("prst_dialog_create onClick Replace name: " + m_preset_name [cur_preset_idx]);
+            preset_set (cur_preset_idx);
+            com_uti.logd ("prst_dialog_create onClick Replace freq: " + m_preset_freq [cur_preset_idx]);
+            com_uti.logd ("prst_dialog_create onClick Replace name: " + m_preset_name [cur_preset_idx]);
+            break;
+          case 2:                                                       // Rename preset
+            com_uti.logd ("prst_dialog_create onClick Rename freq: " + m_preset_freq [cur_preset_idx]);
+            com_uti.logd ("prst_dialog_create onClick Rename name: " + m_preset_name [cur_preset_idx]);
+            m_gui_act.showDialog (DLG_PRST_REN);
+            com_uti.logd ("prst_dialog_create onClick Rename freq: " + m_preset_freq [cur_preset_idx]);
+            com_uti.logd ("prst_dialog_create onClick Rename name: " + m_preset_name [cur_preset_idx]);
+            break;
+          case 3:                                                       // Delete preset   !! Deletes w/ no confirmation
+            com_uti.logd ("prst_dialog_create onClick Delete freq: " + m_preset_freq [cur_preset_idx]);
+            com_uti.logd ("prst_dialog_create onClick Delete name: " + m_preset_name [cur_preset_idx]);
+            preset_delete (cur_preset_idx);
+            com_uti.logd ("prst_dialog_create onClick Delete freq: " + m_preset_freq [cur_preset_idx]);
+            com_uti.logd ("prst_dialog_create onClick Delete name: " + m_preset_name [cur_preset_idx]);
+            break;
+          default:                                                      // Should not happen
+            break;
+        }
+
+    }
+  });
+
     return (dlg_bldr.create ());
   }
 
@@ -1108,30 +1193,20 @@ Rotate counter by 0.75 MHz = 8.766 degrees
 
     // UI buttons and other controls
 
-
-  private View.OnClickListener preset_go_lstnr = new View.OnClickListener () {      // Tune to preset
-    public void onClick (View v) {
-      //v.startAnimation (m_ani_button);                                // ""
-      com_uti.logd ("view: " + v);
-
-      for (int idx = 0; idx < com_api.max_presets; idx ++) {                  // For all presets...
-        if (v == m_preset_ib [idx]) {                                   // If this preset...
-          com_uti.logd ("idx: " + idx);
-          try {
-            if (m_preset_freq [idx].equals (""))                        // If no preset yet...
-              preset_set (idx);                                         // Set it
-            else
-              freq_set ("" + m_preset_freq [idx]);                      // m_preset_tv [idx].getText ();
-          }
-          catch (Throwable e) {
-            e.printStackTrace ();
-          };
-          return;
-        }
-      }
-
-    }
-  };
+  private void preset_delete (int idx) {
+    com_uti.logd ("idx: " + idx);
+    m_preset_tv [idx].setText ("");
+    m_preset_freq [idx] = "";
+    m_preset_name [idx] = "";
+    m_preset_ib [idx].setImageResource (R.drawable.btn_preset);
+    m_com_api.key_set ("radio_name_prst_" + idx, "delete", "radio_freq_prst_" + idx, "delete");   // !! Current implementation requires simultaneous
+  }
+  private void preset_rename (int idx, String name) {
+    com_uti.logd ("idx: " + idx);
+    m_preset_tv [idx].setText (name);
+    m_preset_name [idx] = name;
+    m_com_api.key_set ("radio_name_prst_" + idx, name, "radio_freq_prst_" + idx, m_preset_freq [idx]);   // !! Current implementation requires simultaneous
+  }
   private void preset_set (int idx) {
     com_uti.logd ("idx: " + idx);
     String freq_text = m_com_api.tuner_freq;  //!!"" + com_uti.double_get (m_com_api.tuner_freq);
@@ -1143,26 +1218,56 @@ Rotate counter by 0.75 MHz = 8.766 degrees
       if (! m_com_api.tuner_rds_ps.equals (""))
         freq_text = m_com_api.tuner_rds_ps;
     }
-
     m_preset_tv [idx].setText ("" + freq_text);
+    m_preset_name [idx] = freq_text;
     m_preset_freq [idx] = m_com_api.tuner_freq;
-
-    //m_com_api.key_set ("radio_name_prst_" + idx, "" + freq_text);
-    //m_com_api.key_set ("radio_freq_prst_" + idx, m_com_api.tuner_freq);
-
     m_com_api.key_set ("radio_name_prst_" + idx, "" + freq_text, "radio_freq_prst_" + idx, m_com_api.tuner_freq);   // !! Current implementation requires simultaneous
-
-    //m_preset_ib [idx].setEnabled (false);
     m_preset_ib [idx].setImageResource (R.drawable.transparent);  // R.drawable.btn_preset
   }
-  private View.OnLongClickListener preset_chng_lstnr = new View.OnLongClickListener () {    // Long click: Show preset change options
-    public boolean onLongClick (View v) {
-      //v.startAnimation (m_ani_button);                                // ""
+
+  private View.OnClickListener preset_go_lstnr = new                    // Tap: Tune to preset
+        View.OnClickListener () {
+    public void onClick (View v) {
+      //v.startAnimation (m_ani_button);
       com_uti.logd ("view: " + v);
 
-      for (int idx = 0; idx < com_api.max_presets; idx ++) {                  // For all presets...
+      for (int idx = 0; idx < com_api.max_presets; idx ++) {            // For all presets...
         if (v == m_preset_ib [idx]) {                                   // If this preset...
-          preset_set (idx);                                             // Set preset
+          com_uti.logd ("idx: " + idx);
+          try {
+            if (m_preset_freq [idx].equals (""))                        // If no preset yet...
+              preset_set (idx);                                         // Set preset
+            else
+              freq_set ("" + m_preset_freq [idx]);                      // Else change to preset frequency
+          }
+          catch (Throwable e) {
+            e.printStackTrace ();
+          };
+          return;
+        }
+      }
+
+    }
+  };
+  private int cur_preset_idx = 0;
+  private View.OnLongClickListener preset_chng_lstnr = new              // Tap and Hold: Show preset change options
+        View.OnLongClickListener () {
+    public boolean onLongClick (View v) {
+      //v.startAnimation (m_ani_button);
+      com_uti.logd ("view: " + v);
+
+      for (int idx = 0; idx < com_api.max_presets; idx ++) {            // For all presets...
+        if (v == m_preset_ib [idx]) {                                   // If this preset...
+          cur_preset_idx = idx;
+          com_uti.logd ("idx: " + idx);
+
+            if (m_preset_freq [idx].equals (""))                        // If no preset yet...
+              preset_set (idx);                                         // Set preset
+            else {
+              //preset_set (idx);                                       // Else Set/Change preset
+              m_gui_act.showDialog (DLG_PRST);                          // Show preset options dialog
+            }
+
           break;
         }
       }
@@ -1617,13 +1722,13 @@ Rotate counter by 0.75 MHz = 8.766 degrees
     sys_run ("chmod 666 " + fm_srvc.spirit_getExternalStorageDirectory ().toString () + "/sprt_debug.txt", 1);                // Open permissions for email client
 
     if (! file_get ("" + fm_srvc.spirit_getExternalStorageDirectory ().toString () + "/sprt_debug.txt") ) {
-      //dlg_dismiss (WAIT_DLG);
+      //dlg_dismiss (DLG_WAIT);
       Toast.makeText (apln_context, "Attachment file " + fm_srvc.spirit_getExternalStorageDirectory ().toString () + "/sprt_debug.txt not found.", Toast.LENGTH_LONG).show ();
       return (false);    
     }
 
 
-    //dlg_dismiss (WAIT_DLG);
+    //dlg_dismiss (DLG_WAIT);
 
     boolean bret = file_email (subject, fm_srvc.spirit_getExternalStorageDirectory ().toString () + "/sprt_debug.txt");
     //sys_run ("/data/data/com.WHATEVER.fm/files/dologcat -v time 2>&1 > " + dbgd + "sprt_logcat.txt &", 1);   // Restart logcat as daemon
@@ -1655,7 +1760,7 @@ Rotate counter by 0.75 MHz = 8.766 degrees
     catch (android.content.ActivityNotFoundException e) {
       Toast.makeText (m_context, "No email. Manually send " + filename, Toast.LENGTH_LONG).show ();
     }
-    //dlg_dismiss (WAIT_DLG);
+    //dlg_dismiss (DLG_WAIT);
 
     return (true);
   }

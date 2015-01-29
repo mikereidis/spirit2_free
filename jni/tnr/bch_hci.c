@@ -1167,7 +1167,7 @@ int uart_recv (int fd, unsigned char * buf, int flush) {
   }
 
   if (buf [2] == 0x0f) {
-    loge ("LG G2 BC detected, return success buf [0] buf [7]"); // ????
+    logd ("LG G2 BC detected, return success buf [0] buf [7]"); // ????
     buf [0] = 0;
     buf [7] = 0;
   }
@@ -1247,6 +1247,8 @@ int hci_xact (unsigned char * cmd, int cmd_len) {                       // Do HC
   }
   if (rret < 8 || rret > 270) {
     loge ("hci_xact error rret: %d", rret);
+    hex_dump ("", 32, cmd, cmd_len);
+
     hci_recv_buf [0] = 0xff;                                            // Error
     rret = -1;
     hci_xact_error_times ++;                                            // Another error

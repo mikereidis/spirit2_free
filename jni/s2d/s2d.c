@@ -597,7 +597,7 @@ sock_rx_tmo_set (sockfd, 100);
     //logd ("cb_tnr_rds freq: %d  rds_bundle  pi: %d  pty: %d psn: \"%s\"  rt: \"%s\"  num_afs: %d", freq, rb->pi, rb->pty, rb->psn, rb->rt, rb->num_afs);
     int ctr = 0;
     for (ctr = 0; ctr < rb->num_afs; ctr ++)
-      logd ("cb_tnr_rds rds_bundle af %2.2d: %d", rb->af [ctr]);
+      logv ("cb_tnr_rds rds_bundle af %2.2d: %d", rb->af [ctr]);
 
     if (curr_tuner_freq_int != freq) {
       curr_tuner_freq_int = freq;

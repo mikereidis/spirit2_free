@@ -5,11 +5,12 @@
 
   #define  loge(...)  fm_log_print(ANDROID_LOG_ERROR, LOGTAG,__VA_ARGS__)
   #define  logd(...)  fm_log_print(ANDROID_LOG_DEBUG, LOGTAG,__VA_ARGS__)
+  #define  logv(...)  fm_log_print(ANDROID_LOG_VERBOSE, LOGTAG,__VA_ARGS__)
 
   int extra_log = 0;
 
   int ena_verbo_log = 0;
-  int ena_debug_log = 0;
+  int ena_debug_log = 1;
   int ena_error_log = 1;
   void * log_hndl = NULL;
 
@@ -19,12 +20,10 @@
 
     if (! ena_error_log && prio == ANDROID_LOG_ERROR)
       return -1;
-
     if (! ena_debug_log && prio == ANDROID_LOG_DEBUG)
       return -1;
-
-    //if (! ena_verbo_log)
-    //  return -1;
+    if (! ena_verbo_log && prio == ANDROID_LOG_VERBOSE)
+      return -1;
 
     va_list ap;
     va_start (ap, fmt); 

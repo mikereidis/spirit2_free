@@ -1676,7 +1676,7 @@ ms_sleep (50);
         if (res_len < 1 + 8)
           loge ("WAS bc_g2_pcm_set hci_cmd error res_len: %d", res_len);
         else 
-          loge ("WAS bc_g2_pcm_set OK");
+          logd ("WAS bc_g2_pcm_set OK");
       }
     }
 
