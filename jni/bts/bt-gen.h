@@ -17,8 +17,6 @@
 
 #pragma once
 
-//#include "halhci.h"
-
 #ifdef HAS_BDROID_BUILDCFG
 #include "bdroid_buildcfg.h"
 #endif

@@ -124,14 +124,15 @@ public final class com_uti  {
   }
 
 
-  private static final int max_log_char = 7;//8;
+  public  static final boolean ena_log_pcm_stat = true;
 
-  public static final boolean ena_verbo_log = false;
-  public static final boolean ena_debug_log = true;
-  public static final boolean ena_warni_log = false;
-  public static final boolean ena_error_log = true;
+  private static final boolean ena_log_verbo = false;
+  private static final boolean ena_log_debug = true;
+  private static final boolean ena_log_warni = false;
+  private static final boolean ena_log_error = true;
 
   private static String tag_prefix = "";
+  private static final int max_log_char = 7;//8;
 
   private static String tag_prefix_get () {
     try {
@@ -179,19 +180,19 @@ public final class com_uti  {
   }
 
   public static void logv (String text) {
-    if (ena_verbo_log)
+    if (ena_log_verbo)
       log (Log.VERBOSE, text);
   }
   public static void logd (String text) {
-    if (ena_debug_log)
+    if (ena_log_debug)
       log (Log.DEBUG, text);
   }
   public static void logw (String text) {
-    if (ena_warni_log)
+    if (ena_log_warni)
       log (Log.WARN, text);
   }
   public static void loge (String text) {
-    if (ena_error_log)
+    if (ena_log_error)
       log (Log.ERROR, text);
   }
 
@@ -2372,15 +2373,15 @@ It should be noted that operation in this region is the same as it is for all RD
 
     String cmd = "";
     cmd += ("mount -o remount,rw /system ; ");
-    if (com_uti.file_get ("/system/vendor/lib/libbt-vendor.so")) {
-      cmd += ("mv /system/vendor/lib/libbt-vendor.so  /system/vendor/lib/libbt-vendoro.so ; ");
-      cmd += ("cp /data/data/fm.a2d.sf/lib/libbt-vendor.so /system/vendor/lib/libbt-vendor.so ; ");
-      cmd += ("chmod 644 /system/vendor/lib/libbt-vendor.so ; ");
-    }
-    else {
+    if (com_uti.file_get ("/system/lib/libbt-hci.so")) {                // Favor old style
       cmd += ("mv /system/lib/libbt-hci.so  /system/lib/libbt-hcio.so ; ");
       cmd += ("cp /data/data/fm.a2d.sf/lib/libbt-hci.so /system/lib/libbt-hci.so ; ");
       cmd += ("chmod 644 /system/lib/libbt-hci.so ; ");
+    }
+    else if (com_uti.file_get ("/system/vendor/lib/libbt-vendor.so")) {
+      cmd += ("mv /system/vendor/lib/libbt-vendor.so  /system/vendor/lib/libbt-vendoro.so ; ");
+      cmd += ("cp /data/data/fm.a2d.sf/lib/libbt-vendor.so /system/vendor/lib/libbt-vendor.so ; ");
+      cmd += ("chmod 644 /system/vendor/lib/libbt-vendor.so ; ");
     }
     cmd += ("cp /data/data/fm.a2d.sf/files/99-spirit.sh /system/addon.d/99-spirit.sh ; ");
     cmd += ("chmod 755 /system/addon.d/99-spirit.sh ; ");

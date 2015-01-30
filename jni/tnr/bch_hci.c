@@ -2,24 +2,11 @@
     // #include'd in tnr_bch.cpp
 
 #include <stdio.h>
-#include <getopt.h>
 #include <errno.h>
-#include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
-#include <stdlib.h>
+
 #include <termios.h>
-#include <string.h>
-#include <sys/system_properties.h>
-#define PROPERTY_VALUE_MAX  PROP_VALUE_MAX
-
-// Debug:
-int hci_dbg      = 0;//1;
-//int reg_dbg      = 0;//1;
-//int evt_dbg      = 0;//1;
-
-//int init_baudrate = 115200;               // Motorola DroidX2 uses a startup baudrate of 3.5 MHz
-//int new_baudrate  = 0;//3000000;//0;
 
 #ifndef N_HCI
 #define N_HCI  15
@@ -34,9 +21,6 @@ int hci_dbg      = 0;//1;
 #define HCI_UART_3WIRE  2
 #define HCI_UART_H4DS  3
 #define HCI_UART_LL    4
-
-// property_set ("ctl.start", "hciattach")
-// property_set ("ctl.stop", "hciattach")
 
 int exiting =       0;
 int uart_fd =       -1;
@@ -231,7 +215,7 @@ int do_server () {
     return (-1);
   }
 
-  bzero((char *) &srv_addr, sizeof (srv_addr));
+  memset ((char *) & srv_addr, sizeof (srv_addr), 0);
 #ifdef  CS_AF_UNIX
   srv_addr.sun_family = AF_UNIX;
   strncpy (srv_addr.sun_path, api_srvsock, sizeof (srv_addr.sun_path));
@@ -276,7 +260,7 @@ logd ("srv_len: %d  fam: %d  addr: 0x%x  port: %d", srv_len, srv_addr.sin_family
   logd ("do_server Ready");
 
   while (!exiting) {
-    bzero((char *) &cli_addr, sizeof (cli_addr));                        // ?? Don't need this ?
+    memset ((char *) & cli_addr, sizeof (cli_addr), 0);                        // ?? Don't need this ?
     //cli_addr.sun_family = CS_FAM;                                     // ""
     cli_len = sizeof (cli_addr);
 
@@ -852,8 +836,6 @@ typedef struct {    // BD Address
 #undef  HCI_MAX_FRAME_SIZE
 #endif
 
-//#include "inc/hci.h"
-
     
 int ba2str_size (const bdaddr_t *btaddr, char *straddr, int straddr_size) {
   unsigned char *b = (unsigned char *)btaddr;
@@ -934,6 +916,23 @@ int tmo_read (int fd, unsigned char * buf, int buf_len, int tmo_ms, int single_r
   }
 
   int tmo_time = ms_get () + tmo_ms;                                    // Time to timeout
+
+/* Always get this:
+01-29 05:35:25.806 D/s2tnrbch( 7101): hcd_get from find         have internal HCD: 2
+01-29 05:35:25.806 D/s2tnrbch( 7101): patchram_set fd: 2
+01-29 05:35:26.826 D/s2tnrbch( 7101): tmo_read timeout reached of 1000 milliseconds
+01-29 05:35:26.826 D/s2tnrbch( 7101): patchram_set read 1 ret: 0
+01-29 05:35:26.826 D/s2tnrbch( 7101): baudrate_reset: 3000000
+01-29 05:35:27.226 D/s2tnrbch( 7101): tmo_read timeout reached of 400 milliseconds
+
+01-29 05:35:27.226 E/s2tnrbch( 7101): uart_recv error 1 rret: 0  flush: 0
+01-29 05:35:27.226 E/s2tnrbch( 7101): hci_xact error rret: -1
+01-29 05:35:27.226 E/s2tnrbch( 7101): 00 00 00 00 01 18 fc 06 00 00 c0 c6 2d 00 
+
+01-29 05:35:27.286 D/s2tnrbch( 7101): patchram_set read 3 ret: 139  len: 139
+01-29 05:35:27.306 D/s2tnrbch( 7101): patchram_set read 3 ret: 254  len: 254
+01-29 05:35:27.336 D/s2tnrbch( 7101): patchram_set read 3 ret: 254  len: 254
+*/
 
   while (buf_left > 0) {                                                // While we still have bytes to read
     if (ms_get () >= tmo_time) {
@@ -1216,7 +1215,7 @@ int hci_xact_error_times = 0;
 
 int hci_xact (unsigned char * cmd, int cmd_len) {                       // Do HCI transaction; Bluedroid SHIM or UART mode (app)
   int rret = 0;
-  if (hci_dbg) {
+  if (ena_log_bch_hci) {
     logd ("hci_xact cmd_len: %d", cmd_len);
     hex_dump ("", 32, cmd, cmd_len);
   }
@@ -1238,7 +1237,7 @@ int hci_xact (unsigned char * cmd, int cmd_len) {                       // Do HC
   else
     rret = uart_cmd (cmd, cmd_len);                                     // Do UART mode transaction
 
-  if (hci_dbg) {
+  if (ena_log_bch_hci) {
     logd ("hci_xact rret: %d",rret);
     if (rret > 0)
       hex_dump ("", 32, hci_recv_buf, rret);

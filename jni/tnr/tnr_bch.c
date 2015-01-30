@@ -1,30 +1,15 @@
 
   #define LOGTAG "sftnrbch"
 
-#include <dlfcn.h>
-#include <string.h>
-#include <stdlib.h>
 #include <stdio.h>
-#include <pthread.h>
-#include <unistd.h>
-#include <dirent.h>
 #include <errno.h>
-#include <sys/types.h>
 #include <sys/stat.h>
-#include <stdarg.h>
-
-#include <math.h>
 #include <fcntl.h>
-#include <sys/ioctl.h>
-#include <linux/videodev2.h>
-
-#include <android/log.h>
-#include "jni.h"
 
 #include "tnr_tnr.h"
+#include "tnr_tnr.c"
 
 #define EVT_LOCK_BYPASS
-  #include "tnr_tnr.c"
 
 // Unix datagrams requires other write permission for /dev/socket, or somewhere else (ext, not FAT) writable.
 
@@ -57,26 +42,6 @@ char api_clisock [DEF_BUF] = DEF_API_CLISOCK;
 
 #include <arpa/inet.h>
 
-    // FM Chip specific functions in this code called from generic plug.c code:
-
-    // API start/stop
-    // Functions called from this chip specific code to generic code:
-
-  long ms_sleep (long ms);
-
-  #define  loge(...)  fm_log_print(ANDROID_LOG_ERROR, LOGTAG,__VA_ARGS__)
-  #define  logd(...)  fm_log_print(ANDROID_LOG_DEBUG, LOGTAG,__VA_ARGS__)
-
-  int fm_log_print (int prio, const char * tag, const char * fmt, ...);
-
-  extern int extra_log;// = 0;
-
-    // Debug:
-  int rds_error_debug = 0;                                                // 0 = Don't log it all
-  extern int rds_dbg;// = 1;                                                        // But do log counts every 10, 000 blocks
-  extern int evt_dbg;// = 1;
-  int seek_dbg     = 1;
-
   int freq_up_get (int freq);
   int freq_dn_get (int freq);
 
@@ -87,10 +52,6 @@ char api_clisock [DEF_BUF] = DEF_API_CLISOCK;
 #define DEF_BUF 512    // Raised from 256 so we can add headers to 255-256 byte buffers
 #endif
 
-// Debug:
-//int hci_dbg      = 0;//1;
-int reg_dbg = 0;//      = 0;//1;
-//extern int evt_dbg;//      = 0;//1;
 
 
 int pid_get (const char * cmd, int idx) {
@@ -286,105 +247,6 @@ int do_acc_hci (unsigned char * cmd_buf, int cmd_len, unsigned char * res_buf, i
 
 
 #define MAX_HCI  264   // 8 prepended bytes + 255 max bytes HCI data/parameters + 1 trailing byte to align
-//unsigned char res_buf [MAX_HCI];
-
-
-/*
-// Bluetooth:
-//make -f /home/mike/Documents/android-ndk-r5b/build/core/build-local.mk
-//make -f $NDK/build/core/build-local.mk
-// Support:
-#include <linux/socket.h>
-//#include <errno.h>
-
-// BD Address
-typedef struct {
-	__u8 b[6];
-} __attribute__((packed)) bdaddr_t;
-
-//ar r libbluetooth.a libbluetooth.so
-//cd ../../../../android-3/arch-arm/usr/lib/;mkdir bt; mv libbluetooth.* bt
-//../../android-ndk-r5b/platforms/android-5/arch-arm/usr/lib/libbluetooth.so
-
-
-
-// !! open/socket, read, write etc. can be used without libbluetooth !!
-// When BT is off:
-//      hci_get_route()   returns errno 19 (ENODEV).
-//      hci_open_dev DOES return direct_hci_btsock=3 (w/ dev_id= -1). This socket/handle can be saved for later if BT is switched on.
-//      hci_send_req()    returns errno 77 (EBADFD).
-// When BT is on, but FM is off:
-//       HCI event has data len =1 and single byte = 0x0C error
-
-//static int direct_hci_btsock = -1;  // Not usable
-
-int direct_hci_cmd (uint8_t ogf, uint16_t ocf, char *cmd_buf, int cmd_len, char *res_buf, int res_max) {
-  int ret = 0, dev_id;
-
-  logd ("direct_hci_cmd");
-  if (direct_hci_btsock < 0) {
-    dev_id = hci_get_route (NULL);
-    if (dev_id < 0) {
-      loge ("hci_get_route errno: %d", errno);
-      //return (-101);                                                    // -1 can work as default value
-    }
-    logd ("hci_get_route dev_id: %d",dev_id);
-
-    direct_hci_btsock = hci_open_dev(dev_id);        // This does: socket (PF_BLUETOOTH, SOCK_RAW, 1);        PF_BLUETOOTH = 31
-    if (direct_hci_btsock < 0) {
-      loge ("hci_open_dev errno: %d", errno);
-      hci_close_dev(direct_hci_btsock);    // Same as close (socket);
-      direct_hci_btsock = -1;
-      return (-102);
-    }
-  }
-#define hci_cmd_DEBUG
-#ifdef hci_cmd_DEBUG
-  logd ("hci_open_dev direct_hci_btsock: %d", direct_hci_btsock);
-
-  logd ("HCI Cmd: ogf 0x%x  ocf 0x%x  cmd_len %d",ogf,ocf, cmd_len);
-  hex_dump (" ", 32, cmd_buf, cmd_len);
-#endif
-  struct hci_request hci_req = {0};
-  hci_req.ogf = ogf;
-  hci_req.ocf = ocf;
-  hci_req.event = HCI_EV_CMD_COMPLETE;
-  hci_req.cparam = &cmd_buf [8];
-  hci_req.clen = cmd_len-8;
-  hci_req.rparam = &res_buf [7];
-  hci_req.rlen = res_max;//252;//256; //1 hci error byte + up to 251 bytes of response data/parameters
-
-#define HCI_REQ_TIMEOUT 5000    // 5 seconds
-  ret = hci_send_req (direct_hci_btsock, &hci_req, HCI_REQ_TIMEOUT);
-  if (ret < 0) {
-    loge ("hci_send_req errno: %d", errno);
-    hci_close_dev (direct_hci_btsock);     // Same as close (socket);
-    direct_hci_btsock = -1;
-    return (-103);
-  }
-#ifdef hci_cmd_DEBUG
-  logd ("hci_send_req ret: %d", ret);
-  logd ("HCI Evt: 0x%x  hci_req.rlen %d", hci_req.event, hci_req.rlen);
-  //hex_dump (" ", 32, &res_buf [7], hci_req.rlen);
-  hex_dump (" ", 32, res_buf, hci_req.rlen + 7);
-#endif
-
-  res_buf [0] = 0;
-  res_buf [1] = 4;
-  res_buf [2] = hci_req.event; //0x0e;//HCI_EV_CMD_COMPLETE;
-  res_buf [3] = hci_req.rlen + 3;
-  res_buf [4] = 1;
-
-  ogf = hci_req.ogf;
-  ocf = hci_req.ocf;
-
-  res_buf [5] = oc f& 0x00ff;
-  res_buf [6] = ((ocf & 0x0300) >> 8) | ((ogf & 0x3f) << 2);
-
-  return (hci_req.rlen + 7);
-}
-
-*/
 
 /* Our/Serial HCI response: (Ours prepends 1 byte for internal use)
 04 0e 05 01 0a fc 00 3f
@@ -442,7 +304,7 @@ int do_client_hci (unsigned char * cmd_buf, int cmd_len, unsigned char * res_buf
     }
   #ifdef  CS_DGRAM_UNIX                                                 // Unix datagram sockets must be bound; no ephemeral sockets.
     unlink (api_clisock);                                                // Remove any lingering client socket
-    bzero((char *) &cli_addr, sizeof (cli_addr));
+    memset ((char *) & cli_addr, sizeof (cli_addr), 0);
     cli_addr.sun_family = AF_UNIX;
     strncpy (cli_addr.sun_path, api_clisock, sizeof (cli_addr.sun_path));
     cli_len =strlen (cli_addr.sun_path) + sizeof (cli_addr.sun_family);
@@ -457,7 +319,7 @@ int do_client_hci (unsigned char * cmd_buf, int cmd_len, unsigned char * res_buf
   }
 //!! Can move inside above
 // Setup server address
-  bzero((char *)&srv_addr, sizeof (srv_addr));
+  memset ((char *) & srv_addr, sizeof (srv_addr), 0);
 #ifdef  CS_AF_UNIX
   srv_addr.sun_family = AF_UNIX;
   strlcpy (srv_addr.sun_path, api_srvsock, sizeof (srv_addr.sun_path));
@@ -635,7 +497,7 @@ int hci_cmd (uint8_t ogf, uint16_t ocf, unsigned char * cmd_buf, int cmd_len, un
 //if (cmd_len > 8)
 //hex_dump ("", 32, cmd_buf + 8, cmd_len - 8);
 
-  if (hci_dbg) {
+  if (ena_log_bch_hci) {
     hci_cmd_start_time = ms_get ();
     logd ("hci_cmd ogf: 0x%x  ocf: 0x%x  cmd_len: %d  res_max: %d", ogf, ocf, cmd_len, res_max);
     hex_dump ("", 32, cmd_buf, cmd_len);
@@ -661,7 +523,7 @@ int hci_cmd (uint8_t ogf, uint16_t ocf, unsigned char * cmd_buf, int cmd_len, un
     res_len = do_hci_cmd (0, ogf, ocf, cmd_buf, cmd_len, res_buf, res_max, 1000);
 
   int hci_err = res_buf [7];
-  if (hci_dbg) {
+  if (ena_log_bch_hci) {
     if (res_len > 1 + 8)
       logd ("hci_cmd hci_err: %d %s   res_len: %d  first data byte: 0x%x  last data byte: 0x%x", hci_err, hci_err_get (hci_err), res_len, res_buf [8], res_buf [res_len-1]);
     else if (res_len > 8)
@@ -681,7 +543,7 @@ int hci_cmd (uint8_t ogf, uint16_t ocf, unsigned char * cmd_buf, int cmd_len, un
     //hex_dump ("", 32, cmd_buf, cmd_len);
   }
 
-  if (hci_dbg)
+  if (ena_log_bch_hci)
     logd ("hci_cmd took %d milliseconds", ms_get () - hci_cmd_start_time);
 // 20 - 40/50 ms for hcitool popen2, same except spikes to 60-100+ for hcitool>file, 1-2 ms for UART
 // Daemon HCI = 3/5-10/18 ms w/ open/bind/close every time, else 3-11 ms
@@ -957,7 +819,7 @@ int bulk_get (int reg, int size, unsigned char * res_buf, int res_max) {
   unsigned char cmd_buf [MAX_HCI] = {0};//3 + 8] = {0};
   int  cmd_buf_size = 3 + 8;// ! 11 works for both TI and BCM !           sizeof (cmd_buf);
 
-  if (reg_dbg)
+  if (ena_log_bch_reg)
     logd ("bulk_get reg: %x  size: %d", reg, size);
 
   cmd_buf [8] = reg;
@@ -999,7 +861,7 @@ int reg_set (int reg, int val) {     // !! So far nothing TI checks/uses the ret
   
   //ms_sleep (100);   //100 ms to stabilize
 
-  if (reg_dbg)
+  if (ena_log_bch_reg)
     logd ("reg_set reg: %x  val: 0x%x (%d)", reg, val, val);
 
   int size = 1;
@@ -1035,7 +897,7 @@ int reg_set (int reg, int val) {     // !! So far nothing TI checks/uses the ret
       res_len = hci_cmd (0x3f, 0x15, cmd_buf, size + 2 + 8, res_buf, sizeof (res_buf));            // BC HCI: 0x15
       //if (res_len >= 4 + 8 && ! res_buf [7])    // !!!! WHY IS THIS HERE ???? REMOVE !!!!
       //  val = res_buf [10];                 // !!!! WHY IS THIS HERE ???? REMOVE !!!!
-  //if (reg_dbg)
+  //if (ena_log_bch_reg)
   //  logd ("reg_set res_len: %d", res_len);
   if (res_len < 8) {
     loge ("reg_set hci_cmd error res_len: %d hci error: %d %s  reg: 0x%x  val: 0x%x", res_len, res_buf [7], hci_err_get (res_buf [7]), reg, val);
@@ -1075,7 +937,7 @@ int reg_get (int reg) {  // If error, return 0 instead of error code.
 
   unsigned char cmd_buf [MAX_HCI] = {0};//3+8] = {};; //= {0xff, 0x01, 0x01};    // TI: {0xff, 0x02, 0x00};
 
-  if (reg_dbg)
+  if (ena_log_bch_reg)
     logd ("reg_get reg: 0x%x", reg);//  api_mode: %d", reg, api_mode);
 
   int size = 1;
@@ -1102,7 +964,7 @@ int reg_get (int reg) {  // If error, return 0 instead of error code.
         val = res_buf [13] << 24 + res_buf [12] << 16 + res_buf [11] << 8 + res_buf [10] << 0;
       else
         val = res_buf [10];
-  //if (reg_dbg)
+  //if (ena_log_bch_reg)
   //  logd ("reg_get res_len: %d", res_len);
   if (res_len < 8) {
     if (reg_get_err_enab)                           // If we display reg_get () error messages
@@ -1110,7 +972,7 @@ int reg_get (int reg) {  // If error, return 0 instead of error code.
     return (0);
   }
   if (! res_buf [7]) {
-    if (reg_dbg)
+    if (ena_log_bch_reg)
       logd ("reg_get reg: 0x%x  val: 0x%x (%d)", reg, val, val);
     return (val);
   }
@@ -1198,7 +1060,9 @@ Seek:
         }
       }
     }
-    else if (stat ("/system/vendor/lib/libbt-vendor.so", & sb) == 0) {                 // If Bluedroid file exists...
+    //if (shim_hci_enable == 0)
+    //else
+    if (stat ("/system/vendor/lib/libbt-vendor.so", & sb) == 0) {                 // If Bluedroid file exists...
       if (sb.st_size > 60000 && file_get ("/system/vendor/lib/libbt-vendoro.so")){// If our lib and have old lib to call  (If just large but no old, assume original
         if (file_get ("/dev/ttyHS0") || file_get ("/dev/ttyHS99")) {
           //if (bt_get ())                                              // com.android.bluetooth always runs after BT turned on, even when off
@@ -1632,10 +1496,10 @@ ms_sleep (50);
     ms_sleep (500);
 */
 
-    props_log ("ro.product.board",            product_board_prop_buf);
+    prop_buf_get ("ro.product.board",            product_board_prop_buf);
     if (! strncasecmp (product_board_prop_buf, "GALBI", strlen ("GALBI")))        is_lg2 = 1;
 
-    props_log ("ro.product.device",           product_device_prop_buf);
+    prop_buf_get ("ro.product.device",           product_device_prop_buf);
     if (! strncasecmp (product_device_prop_buf, "G2", strlen ("G2")))             is_lg2 = 1;
     if (! strncasecmp (product_device_prop_buf, "LS980", strlen ("LS980")))       is_lg2 = 1;
     if (! strncasecmp (product_device_prop_buf, "VS980", strlen ("VS980")))       is_lg2 = 1;
@@ -1645,12 +1509,12 @@ ms_sleep (50);
     if (! strncasecmp (product_device_prop_buf,  "D803", strlen ( "D803")))       is_lg2 = 1;
     if (! strncasecmp (product_device_prop_buf,   "D80", strlen (  "D80")))       is_lg2 = 1;
 
-    props_log ("ro.product.manufacturer",           product_manuf_prop_buf);
+    prop_buf_get ("ro.product.manufacturer",           product_manuf_prop_buf);
     if (! strncasecmp (product_manuf_prop_buf,   "LG", strlen (   "LG")))       is_lg2 = 1;     // LG or LGE
 
     if (! strncasecmp (product_manuf_prop_buf,  "HTC", strlen (  "HTC")))       is_m7  = 1;
 
-    props_log ("ro.build.version.sdk",        version_sdk_prop_buf);      // Android 4.4 KitKat = 19
+    prop_buf_get ("ro.build.version.sdk",        version_sdk_prop_buf);      // Android 4.4 KitKat = 19
     version_sdk = atoi (version_sdk_prop_buf);
 
 
@@ -1670,15 +1534,34 @@ ms_sleep (50);
         unsigned char hci_buf [] = {0, 0, 0, 0, 0, 0, 0, 0, 0xf3, 0x88, 0x01, 0x02, 0x05};
         res_len = hci_cmd (0x3f, 0x00, hci_buf, sizeof (hci_buf), res_buf, sizeof (res_buf));
         if (res_buf [7]) {
-          loge ("WAS bc_g2_pcm_set hci error: %d %s", res_buf [7], hci_err_get (res_buf [7]));
+          logd ("WAS bc_g2_pcm_set hci error: %d %s", res_buf [7], hci_err_get (res_buf [7]));      // !!!! Always error
           //return (res_buf [7]);
         }
         if (res_len < 1 + 8)
-          loge ("WAS bc_g2_pcm_set hci_cmd error res_len: %d", res_len);
+          logd ("WAS bc_g2_pcm_set hci_cmd error res_len: %d", res_len);                            // !!!! Always error
         else 
           logd ("WAS bc_g2_pcm_set OK");
       }
     }
+/*
+01-29 05:35:34.096 D/s2tnrbch( 7101): LG G2 BC detected, return success buf [0] buf [7]
+01-29 05:35:34.096 E/s2tnrbch( 7101): do_acc_hci hci err: 252 Unknown HCI Error
+01-29 05:35:34.096 E/s2tnrbch( 7101): hci_cmd error res_len: 8  hci_err: 252 Unknown HCI Error
+01-29 05:35:34.096 D/s2tnrbch( 7101): hci_cmd failed command ogf: 0x3f  ocf: 0x0  cmd_len: 13  res_max: 252
+
+01-29 05:35:34.096 E/s2tnrbch( 7101): WAS bc_g2_pcm_set hci error: 252 Unknown HCI Error
+01-29 05:35:34.096 E/s2tnrbch( 7101): WAS bc_g2_pcm_set hci_cmd error res_len: 0
+
+01-29 05:35:34.096 D/s2tnrbch( 7101): chip_imp_pwr_on done
+01-29 05:35:34.096 D/s2tnrbch( 7101): chip_imp_mute_set: 000
+
+01-29 05:35:34.096 E/s2tnrbch( 7101): uart_send rret: 7
+01-29 05:35:34.096 E/s2tnrbch( 7101): 04 ff 04 f3 00 88 00 
+
+01-29 05:35:34.106 D/s2d.....( 7101): rx_start: 0
+01-29 05:35:34.106 D/s2comuti( 7059): daemon_set: key: tuner_state  val: Start  res: Start
+*/
+
 
     int vol_val = 0x00ff;//40;                                             // Target max about 27,000
     if (is_m7 && version_sdk >= 21) {                                   // For HTC One M7 Lollipop
@@ -1938,7 +1821,7 @@ int bc_vol_poke (int vol) {
     int ret = reg_get (0x0a | 0x10000);
     int freq = bc_freq_lo + ret;
     curr_freq_val = freq;
-    if (extra_log)
+    if (ena_log_tnr_extra)
       logd ("chip_imp_freq_get: %d", freq);
     return (freq);
   }
@@ -1950,7 +1833,7 @@ int bc_vol_poke (int vol) {
     //logd ("bc_rssi_get: %d",rssi);
     //rssi*= 2;
     //rssi/= 3;                                         // Adjusted to TI levels of around 0 - 40/50
-    if (extra_log)
+    if (ena_log_tnr_extra)
       logd ("chip_imp_rssi_get: %d",rssi);
     return (rssi);
   }
@@ -2005,8 +1888,7 @@ int bc_vol_poke (int vol) {
     }
                                                                         // Else if seek IS complete (bit0 = 1 = odd)...
     if (flags & 0x0c)                                                   // If carrier error high or rssi low
-      if (seek_dbg)
-        logd ("bc_seek_handle carrier error high or rssi low flags: 0x%2.2x    curr_freq_val: %d", flags, curr_freq_val); // Get this at limits
+      logv ("bc_seek_handle carrier error high or rssi low flags: 0x%2.2x    curr_freq_val: %d", flags, curr_freq_val); // Get this at limits
 
     curr_freq_val = chip_imp_freq_get ();
 
@@ -2073,7 +1955,7 @@ int bc_vol_poke (int vol) {
     for (ctr = 0; ctr < 40; ctr ++) {                                   // With 4 second timeout by 40 times, each 100 ms...
       int flags = reg_get (0x12 | 0x10000);                             // Read 2 bytes event/RDS event register  For some reason, this needs to be done before
                                                                         //  RDS flags get and process, still fails some time
-      //if (evt_dbg)
+      //if (ena_log_tnr_evt)
       //  logd ("chip_imp_seek_start flags: 0x%x", flags);
       if (bc_seek_handle (flags, dir))
         break;                                                          // Terminate loop
@@ -2237,6 +2119,4 @@ int regional_set (int lo, int hi, int inc, int odd, int emph75, int rbds) {
 
     return (0);
   }
-
-//  #include "plug.c"
 

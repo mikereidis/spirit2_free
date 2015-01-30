@@ -1,5 +1,4 @@
 
-  int daemon_cmd_log = 0;
   
   #define DEF_LOGTAG "sfl....."
   #define CLT_LOGTAG "sfc....."
@@ -12,26 +11,21 @@
   const char * copyright = "Copyright (c) 2011-2015 Michael A. Reid. All rights reserved.";
 
   #include <dlfcn.h>
-
   #include <stdio.h>
-  #include <getopt.h>
   #include <errno.h>
-  #include <sys/types.h>
   #include <sys/stat.h>
   #include <fcntl.h>
-  #include <stdlib.h>
-  #include <dirent.h>
-  #include <termios.h>
-  #include <string.h>
-  #include <sys/system_properties.h>
-
   #include <sys/ioctl.h>
-  #include <pthread.h>
 
   #define DEF_BUF 512    // Raised from 256 so we can add headers to 255-256 byte buffers
 
-
   #include "utils.c"
+
+  //#ifdef  CS_AF_UNIX                                                      // For Address Family UNIX sockets
+  //#include <sys/un.h>
+  //#else                                                                   // For Address Family NETWORK sockets
+  #include <netinet/in.h>
+  #include <netdb.h> 
 
 
     //
@@ -164,7 +158,7 @@
   #define CS_RX_TMO   1000    // 1 second     //#define CS_RX_TMO   100     // 100 milliseconds
 
   #ifdef  CS_AF_UNIX                                                      // For Address Family UNIX sockets
-  #include <sys/un.h>
+  //#include <sys/un.h>
   #define DEF_API_SRVSOCK    "/dev/socket/srv_spirit"
   #define DEF_API_CLISOCK    "/dev/socket/cli_spirit"
   char api_srvsock [DEF_BUF] = DEF_API_SRVSOCK;
@@ -172,8 +166,8 @@
   #define CS_FAM   AF_UNIX
 
   #else                                                                   // For Address Family NETWORK sockets
-  #include <netinet/in.h>
-  #include <netdb.h> 
+  //#include <netinet/in.h>
+  //#include <netdb.h> 
   int s2d_port = 2122;
   #define CS_FAM   AF_INET
   #endif
@@ -231,7 +225,7 @@
       }
     #ifdef  CS_DGRAM_UNIX                                                 // Unix datagram sockets must be bound; no ephemeral sockets.
       unlink (api_clisock);                                                // Remove any lingering client socket
-      bzero((char *) & cli_addr, sizeof (cli_addr));
+      memset ((char *) & cli_addr, sizeof (cli_addr), 0);
       cli_addr.sun_family = AF_UNIX;
       strncpy (cli_addr.sun_path, api_clisock, sizeof (cli_addr.sun_path));
       cli_len = strlen (cli_addr.sun_path) + sizeof (cli_addr.sun_family);
@@ -246,7 +240,7 @@
     }
   //!! Can move inside above
   // Setup server address
-    bzero((char *)&srv_addr, sizeof (srv_addr));
+    memset ((char *) & srv_addr, sizeof (srv_addr), 0);
   #ifdef  CS_AF_UNIX
     srv_addr.sun_family = AF_UNIX;
     strlcpy (srv_addr.sun_path, api_srvsock, sizeof (srv_addr.sun_path));
@@ -358,7 +352,7 @@
 
     sock_rx_tmo_set (sockfd, 100);                                      // For polling every 100 ms
 
-    bzero ((char *) & srv_addr, sizeof (srv_addr));
+    memset ((char *) & srv_addr, sizeof (srv_addr), 0);
   #ifdef  CS_AF_UNIX
     srv_addr.sun_family = AF_UNIX;
     strncpy (srv_addr.sun_path, api_srvsock, sizeof (srv_addr.sun_path));
@@ -405,7 +399,7 @@ sock_rx_tmo_set (sockfd, 100);
     logd ("server_work Ready");
   
     while (! exiting) {
-      bzero ((char *) & cli_addr, sizeof (cli_addr));                        // ?? Don't need this ?
+      memset ((char *) & cli_addr, sizeof (cli_addr), 0);                        // ?? Don't need this ?
       //cli_addr.sun_family = CS_FAM;                                     // ""
       cli_len = sizeof (cli_addr);
   
@@ -683,7 +677,6 @@ sock_rx_tmo_set (sockfd, 100);
   }
 
 
-  #include <stdbool.h>
   #define boolean bool
   //#define false 0
   //#define true  1
@@ -1026,11 +1019,11 @@ sock_rx_tmo_set (sockfd, 100);
 
   int server_work_func (unsigned char * cmd_buf, int cmd_len, unsigned char * res_buf, int res_max) {
 
-    if (daemon_cmd_log)
+    if (ena_log_s2d_cmd)
       logd ("server_work_func cmd_len: %d  cmd_buf: \"%s\"", cmd_len, cmd_buf);
     int res_len = tuner_server_work_func (cmd_buf, cmd_len, res_buf, res_max);
 
-    if (daemon_cmd_log)
+    if (ena_log_s2d_cmd)
       logd ("res_len: %d  res_buf: \"%s\"", res_len, res_buf);
     return (res_len);
   }
@@ -1329,9 +1322,6 @@ sock_rx_tmo_set (sockfd, 100);
     cmd_buf [1] = 0;
     return (2);
   }
-
-  //#include <readline/readline.h>
-  //#include <readline/history.h>
 
 /*
   #include <signal.h>

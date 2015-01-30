@@ -1,42 +1,15 @@
 
   #define LOGTAG "sftnrgen"
 
-#include <dlfcn.h>
-#include <string.h>
-#include <stdlib.h>
 #include <stdio.h>
-#include <pthread.h>
-#include <unistd.h>
-#include <dirent.h>
 #include <errno.h>
-#include <sys/types.h>
 #include <sys/stat.h>
-#include <stdarg.h>
-
-#include <math.h>
 #include <fcntl.h>
-#include <sys/ioctl.h>
-#include <linux/videodev2.h>
-
-#include <android/log.h>
-#include "jni.h"
 
 #include "tnr_tnr.h"
+#include "tnr_tnr.c"
 
 #define EVT_LOCK_BYPASS
-  #include "tnr_tnr.c"
-
-    // Functions called from this chip specific code to generic code:
-
-  long ms_sleep (long ms);
-
-  #define  loge(...)  fm_log_print(ANDROID_LOG_ERROR, LOGTAG,__VA_ARGS__)
-  #define  logd(...)  fm_log_print(ANDROID_LOG_DEBUG, LOGTAG,__VA_ARGS__)
-
-  int fm_log_print (int prio, const char * tag, const char * fmt, ...);
-
-  extern int extra_log;// = 0;
-
 
     // FM Chip specific code
 
@@ -239,7 +212,7 @@
     freq *= 10;
 */
     curr_freq_val = freq;
-    if (extra_log)
+    if (ena_log_tnr_extra)
       logd ("chip_imp_freq_get gen success: %3.3d", freq);
     return (freq);
   }
@@ -252,7 +225,7 @@
       loge ("chip_imp_rssi_get IOCTL Si4709_IOC_CUR_RSSI_GET error: %3.3d", ret);
       return (-1);
     }
-    if (extra_log)
+    if (ena_log_tnr_extra)
       logd ("chip_imp_rssi_get IOCTL Si4709_IOC_CUR_RSSI_GET success: %3.3d %3.3d %3.3d",rssi_snr.curr_rssi,rssi_snr.curr_rssi_th,rssi_snr.curr_snr);
     return (rssi_snr.curr_rssi);
 */
@@ -388,6 +361,4 @@
       return (-1);
     return (0);
   }
-
-//  #include "plug.c"
 

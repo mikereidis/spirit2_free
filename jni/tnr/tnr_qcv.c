@@ -1,43 +1,18 @@
 
   #define LOGTAG "sftnrqcv"
 
-#include <dlfcn.h>
-#include <string.h>
-#include <stdlib.h>
 #include <stdio.h>
-#include <pthread.h>
-#include <unistd.h>
-#include <dirent.h>
 #include <errno.h>
-#include <sys/types.h>
 #include <sys/stat.h>
-#include <stdarg.h>
-
-#include <math.h>
 #include <fcntl.h>
+
 #include <sys/ioctl.h>
 #include <linux/videodev2.h>
 
-#include <android/log.h>
-#include "jni.h"
-
 #include "tnr_tnr.h"
+#include "tnr_tnr.c"
 
 #define EVT_LOCK_BYPASS             // Locking causes problems at beginning due to blocking iris_buf_get()
-  #include "tnr_tnr.c"
-
-    // Functions called from this chip specific code to generic code:
-
-  long ms_sleep (long ms);
-
-  #define  loge(...)  fm_log_print(ANDROID_LOG_ERROR, LOGTAG,__VA_ARGS__)
-  #define  logd(...)  fm_log_print(ANDROID_LOG_DEBUG, LOGTAG,__VA_ARGS__)
-
-  int fm_log_print (int prio, const char * tag, const char * fmt, ...);
-
-  extern int extra_log;// = 0;
-
-
 
     // FM Chip specific code
 
@@ -150,28 +125,7 @@ if (0) {
     if (file_get ("/system/lib/modules/radio-iris-transport.ko"))
       sys_run ((char *) "insmod /system/lib/modules/radio-iris-transport.ko >/dev/null 2>/dev/null");
 
-/*
-    char value [4] = {0x41,0x42,0x43,0x44};//"z";//'z';//0;    //char prop_buf [DEF_BUF] = "";
-    int i = 0, init_success = 0;
-    int sleep_ms = 10;
-    int max_ms = 6000;
-    for (i = 0; i < max_ms / sleep_ms; i ++) {
-      __system_property_get ("hw.fm.init", value);
-      if (value [0] == '1') {
-        init_success = 1;
-        break;
-      }
-      else {
-        ms_sleep (sleep_ms);
-      }
-    }
-    if (init_success == 1)
-      logd ("chip_imp_api_on init success after %d milliseconds", i * sleep_ms);
-    else
-      loge ("chip_imp_api_on init error 0x%x after %d milliseconds", value, i * sleep_ms);
-*/
-
-ms_sleep (1010);
+    ms_sleep (1010);
 
     //dev_hndl = open ("/dev/radio0", O_RDONLY | O_NONBLOCK);
     dev_hndl = open ("/dev/radio0", O_RDWR   | O_NONBLOCK);
@@ -181,7 +135,7 @@ ms_sleep (1010);
     }
     logd ("chip_imp_api_on qualcomm /dev/radio0: %3.3d", dev_hndl);
 
-ms_sleep (1010);
+    ms_sleep (1010);
 
     return (0);
 
@@ -282,7 +236,7 @@ ms_sleep (1010);
 
 
 
-enum v4l2_cid_iris_private_iris_t {
+  enum v4l2_cid_iris_private_iris_t {
         V4L2_CID_PRIVATE_IRIS_SRCHMODE = (0x08000000 + 1),  // = 0
         V4L2_CID_PRIVATE_IRIS_SCANDWELL,
         V4L2_CID_PRIVATE_IRIS_SRCHON,           // = 1 ? Stuck searching ?
@@ -336,12 +290,14 @@ enum v4l2_cid_iris_private_iris_t {
         V4L2_CID_PRIVATE_IRIS_READ_DEFAULT = 0x00980928,
         V4L2_CID_PRIVATE_IRIS_WRITE_DEFAULT,
         V4L2_CID_PRIVATE_IRIS_SET_CALIBRATION,
-};
+  };
 
-#define V4L2_CID_RDS_TX_PI                      (V4L2_CID_FM_TX_CLASS_BASE + 2)
-#define V4L2_CID_RDS_TX_PTY                     (V4L2_CID_FM_TX_CLASS_BASE + 3)
-#define V4L2_CID_RDS_TX_PS_NAME                 (V4L2_CID_FM_TX_CLASS_BASE + 5)
-#define V4L2_CID_RDS_TX_RADIO_TEXT              (V4L2_CID_FM_TX_CLASS_BASE + 6)
+
+    // Not in /home/m/bin/android-ndk-r10/platforms/android-19/arch-arm/usr/include/linux/videodev2.h or videodev.h
+  #define V4L2_CID_RDS_TX_PI                      (V4L2_CID_FM_TX_CLASS_BASE + 2)
+  #define V4L2_CID_RDS_TX_PTY                     (V4L2_CID_FM_TX_CLASS_BASE + 3)
+  #define V4L2_CID_RDS_TX_PS_NAME                 (V4L2_CID_FM_TX_CLASS_BASE + 5)
+  #define V4L2_CID_RDS_TX_RADIO_TEXT              (V4L2_CID_FM_TX_CLASS_BASE + 6)
  
 /*
         .vidioc_querycap              = iris_vidioc_querycap,
@@ -365,9 +321,10 @@ enum v4l2_cid_iris_private_iris_t {
   struct v4l2_control       v4l_ctrl    = {0};
   struct v4l2_frequency     v4l_freq    = {0};
 
-//#define V4L2_CAP_HW_FREQ_SEEK           0x00000400  /* Can do hardware frequency seek  */
-#ifndef v4l2_hw_freq_seek
-struct v4l2_hw_freq_seek {
+  //#define V4L2_CAP_HW_FREQ_SEEK           0x00000400  /* Can do hardware frequency seek  */
+
+  #ifndef v4l2_hw_freq_seek
+  struct v4l2_hw_freq_seek {
         __u32                 tuner;
         enum v4l2_tuner_type  type;
         __u32                 seek_upward;
@@ -375,12 +332,12 @@ struct v4l2_hw_freq_seek {
         //__u32                 reserved[8];
         __u32                 spacing;
         __u32                 reserved[7];
-};
-#endif
+  };
+  #endif
 
   struct v4l2_hw_freq_seek  v4l_seek;//    = {0};
 
-  //int tuner_cap_low = 0;
+  //int tuner_cap_low = 0;  // Don't need for Qualcomm chip, hi only
 
   #ifndef DEF_BUF
   #define DEF_BUF 512    // Raised from 256 so we can add headers to 255-256 byte buffers
@@ -515,16 +472,6 @@ enum iris_buf_t {
 
 
     // Chip API:
-
-  char prop_buf    [DEF_BUF] = "";
-
-  //#include <sys/system_properties.h>
-  char * prop_get (const char * prop) {
-    //char prop_buf [DEF_BUF] = "";
-    __system_property_get (prop, prop_buf);
-    logd ("props_log %32.32s: %s", prop, prop_buf);
-    return (prop_buf);
-  }
 
 
   int s2_tx = 0;
@@ -801,19 +748,6 @@ static struct v4l2_queryctrl tavarua_v4l2_queryctrl[] = {        {
                 .step               = 1,
                 .default_value = 15,        },
 */
-/*
-    //#include <linux/soundcard.h>
-    logd ("chip_imp_vol_set: %d", vol);
-    //if (m_aud_meth == AM_HTCOneSXLteAlsa) {
-    char cmd [256] = "ssd 4 2 \"Internal FM RX Volume\" ";  // Disabled code here re ssd
-    strlcat (cmd, itoa (vol / 32), sizeof (cmd));             // 0-65535 -> 2047 (max 8K or more ? seems dangerous)
-    ret = internal_sh_run (cmd);
-    logd ("Internal FM RX Volume set: %d %s", ret, cmd);
-    if (dev_hndl <= 0) {
-      loge ("dev_hndl <= 0");
-      return (-1);
-    }
-*/
     return (0);
 /*
 
@@ -865,7 +799,7 @@ static struct v4l2_queryctrl tavarua_v4l2_queryctrl[] = {        {
     }
     freq = v4l_freq.frequency / 16;
     curr_freq_val = freq;
-    if (extra_log)
+    if (ena_log_tnr_extra)
       logd ("chip_imp_freq_get VIDIOC_G_FREQUENCY success: %d", freq);
     return (freq);
   }
@@ -888,7 +822,7 @@ static struct v4l2_queryctrl tavarua_v4l2_queryctrl[] = {        {
     static int timesb = 0;
     if (timesb ++ % 10 == 0)
       //logd ("chip_imp_rssi_get VIDIOC_G_TUNER success: %d", v4l_tuner.signal);  // At 87.5 got 180 and 185
-      if (extra_log)
+      if (ena_log_tnr_extra)
         logd ("chip_imp_rssi_get VIDIOC_G_TUNER success name: %s  type: %d  cap: 0x%x  lo: %d  hi: %d  sc: %d  am: %d  sig: %d  afc: %d", v4l_tuner.name,
             v4l_tuner.type, v4l_tuner.capability, v4l_tuner.rangelow , v4l_tuner.rangehigh, v4l_tuner.rxsubchans, v4l_tuner.audmode, v4l_tuner.signal, v4l_tuner.afc);
 /*  if (v4l_tuner.signal < -10)
@@ -1342,37 +1276,6 @@ int chip_get () {
 
 // #define V4L2_CAP_DEVICE_CAPS            0x80000000  /* sets device capabilities field */
 
-
-/*
-
-  char versionStr [40];
-  char value = 0;
-
-   // Driver Version = Same as ChipId
-       //Conver the integer to string
-  sprintf (versionStr, "%d", v4l_cap.version );
-  __system_property_set ("hw.fm.version", versionStr);
-    //Set the mode for soc downloader
-  __system_property_set ("hw.fm.mode", "normal");
-
-  __system_property_set ("ctl.start", "fm_dl");
-  sleep(1);
-  int i = 0, init_success = 0;
-  for (i = 0; i < 6;i ++) {
-    __system_property_get ("hw.fm.init", & value);//, NULL);
-    if (value == '1') {
-      init_success = 1;
-      break;
-    }
-    else {
-      sleep(1);
-    }
-  }
-  loge ("init_success: %d after %d seconds", init_success, i);
-/* Close:
-    __system_property_set ("ctl.stop", "fm_dl");
-    close(fd); */
-
 /*  int rds_ready_get () {
     status_rssi_t sr = {0};
     int ret = ioctl (dev_hndl, Si4709_IOC_STATUS_RSSI_GET, & sr);
@@ -1639,6 +1542,4 @@ extern char conf_rt[65];// ="                                                   
       chip_ctrl_set (V4L2_CID_PRIVATE_INTF_LOW_THRESHOLD, ilo_th);
 
   }
-
-//  #include "plug.c"
 

@@ -12,14 +12,13 @@ al  /system/lib/libbt-hci*
 
 #define LOGTAG "sfbt-hci"
 
-#include <dlfcn.h>
-
 #include <stdio.h>
-#include <stdlib.h>
 #include <errno.h>
 #include <sys/stat.h>
-#include <pthread.h>
 #include <fcntl.h>
+
+#include <pthread.h>
+#include <dlfcn.h>
 
 
   const char * copyright = "Copyright (c) 2011-2015 Michael A. Reid. All rights reserved.";
@@ -37,7 +36,7 @@ al  /system/lib/libbt-hci*
 
   //int hcd_num = 0;
 
-  int shim_hci_enable = 1;//0;                                              // Default 0 = UART, 1 = Bluedroid SHIM
+  int shim_hci_enable = 1;//0;                                          // Default 0 = UART, 1 = Bluedroid SHIM
 #include "tnr/bch_hci.c"
 
 #define USE_BDROID_INC
@@ -45,8 +44,8 @@ al  /system/lib/libbt-hci*
   #include "halhci.h"
 #else
 
-// Most removed...
-  typedef void  (*dealloc_mem_cb)       (TRANSAC transac, char *p_buf);                     /* datapath buffer deallocation callback (callout) */
+    // Most removed...
+  typedef void  (* dealloc_mem_cb) (TRANSAC transac, char * p_buf);     // datapath buffer deallocation callback (callout)
 
     // Bluetooth Host/Controller Interface
 
@@ -148,18 +147,18 @@ int   (*tx_cmd)(TRANSAC transac, char *p_buf, int len);    /** sends commands to
   }
   int allocs = 0, deallocs = 0;
   static char * hcib_alloc_mem_cb         (int size) {                                        /* datapath buffer allocation callback (callout) */
-    logd ("hcib_alloc_mem_cb size: %d", size);
+    logv ("hcib_alloc_mem_cb size: %d", size);
     char * ret = NULL;
     if (hcib && hcib -> alloc)
       ret = hcib -> alloc (size);
-    logd ("hcib_alloc_mem_cb done ret: %p", ret);
+    logv ("hcib_alloc_mem_cb done ret: %p", ret);
     return (ret);
   }
   static void hcib_dealloc_mem_cb       (TRANSAC transac) {//, char *p_buf) {                    /* datapath buffer deallocation callback (callout) */
-    logd ("hcib_dealloc_mem_cb transac: %p");//  p_buf: %p", transac, p_buf);
+    logv ("hcib_dealloc_mem_cb transac: %p");//  p_buf: %p", transac, p_buf);
     /*int ret = 0;
     ret =*/ hcib -> dealloc (transac);//, p_buf);
-    logd ("hcib_dealloc_mem_cb done");// ret: %d", ret);
+    logv ("hcib_dealloc_mem_cb done");// ret: %d", ret);
     return;// (ret);
   }
 
@@ -168,14 +167,14 @@ int   (*tx_cmd)(TRANSAC transac, char *p_buf, int len);    /** sends commands to
     if ((len >= 5 && p_buf [3] == 0x15 && p_buf [4] == 0xfc) ||         // Broadcom 3F  15
         (len >= 5 && p_buf [3] == 0x33 && p_buf [4] == 0xfd) ||         // TI       3F 133
         (len >= 5 && p_buf [3] == 0x01 && p_buf [4] == 0x10 && bfm_rx_len == 0)) {// 4   1      "ssd 4 1"
-      logd ("bfm_ hcib_data_ind_cb transac: %p  p_buf: %p  len: %d  bfm_rx_len: %d", transac, p_buf, len, bfm_rx_len);
+      logv ("bfm_ hcib_data_ind_cb transac: %p  p_buf: %p  len: %d  bfm_rx_len: %d", transac, p_buf, len, bfm_rx_len);
       hex_dump ("bfm_ ", 16, (unsigned char *) p_buf, len);
 
       bfm_rx_len = len;
       memcpy (bfm_rx_buf, p_buf, len);
     }
 
-    logd ("hcib_data_ind_cb transac: %p  p_buf: %p  len: %d", transac, p_buf, len);
+    logv ("hcib_data_ind_cb transac: %p  p_buf: %p  len: %d", transac, p_buf, len);
     int shortlen = len;
     if (shortlen < 0)
       shortlen = 0;
@@ -185,14 +184,14 @@ int   (*tx_cmd)(TRANSAC transac, char *p_buf, int len);    /** sends commands to
 
     int ret = 0;
     ret = hcib -> data_ind (transac, p_buf, len);
-    logd ("hcib_data_ind_cb done ret: %d", ret);
+    logv ("hcib_data_ind_cb done ret: %d", ret);
     return (ret);
   }
   static int   hcib_tx_result_cb         (TRANSAC transac, char *p_buf, bt_hc_transmit_result_t result) {/* transmit result callback */
-    logd ("hcib_tx_result_cb : transac: %p  p_buf: %p  result: %d", transac, p_buf, result);
+    logv ("hcib_tx_result_cb : transac: %p  p_buf: %p  result: %d", transac, p_buf, result);
     int ret = 0;
     ret = hcib -> tx_result (transac, p_buf, result);
-    logd ("hcib_tx_result_cb done ret: %d", ret);
+    logv ("hcib_tx_result_cb done ret: %d", ret);
     return (ret);
   }
 
@@ -290,9 +289,9 @@ int   (*tx_cmd)(TRANSAC transac, char *p_buf, int len);    /** sends commands to
 
     /** Configure low power mode wake state */
   static int lpm (bt_hc_low_power_event_t event) {
-    logd ("lpm event: %d", event);
+    logv ("lpm event: %d", event);
     int ret = hcio_lpm (event);
-    logd ("lpm ret: %d", ret);
+    logv ("lpm ret: %d", ret);
     return (ret);
   }
 
@@ -314,7 +313,7 @@ int   (*tx_cmd)(TRANSAC transac, char *p_buf, int len);    /** sends commands to
 
     /** Transmit frame */
   static int transmit_buf (TRANSAC transac, char * p_buf, int len) {
-    logd ("transmit_buf transac: %p  p_buf: %p  len: %d", transac, p_buf, len);
+    logv ("transmit_buf transac: %p  p_buf: %p  len: %d", transac, p_buf, len);
     int shortlen = len;
     if (shortlen < 0)
       shortlen = 0;
@@ -322,7 +321,7 @@ int   (*tx_cmd)(TRANSAC transac, char *p_buf, int len);    /** sends commands to
       shortlen = 32;
     hex_dump ("TXB ", 16, (unsigned char *) p_buf, shortlen);
     int ret = hcio_transmit_buf (transac, p_buf, len);
-    logd ("transmit_buf ret: %d", ret);
+    logv ("transmit_buf ret: %d", ret);
     return (ret);
   }
 
@@ -446,7 +445,7 @@ int   (*tx_cmd)(TRANSAC transac, char *p_buf, int len);    /** sends commands to
   static char * gv_mem = NULL;
 
   TRANSAC bfm_send (char * buf, int len) {
-    logd ("bfm_send");
+    logv ("bfm_send");
     int data_len = len - 3;//3;//0;
     int full_len = len + 8;
 
@@ -474,7 +473,7 @@ int   (*tx_cmd)(TRANSAC transac, char *p_buf, int len);    /** sends commands to
     int hci_len = len - 3; // buf [2]
     uint16_t opcode = (ogf * 1024) | ocf;
 
-    logd ("bfm_send ogf: 0x%x  ocf: 0x%x  opcode: 0x%x  hci_data: %p  hci_len: %d", ogf, ocf, opcode, hci_data, hci_len);
+    logv ("bfm_send ogf: 0x%x  ocf: 0x%x  opcode: 0x%x  hci_data: %p  hci_len: %d", ogf, ocf, opcode, hci_data, hci_len);
 
     uint16_t HC_BT_HDR_event          = 0x2000;   // MSG_STACK_TO_HC_HCI_CMD | 0 / LOCAL_BR_EDR_CONTROLLER_ID
     uint16_t HC_BT_HDR_len            = len;//0x0003;
@@ -497,7 +496,7 @@ int   (*tx_cmd)(TRANSAC transac, char *p_buf, int len);    /** sends commands to
       loge ("bfm_send len error: %d", len);
     TRANSAC itransac = gv_mem;//buf;
     int ret = transmit_buf (itransac, & gv_mem [8], len);
-    logd ("bfm_send ret: %d", ret);
+    logv ("bfm_send ret: %d", ret);
     return (gv_mem);
   }
 

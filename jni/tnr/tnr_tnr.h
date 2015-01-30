@@ -14,8 +14,6 @@
             #define ANDROID_FMRADIO_INTERFACE_H
 
 #define bool    int
-#define pthread_mutex_t int
-#define pthread_cond_t int
 #define false   0
 #define true    1
 
@@ -87,18 +85,18 @@
             };
 
             struct fmradio_rds_bundle_t {
-                unsigned short pi;
-                short tp;
-                short pty;
-                short ta;
-                short ms;
-                short num_afs;
-                int af[RDS_MAX_AFS];
-                char psn[RDS_PSN_MAX_LENGTH + 1];
-                char rt[RDS_RT_MAX_LENGTH + 1];
-                char ct[RDS_CT_MAX_LENGTH + 1];
-                char ptyn[RDS_PTYN_MAX_LENGTH + 1];
-                short tmc[RDS_NUMBER_OF_TMC];
+                unsigned short  pi;
+                short           tp;
+                short           pty;
+                short           ta;
+                short           ms;
+                short           num_afs;
+                int             af      [RDS_MAX_AFS];
+                char            psn     [RDS_PSN_MAX_LENGTH + 1];
+                char            rt      [RDS_RT_MAX_LENGTH + 1];
+                char            ct      [RDS_CT_MAX_LENGTH + 1];
+                char            ptyn    [RDS_PTYN_MAX_LENGTH + 1];
+                short           tmc     [RDS_NUMBER_OF_TMC];
                 int taf;
             };
 

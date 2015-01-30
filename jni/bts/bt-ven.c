@@ -16,16 +16,13 @@ a mount -o remount,rw /system ; adb push libs/armeabi/libbt-vendor.so /sdcard/ ;
 
 #define LOGTAG "sfbt-ven"
 
-int extra_logs = 0;//1;
-
-#include <dlfcn.h>
-
 #include <stdio.h>
-#include <stdlib.h>
 #include <errno.h>
 #include <sys/stat.h>
-#include <pthread.h>
 #include <fcntl.h>
+
+#include <pthread.h>
+#include <dlfcn.h>
 
 #include "halven.h"
 #include "halhci.h"
@@ -284,7 +281,7 @@ Good:                                 TXB 00 20 08 00 00 00 00 fc 00 fc 05 f3 88
 int need_bc_g2 = 1;
     // Requested operation
   static int ven_op (bt_vendor_opcode_t opcode, void * param) {
-    if (extra_logs && opcode != BT_VND_OP_LPM_WAKE_SET_STATE)
+    if (ena_log_ven_extra && opcode != BT_VND_OP_LPM_WAKE_SET_STATE)
       logd ("ven_op opcode: %d (%s) param: %p", opcode, op_str_get (opcode), param);
     int ret = -77;
     if (veno_op)
@@ -293,7 +290,7 @@ if (need_bc_g2 && opcode == 7){//BT_VND_OP_LPM_WAKE_SET_STATE   1) {    // BT_VN
 need_bc_g2 = 0;
 //bc_g2_pcm_set ();
 }
-    if (extra_logs && opcode != BT_VND_OP_LPM_WAKE_SET_STATE)
+    if (ena_log_ven_extra && opcode != BT_VND_OP_LPM_WAKE_SET_STATE)
       logd ("ven_op ret: %d", ret);
     return (ret);
   }
@@ -324,7 +321,7 @@ need_bc_g2 = 0;
 
 
   static void bfm_cback (void * p_mem) {
-    if (extra_logs)
+    if (ena_log_ven_extra)
       logd ("bfm_cback p_mem: %p", p_mem);
     if (p_mem == NULL)
       return;
@@ -332,7 +329,7 @@ need_bc_g2 = 0;
     char * p_buf = (char *) p_mem;
     int len = (p_buf [1 + 8] & 0x00ff) + 2 + 8;       // x + 4 + 6 = len
 
-    if (extra_logs)
+    if (ena_log_ven_extra)
       hex_dump ("bfm_cb", 16, (unsigned char *) p_buf, len);//32);//288-16);//len);
 
     if (len > 288 || len < 0) {
@@ -342,13 +339,13 @@ need_bc_g2 = 0;
       return;
     }
 
-    if (extra_logs)
+    if (ena_log_ven_extra)
       logd ("bfm_cback p_buf: %p  len: %d  bfm_rx_len: %d", p_buf, len, bfm_rx_len);
 
     memcpy (bfm_rx_buf, & p_buf [8], len - 8);                          // Copy HCI data to bfm_rx_buf
     bfm_rx_len = len;                                                   // Return length to flag ready now that data is written
 
-    if (extra_logs)
+    if (ena_log_ven_extra)
       logd ("bfm_cback p_buf: %p  len: %d", p_buf, len);
     int shortlen = len;
     if (shortlen < 0)
@@ -356,14 +353,14 @@ need_bc_g2 = 0;
     if (shortlen > 32)
       shortlen = 32;
 
-//    if (extra_logs)
+//    if (ena_log_ven_extra)
 //      hex_dump ("RXB ", 16, (unsigned char *) p_buf, shortlen);
 
         // Must free the RX event buffer    - Or re-use ??
     if (bt_ven_cbacks != NULL)
       bt_ven_cbacks->dealloc (p_mem);
 
-    if (extra_logs)
+    if (ena_log_ven_extra)
       logd ("bfm_cback done");
   }
 
@@ -371,7 +368,7 @@ need_bc_g2 = 0;
   static char * gv_mem = NULL;
 
   void * bfm_send (char * buf, int len) {
-    if (extra_logs)
+    if (ena_log_ven_extra)
       logd ("bfm_send buf: %p  len: %d", buf, len);
     int data_len = len - 3;
     int full_len = len + 8;
@@ -404,7 +401,7 @@ need_bc_g2 = 0;
     int hci_len = len - 3; // buf [2]
     uint16_t opcode = (ogf * 1024) | ocf;
 
-    if (extra_logs)
+    if (ena_log_ven_extra)
       logd ("bfm_send ogf: 0x%x  ocf: 0x%x  opcode: 0x%x  hci_data: %p  hci_len: %d", ogf, ocf, opcode, hci_data, hci_len);
 
     int event_mask = 0x2000;
@@ -439,7 +436,7 @@ need_bc_g2 = 0;
       shortlen = 0;
     if (shortlen > 32)
       shortlen = 32;
-    if (extra_logs)
+    if (ena_log_ven_extra)
       hex_dump ("TXB ", 16, (unsigned char *) gv_mem, shortlen);
 
 // hcitool cmd 3f 00 f3 88 01 02 05
@@ -452,7 +449,7 @@ need_bc_g2 = 0;
 */
       ret = bt_ven_cbacks->xmit_cb (opcode, gv_mem, bfm_cback);
 
-    if (extra_logs)
+    if (ena_log_ven_extra)
       logd ("bfm_send ret: %d", ret);
     return (gv_mem);
   }

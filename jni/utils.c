@@ -1,50 +1,95 @@
 
     // Utilities: Used by many
 
+    // Debug:
+
   #include <android/log.h>
+  #include <dirent.h>                                 // For opendir (), readdir (), closedir (), DIR, struct dirent.
 
-  #define  loge(...)  fm_log_print(ANDROID_LOG_ERROR, LOGTAG,__VA_ARGS__)
-  #define  logd(...)  fm_log_print(ANDROID_LOG_DEBUG, LOGTAG,__VA_ARGS__)
-  #define  logv(...)  fm_log_print(ANDROID_LOG_VERBOSE, LOGTAG,__VA_ARGS__)
+//#define DL_LOG_METHOD
+#ifdef  DL_LOG_METHOD
+  #include <dlfcn.h>
+#endif
 
-  int extra_log = 0;
+  #define  logv(...)  s2_log(ANDROID_LOG_VERBOSE,LOGTAG,__VA_ARGS__)
+  #define  logd(...)  s2_log(ANDROID_LOG_DEBUG,LOGTAG,__VA_ARGS__)
+  #define  logw(...)  s2_log(ANDROID_LOG_WARN,LOGTAG,__VA_ARGS__)
+  #define  loge(...)  s2_log(ANDROID_LOG_ERROR,LOGTAG,__VA_ARGS__)
 
-  int ena_verbo_log = 0;
-  int ena_debug_log = 1;
-  int ena_error_log = 1;
+/*
+  #define  logv(...)  __android_log_print(ANDROID_LOG_VERBOSE,LOGTAG,__VA_ARGS__)
+  #define  logd(...)  __android_log_print(ANDROID_LOG_DEBUG,LOGTAG,__VA_ARGS__)
+  #define  logw(...)  __android_log_print(ANDROID_LOG_WARN,LOGTAG,__VA_ARGS__)
+  #define  loge(...)  __android_log_print(ANDROID_LOG_ERROR,LOGTAG,__VA_ARGS__)
+#define s2_log  __android_log_print
+*/
+
+
+  int ena_log_verbo = 0;
+  int ena_log_debug = 1;
+  int ena_log_warni = 0;
+  int ena_log_error = 1;
+
+  int ena_log_hex_dump      = 0;    // Hex dump for bt-hci and many others
+  int ena_log_tnr_extra     = 0;    // Tuner verbose
+  int ena_log_tnr_evt       = 0;    // Tuner events
+  int ena_log_s2d_cmd       = 0;    // S2d commands
+  int ena_log_ven_extra     = 0;    // Shim
+
+  int ena_log_af_com_err    = 0;    // AF common errors
+  int ena_log_af_ok         = 0;    // AF OK                !! AF Needs some work !!
+
+  int ena_log_rds_ok_iris   = 0;    // Qualcomm RDS OK
+
+  int ena_log_rds_rt        = 1;    // New RT
+  int ena_log_rds_pspt      = 1;    // New PS, PT
+  int ena_log_rds_extra     = 0;    // Time/Date, Traffic, Group info
+  int ena_log_bch_rds_stats = 0;    // Broadcom RDS stats
+  int ena_log_bch_rds_err   = 0;    // Broadcom RDS errors
+
+  int ena_log_bch_reg       = 0;    // Broadcom Registers
+  int ena_log_bch_hci       = 0;    // Broadcom HCI
+
+#ifdef  DL_LOG_METHOD
   void * log_hndl = NULL;
-
   int (* do_log) (int prio, const char * tag, const char * fmt, va_list ap);
-  #include <stdarg.h>
-  int fm_log_print (int prio, const char * tag, const char * fmt, ...) {
+#endif
 
-    if (! ena_error_log && prio == ANDROID_LOG_ERROR)
+//int __android_log_print(int prio, const char *tag, const char *fmt, ...);
+//int __android_log_vprint(int prio, const char *tag, const char *fmt, va_list ap);
+
+
+  int s2_log (int prio, const char * tag, const char * fmt, ...) {
+
+    if (! ena_log_verbo && prio == ANDROID_LOG_VERBOSE)
       return -1;
-    if (! ena_debug_log && prio == ANDROID_LOG_DEBUG)
+    if (! ena_log_debug && prio == ANDROID_LOG_DEBUG)
       return -1;
-    if (! ena_verbo_log && prio == ANDROID_LOG_VERBOSE)
+    if (! ena_log_warni && prio == ANDROID_LOG_WARN)
+      return -1;
+    if (! ena_log_error && prio == ANDROID_LOG_ERROR)
       return -1;
 
     va_list ap;
     va_start (ap, fmt); 
 
+#ifdef  DL_LOG_METHOD
     if (log_hndl == NULL) {
       log_hndl = dlopen ("liblog.so", RTLD_LAZY);
-      if (log_hndl == NULL) {
-        ena_verbo_log = 0;                                              // Don't try again
-        ena_debug_log = 0;
-        ena_error_log = 1;
-        return (-1);
-      }
-      do_log = dlsym (log_hndl, "__android_log_vprint");
-      if (do_log == NULL) {
-        ena_verbo_log = 0;                                              // Don't try again
-        ena_debug_log = 0;
-        ena_error_log = 1;
+      if (log_hndl != NULL)
+        do_log = dlsym (log_hndl, "__android_log_vprint");
+      if (log_hndl == NULL || do_log == NULL) {
+        ena_log_verbo = 0;                                              // Don't try again for verbose
+        ena_log_debug = 0;
+        ena_log_warni = 0;
+        ena_log_error = 1;                                              // Try again only for error
         return (-1);
       }
     }
     do_log (prio, tag, fmt, ap);
+#else
+    __android_log_vprint(prio, tag, fmt, ap);
+#endif
     return (0);
   }
 
@@ -77,7 +122,6 @@
   }
 
 
-#include <dirent.h>                                 // For opendir (), readdir (), closedir (), DIR, struct dirent.
 
 char user_dev [DEF_BUF] = "";
 
@@ -136,19 +180,26 @@ char * user_char_dev_get (char * dir_or_dev, int user) {
   return (NULL);
 }
 
-int version_sdk;
-char version_sdk_prop_buf       [DEF_BUF];
 
-char product_device_prop_buf    [DEF_BUF] = "";
-char product_manuf_prop_buf     [DEF_BUF] = "";
-char product_board_prop_buf     [DEF_BUF] = "";
+  int version_sdk;
+  char version_sdk_prop_buf       [DEF_BUF];
 
-void props_log (const char * prop, char * prop_buf) {
-  //char prop_buf [DEF_BUF] = "";
-  __system_property_get (prop, prop_buf);
-  logd ("props_log %32.32s: %s", prop, prop_buf);
-}
+  char product_device_prop_buf    [DEF_BUF] = "";
+  char product_manuf_prop_buf     [DEF_BUF] = "";
+  char product_board_prop_buf     [DEF_BUF] = "";
 
+  void prop_buf_get (const char * prop, char * prop_buf) {
+    __system_property_get (prop, prop_buf);
+    logd ("prop_buf_get %32.32s: %s", prop, prop_buf);
+  }
+
+  char def_prop_buf    [DEF_BUF] = "";
+
+  char * prop_get (const char * prop) {
+    __system_property_get (prop, def_prop_buf);
+    logd ("prop_get %32.32s: %s", prop, def_prop_buf);
+    return (def_prop_buf);
+  }
 
 
 
@@ -247,7 +298,7 @@ int hcd_file_find (char * path_buf, int path_len) {      // Find first file unde
   if (ret)                  // If we have at least one BC *.hcd or *.HCD firmware file in /system...
     logd ("hcd_file_find have *.hcd file: %s", path_buf);
 
-  props_log ("ro.product.manufacturer",           product_manuf_prop_buf);
+  prop_buf_get ("ro.product.manufacturer",           product_manuf_prop_buf);
 
   if (! strncasecmp (product_manuf_prop_buf,"LG", strlen ("LG"))) {     // LG or LGE
     logd ("hcd_file_find LG G2");
@@ -310,6 +361,8 @@ long ms_get () {
 
   #define HD_MW   256
   static void hex_dump (char * prefix, int width, unsigned char * buf, int len) {
+    if (! ena_log_hex_dump)
+      return;
     char tmp  [3 * HD_MW + 8] = "";     // Handle line widths up to HD_MW
     char line [3 * HD_MW + 8] = "";
     if (width > HD_MW)
@@ -323,13 +376,13 @@ long ms_get () {
       strncat (line, tmp, sizeof (line));
       if (n == width) {
         n = 0;
-        logd (line);
+        loge (line);
         line [0] = 0;
         if (prefix)
           strlcpy (line, prefix, sizeof (line));
       }
       else if (i == len - 1 && n)
-        logd (line);
+        loge (line);
     }
   }
 

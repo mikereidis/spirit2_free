@@ -890,7 +890,7 @@ private final int getAndIncrement(int modulo) {
             com_uti.loge ("pcm_write_runnable run() ms_time: " + ms_time + "  len: " + len + "  len_written: " + len_written + "  aud_buf: " + aud_buf);
 
 
-          if (com_uti.ena_debug_log && writes_processed % ((2 * write_stats_seconds * m_samplerate * m_channels) / len) == 0)   // Every stats_seconds
+          if (com_uti.ena_log_pcm_stat && writes_processed % ((2 * write_stats_seconds * m_samplerate * m_channels) / len) == 0)   // Every stats_seconds
             pcm_stat_logs ("Write", m_channels, len, aud_buf);
           writes_processed ++;                                          // Update pointers etc
           aud_buf_head ++;
@@ -1068,7 +1068,7 @@ dai_delay = 0;  // !! No delay ??
             if (need_aud_mod)
               aud_mod (len, aud_buf);
 
-            if (com_uti.ena_debug_log && reads_processed % ((2 * read_stats_seconds * m_samplerate * m_channels) / len) == 0)   // Every stats_seconds
+            if (com_uti.ena_log_pcm_stat && reads_processed % ((2 * read_stats_seconds * m_samplerate * m_channels) / len) == 0)   // Every stats_seconds
               pcm_stat_logs ("Read ", m_channels, len, aud_buf);
 
             if (aud_buf_tail < 0 || aud_buf_tail > aud_buf_num - 1)     // Protect from ArrayIndexOutOfBoundsException

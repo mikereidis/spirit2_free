@@ -3,34 +3,7 @@
 
   const char * copyright = "Copyright (c) 2011-2015 Michael A. Reid. All rights reserved.";
 
-#include <dlfcn.h>
-#include <string.h>
-#include <stdlib.h>
-#include <stdio.h>
-#include <pthread.h>
-#include <unistd.h>
-#include <dirent.h>
-#include <errno.h>
-#include <sys/types.h>
-#include <sys/stat.h>
-#include <stdarg.h>
-
-#include <math.h>
-#include <fcntl.h>
-#include <sys/ioctl.h>
-#include <linux/videodev2.h>
-
-#include <android/log.h>
-#include "jni.h"
-
-#include "tnr_tnr.h"
-
-
-  #define  loge(...)  fm_log_print(ANDROID_LOG_ERROR, LOGTAG,__VA_ARGS__)
-  #define  logd(...)  fm_log_print(ANDROID_LOG_DEBUG, LOGTAG,__VA_ARGS__)
-  int fm_log_print (int prio, const char * tag, const char * fmt, ...);
-
-  long ms_sleep (long ms);
+  #include "utils.c"
 
     // FM Chip specific functions in this code called from generic plug.c code:
 
@@ -218,10 +191,6 @@
 
     // Generic utilities:
 
-  #include "utils.c"
-
-
-
   int noblock_set (int fd) {
     //#define IOCTL_METH
     #ifdef  IOCTL_METH
@@ -307,10 +276,6 @@
 
 
     // Debug:
-  int evt_dbg                 = 0;
-
-  int af_ok_debug             = 0;
-  int af_common_error_debug   = 0;
 
   int af_common_error_num     = 0;
   int af_general_error_num    = 0;
@@ -404,11 +369,6 @@ int freq_dn_get (int freq) {                                            // Calle
 
   int curr_af_num = 0;                                                    // Current number of AF table entries
 
-    // Debug:
-  int rds_dbg                 = 1;  // RT                                              // 1 = But do log counts every 10, 000 blocks
-  int rds_ok_dbg              = 1;  // PS, PT
-  int rds_ok_extra_dbg        = 0;
-
     // Values: Current (under construction), Candidate (complete, but must be repeated before confirmed), Confirmed (Displayable, with few if any visual/logical defects.)
 int curr_pi = 0;         // Program ID. Canada non-national = 0xCxxx.   // 88.5: 0x163e, 106.1: 0xc448, 105.3: 0xc87d, 106.9: 0xdc09, 91.5: 0xb102, 89.1: 0, 89.9: 0x15d6, 93.9: 0xccb6
 int cand_pi = 0;
@@ -446,7 +406,6 @@ char g16 [256] = "";
 
 
 
-//#define  SUPPORT_RDS
 #ifdef  SUPPORT_RDS
   #include "tnr_rds.c"
 #else
@@ -477,7 +436,6 @@ char g16 [256] = "";
 
     // Event getter:
   int evt_get (int just_poll) { // Called only from af_switch() w/ just_poll=1 or rx_thread() w/ just_poll=0
-    //evt_dbg = 1;
     int evt = -1, stro_sig = 0;//, evt_freq = 0;
 
     if (! curr_pwr)                                                     // If no power...
@@ -532,12 +490,12 @@ char g16 [256] = "";
       int old_rssi = curr_rssi;
       curr_rssi = chip_api_rssi_get ();
       if (curr_rssi != old_rssi) {                                      // If RSSI changed
-        if (evt_dbg)
+        if (ena_log_tnr_evt)
           logd ("evt_get  new rssi: %3.3d", curr_rssi);
         on_signal_strength_changed (RSSI_FACTOR * curr_rssi);                         // Signal RSSI changed event
       }
       else {
-        if (evt_dbg)
+        if (ena_log_tnr_evt)
           logd ("evt_get same rssi: %3.3d", curr_rssi);
       }
     }
@@ -545,55 +503,55 @@ char g16 [256] = "";
 
 
   if (! curr_pwr) {
-    if (evt_dbg)
+    if (ena_log_tnr_evt)
       logd ("evt_get ! curr_pwr");
     evt = 0;
   }
   else if (just_poll) {
-    if (evt_dbg)
+    if (ena_log_tnr_evt)
       logd ("evt_get just_poll");
     evt = 0;
   }
   else if (seek_in_progress && need_seek_cmplt) {
-    if (evt_dbg)
+    if (ena_log_tnr_evt)
       logd ("evt_get seek_in_progress && need_seek_cmplt");
     seek_in_progress = 0;
     need_seek_cmplt = 0;
     evt = curr_freq_val + 1000000;                                      // SEEK_COMPLETE_EVENT
   }
   else if (need_freq_chngd) {
-    if (evt_dbg)
+    if (ena_log_tnr_evt)
       logd ("evt_get need_freq_chngd");
     need_freq_chngd = 0;
     evt = curr_freq_val;                                                // TUNE_EVENT
   }
   else if (need_pi_chngd) {
-    if (evt_dbg)
+    if (ena_log_tnr_evt)
       logd ("evt_get need_pi_chngd");
     //logd ("evt need_pi_chngd");
     need_pi_chngd = 0;
     evt = 3;
   }
   else if (need_pt_chngd) {
-    if (evt_dbg)
+    if (ena_log_tnr_evt)
       logd ("evt_get need_pt_chngd");
     need_pt_chngd = 0;
     evt = 4;
   }
   else if (need_ps_chngd) {
-    if (evt_dbg)
+    if (ena_log_tnr_evt)
       logd ("evt_get need_ps_chngd");
     need_ps_chngd = 0;
     evt = 5;
   }
   else if (need_rt_chngd) {
-    if (evt_dbg)
+    if (ena_log_tnr_evt)
       logd ("evt_get need_rt_chngd");
     need_rt_chngd = 0;
     evt = 6;
   }
   else {
-    if (evt_dbg)
+    if (ena_log_tnr_evt)
       logd ("evt_get no event");
   }
 
@@ -649,7 +607,7 @@ char g16 [256] = "";
       rx_thread_ctr ++;
     return (1); // 1 = Still running
   }
-
+/*
   static void * rx_thread (void * arg) {
 
     logd ("rx_thread: %p", arg);
@@ -674,7 +632,8 @@ char g16 [256] = "";
   };
 
   struct thread_info * tinfo;
-
+*/
+/*
   int rx_thread_start () {
     int s, tnum, opt, num_threads = 1;
     void * res;
@@ -722,20 +681,6 @@ char g16 [256] = "";
       loge ("pthread_attr_destroy error: %d", s);
 //Thread active so just continue   return (-1);
     }
-
-    // Join with each thread, and display its returned value
-/*
-    for (tnum = 0; tnum < num_threads; tnum ++) {
-      s = pthread_join (tinfo [tnum].thread_id, & res);
-      if (s != 0)
-        handle_error_en (s, "pthread_join");
-
-      printf ("Joined with thread %3.3d; returned value was %s\n", tinfo [tnum].thread_num, (char *) res);
-      free (res);      // Free memory allocated by thread
-    }
-    free (tinfo);
-*/
-
     return (0);
   }
   int rx_thread_stop () {
@@ -751,7 +696,7 @@ char g16 [256] = "";
 
     return (0);
   }
-
+*/
 
     // Minimum: rx_start or tx_start, pause, resume, reset
   int rx_start (void ** session_data, const struct fmradio_vendor_callbacks_t * callbacks, int low_freq, int high_freq, int default_freq, int grid) {
@@ -820,7 +765,7 @@ char g16 [256] = "";
   }
   int get_frequency (void ** session_data) {
     int freq = chip_api_freq_get ();
-    if (extra_log)
+    if (ena_log_tnr_extra)
       logd ("get_frequency: %d", freq);
     return (freq);
   }
@@ -862,7 +807,7 @@ char g16 [256] = "";
     //logd ("get_signal_strength");
     curr_rssi = chip_api_rssi_get ();
     int rssi = RSSI_FACTOR * curr_rssi;
-    if (extra_log)
+    if (ena_log_tnr_extra)
       logd ("get_signal_strength: %d", rssi);
     return (rssi);
   }

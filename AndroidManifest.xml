@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     package="fm.a2d.sf"
-    android:versionCode="84"
-    android:versionName="2015_01_29_beta" >
+    android:versionCode="85"
+    android:versionName="2015_01_30_beta" >
 
 <!-- 
 !! See to add android.intent.action.BUG_REPORT
