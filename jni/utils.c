@@ -39,6 +39,8 @@
   int ena_log_af_com_err    = 0;    // AF common errors
   int ena_log_af_ok         = 0;    // AF OK                !! AF Needs some work !!
 
+  int ena_log_rds_com_err   = 1;    // RDS common errors
+
   int ena_log_rds_ok_iris   = 0;    // Qualcomm RDS OK
 
   int ena_log_rds_rt        = 1;    // New RT
@@ -357,6 +359,41 @@ long ms_get () {
 
   return (millisecs);
 }
+
+  int chip_lock_val = 0;
+  char * curr_lock_cmd = "none";
+  int chip_lock_get (char * cmd) {
+    return (0);
+/*
+    int retries = 0;
+    int max_msecs = 3030;
+    int sleep_ms = 101; // 10
+    while (retries ++ < max_msecs / sleep_ms) {
+      chip_lock_val ++;
+      if (chip_lock_val == 1) {
+        curr_lock_cmd = cmd;
+        return (0);
+      }
+      chip_lock_val --;
+      if (chip_lock_val < 0)
+        chip_lock_val = 0;
+      loge ("sleep_ms: %d  retries: %d  cmd: %s  curr_lock_cmd: %s", sleep_ms, retries, cmd, curr_lock_cmd);
+      ms_sleep (sleep_ms);
+    }
+    loge ("chip_lock_get retries exhausted");
+    return (-1);
+*/
+  }
+  int chip_lock_ret () {
+/*
+    if (chip_lock_val > 0)
+      chip_lock_val --;
+    if (chip_lock_val < 0)
+      chip_lock_val = 0;
+*/
+    return (0);
+  }
+
 
 
   #define HD_MW   256

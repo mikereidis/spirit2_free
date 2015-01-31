@@ -11,14 +11,11 @@
 #include "tnr_tnr.h"
 #include "tnr_tnr.c"
 
-#define EVT_LOCK_BYPASS
-            // Locking causes problems after a while; blocks in events_process()    (   ioctl (dev_hndl, Si4709_IOC_RDS_DATA_GET, & rd);    )
 
-
-  int dev_hndl      =     -1;
 
     // FM Chip specific code:
 
+  int dev_hndl      =     -1;
 
 #define u8  uint8_t
 #define u16 uint16_t

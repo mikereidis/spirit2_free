@@ -123,7 +123,7 @@
                 int (*tx_start) (void ** session_data,
                                 const struct fmradio_vendor_callbacks_t * callbacks,
                                 int low_freq, int high_freq, int default_freq, int grid);
-                int (*pause) (void ** session_data);
+                int (*pause2) (void ** session_data);
                 int (*resume) (void ** session_data);
                 int (*reset) (void ** session_data);
                 int (*set_frequency) (void ** session_data, int frequency);

@@ -120,7 +120,7 @@
         // Mandatory:
     logd ("rx_start:                  %p", tnr_funcs->rx_start);
     logd ("tx_start:                  %p", tnr_funcs->tx_start);
-    logd ("rx_pause:                  %p", tnr_funcs->pause);
+    logd ("rx_pause2:                  %p", tnr_funcs->pause2);
     logd ("rx_resume:                 %p", tnr_funcs->resume);
     logd ("rx_reset:                  %p", tnr_funcs->reset);
         // Optional: Both RX & TX:
@@ -888,10 +888,9 @@ sock_rx_tmo_set (sockfd, 100);
     return (0);
   }
   int gs3_digital_input_off () {                                     // Set back to assumed defaults
+    alsa_bool_set ("MIXINR IN2R Switch", 1);
     return (0);
   }
-
-  boolean do_ssd = true;        // LG G2 w/ CM 11 needs at least one "ssd 4 0" command, so might as well use binary SSD
 
   int lg2_digital_input_on () {
     alsa_enum_set ("FM Radio", 0);
@@ -977,6 +976,8 @@ sock_rx_tmo_set (sockfd, 100);
   }
 
   int dev_digital_input_on () {
+    if (tnr_funcs != NULL)                               // !!!! Should go at end !!!!
+      tnr_funcs->resume         (NULL);                                 // UnMute
     switch (curr_radio_device_int) {
       case DEV_UNK: return (-1);
       case DEV_GEN: return (-1);
@@ -991,6 +992,8 @@ sock_rx_tmo_set (sockfd, 100);
     return (-1);
   }
   int dev_digital_input_off () {
+    if (tnr_funcs != NULL)
+      tnr_funcs->pause2 (NULL);                                 // Mute
     switch (curr_radio_device_int) {
       case DEV_UNK: return (-1);
       case DEV_GEN: return (-1);
@@ -1102,8 +1105,8 @@ sock_rx_tmo_set (sockfd, 100);
           }
           else if (tuner_initialized && strcpy (cval, "Stop") && (clen = strlen (cval)) && ! strncasecmp (val, cval, clen))      // Stop
             terminate = 1;
-          else if (tuner_initialized && strcpy (cval, "Pause") && (clen = strlen (cval)) && ! strncasecmp (val, cval, clen))     // Pause
-            logd ("pause: %d", tnr_funcs->pause (NULL));
+          else if (tuner_initialized && strcpy (cval, "pause2") && (clen = strlen (cval)) && ! strncasecmp (val, cval, clen))     // pause2
+            logd ("pause2: %d", tnr_funcs->pause2 (NULL));
           else if (tuner_initialized && strcpy (cval, "Resume") && (clen = strlen (cval)) && ! strncasecmp (val, cval, clen))    // Resume
             logd ("resume: %d", tnr_funcs->resume (NULL));
           else

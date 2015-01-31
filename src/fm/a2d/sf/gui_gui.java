@@ -314,22 +314,19 @@ public class gui_gui implements gui_gap {
     m_rg_band = (RadioGroup) m_gui_act.findViewById (R.id.rg_band);
 
     if (radio_gui_start_count <= 1) {                                   // If first 1 runs...
-      String cc = com_uti.country_get (m_context).toUpperCase ();//Locale.getDefault ());
-      if (cc.equals ("US") || cc.equals ("CA") || cc.equals ("MX")) {   // USA, Canada or Mexico
+      String cc = com_uti.country_get (m_context).toUpperCase ();
+      if (cc.equals ("US") || cc.equals ("CA") || cc.equals ("MX")) {   // If USA, Canada or Mexico
         com_uti.logd ("Setting band US");
-        tuner_band_set_non_volatile ("US");
+        tuner_band_set_non_volatile ("US");                             // Band = US
       }
       else {
         com_uti.logd ("Setting band EU");
-        tuner_band_set_non_volatile ("EU");
+        tuner_band_set_non_volatile ("EU");                             // Else Band = EU
       }
       m_gui_act.showDialog (DLG_INTRO);                                 // Show the intro dialog
     }
-    //else {
     else if (radio_gui_start_count <= 3) {                              // If first 3 runs...
-
-      m_gui_act.showDialog (DLG_POWER);                                 // Show the power dialog
-      //starting_gui_dlg_show (true);
+      m_gui_act.showDialog (DLG_INTRO);                                 // Show the intro dialog
     }
 
     String band = com_uti.prefs_get (m_context, "tuner_band", "EU");
@@ -614,12 +611,11 @@ Rotate counter by 0.75 MHz = 8.766 degrees
 
     // Dialog methods:
 
-  private static final int DLG_INTRO    = 1;                            // First time show this
-  private static final int DLG_POWER    = 2;                            // Every subsequent startup show this
-  private static final int DLG_FREQ_SET = 3;
-  private static final int DLG_MENU     = 4;
-  private static final int DLG_PRST     = 5;
-  private static final int DLG_PRST_REN = 6;
+  private static final int DLG_INTRO    = 1;                            // First few times show this Intro
+  private static final int DLG_FREQ_SET = 2;                            // Frequency set
+  private static final int DLG_MENU     = 3;                            // Menu
+  private static final int DLG_PRST     = 4;                            // Preset functions
+  private static final int DLG_PRST_REN = 5;                            // Preset rename
 
   public Dialog gap_dialog_create (int id, Bundle args) {               // Create a dialog by calling specific *_dialog_create function    ; Triggered by showDialog (int id);
   //public DialogFragment gap_dialog_create (int id, Bundle args) {
@@ -628,7 +624,6 @@ Rotate counter by 0.75 MHz = 8.766 degrees
     //DialogFragment ret = null;
     switch (id) {
       case DLG_INTRO:
-      case DLG_POWER:
         ret = intro_dialog_create     (id);
         intro_dialog = ret;
         break;
@@ -758,9 +753,6 @@ Rotate counter by 0.75 MHz = 8.766 degrees
       intro_msg +=  "SpiritF Starting...\n\n";
 
     dlg_bldr.setMessage (intro_msg);
-
-    if (id == DLG_INTRO) {
-    }
 
     return (dlg_bldr.create ());
   }
@@ -1059,9 +1051,6 @@ Rotate counter by 0.75 MHz = 8.766 degrees
         intro_dialog.dismiss ();
         intro_dialog = null;
 
-        if (com_uti.device == com_uti.DEV_LG2 && com_uti.android_version >= 21 && bt_get ())
-          m_com_api.key_set ("tuner_extra_cmd", "230000");  // Enable audio
-
       }
     }
 
@@ -1215,7 +1204,7 @@ Rotate counter by 0.75 MHz = 8.766 degrees
         freq_text = m_com_api.tuner_rds_picl;
     }
     else {
-      if (! m_com_api.tuner_rds_ps.equals (""))
+      if (! m_com_api.tuner_rds_ps.trim ().equals (""))
         freq_text = m_com_api.tuner_rds_ps;
     }
     m_preset_tv [idx].setText ("" + freq_text);

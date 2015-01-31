@@ -9,8 +9,6 @@
 #include "tnr_tnr.h"
 #include "tnr_tnr.c"
 
-#define EVT_LOCK_BYPASS
-
     // FM Chip specific code
 
   int dev_hndl      =     -1;

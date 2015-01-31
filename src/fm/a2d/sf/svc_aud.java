@@ -139,77 +139,9 @@ public class svc_aud implements svc_aap, AudioManager.OnAudioFocusChangeListener
   private boolean aud_mic = true;
   private int m_aud_src = 0;
 
+  private boolean s2_tx = false;
 
     // Code:
-
-  private void audio_transmit_pause () {
-    audio_transmit_stop ();
-  }
-  private void audio_transmit_stop () {
-dai_set (false);
-
-//    String cmd1 = "/data/data/fm.a2d.st/lib/libssd.so 4 1 \"SLIMBUS_0_RX Audio Mixer MultiMedia1\" 1";    // Wired headset audio on
-//    sys_run (cmd1, true);//false);
-
-//    com_uti.alsa_bool_set ("SLIMBUS_0_RX Audio Mixer MultiMedia1", 1);    // Wired headset audio on
-//    com_uti.ssd_commit ();
-
-    //AudioSystem.setDeviceConnectionState (AudioSystem.DEVICE_OUT_WIRED_HEADSET, AudioSystem.DEVICE_STATE_AVAILABLE, "");     // Headset available
-  }
-
-  private void audio_transmit_start () {
-dai_set (true);
-
-
-  //AudioManager  m_AM        = null;
-  //m_AM = (AudioManager) this.getSystemService (Context.AUDIO_SERVICE);
-  if (m_AM != null) {
-    int max_musi_vol = m_AM.getStreamMaxVolume  (AudioManager.STREAM_MUSIC);
-    //int cur_musi_vol = m_AM.getStreamVolume     (AudioManager.STREAM_MUSIC);
-
-    m_AM.setStreamVolume (AudioManager.STREAM_MUSIC, max_musi_vol, AudioManager.FLAG_SHOW_UI);// Display volume change
-  }
-
-//      AudioSystem.setDeviceConnectionState(AudioSystem.DEVICE_OUT_FM_TX, AudioSystem.DEVICE_STATE_AVAILABLE, "");
-/*
-      String cmd1 = "/data/data/fm.a2d.st/lib/libssd.so 4 1 \"SLIMBUS_0_RX Audio Mixer MultiMedia1\" 0";    // Wired headset audio off
-
-      //AudioSystem.setDeviceConnectionState (AudioSystem.DEVICE_OUT_WIRED_HEADSET, AudioSystem.DEVICE_STATE_UNAVAILABLE, "");     // Headset unavailable
-
-      String cmd2 = "/data/data/fm.a2d.st/lib/libssd.so 4 1 \"INTERNAL_FM_RX Audio Mixer MultiMedia1\" 1";
-      String cmd3 = "/data/data/fm.a2d.st/lib/libssd.so 4 1 \"INTERNAL_FM_RX Audio Mixer MultiMedia4\" 1";
-      String cmd4 = "/data/data/fm.a2d.st/lib/libssd.so 4 1 \"INTERNAL_FM_RX Audio Mixer MultiMedia5\" 1";
-      String [] cmds = {cmd1, cmd2, cmd3, cmd4};
-      //String [] cmds = {cmd2, cmd3, cmd4};
-      //String [] cmds = {cmd1, cmd2};
-      sys_run (cmds, true);//false);
-*/
-/* !!!! Why does this block on MOG, OXL and ONE ???
-      String cmd1 = "/data/data/fm.a2d.sf/files/ssd 4 1 \"SLIMBUS_0_RX Audio Mixer MultiMedia1\" 0";    // Wired headset audio off
-      String cmd2 = "/data/data/fm.a2d.sf/files/ssd 4 1 \"INTERNAL_FM_RX Audio Mixer MultiMedia1\" 1";
-      //String cmd3 = "/data/data/fm.a2d.sf/files/ssd 4 1 \"INTERNAL_FM_RX Audio Mixer MultiMedia4\" 1";
-      //String cmd4 = "/data/data/fm.a2d.sf/files/ssd 4 1 \"INTERNAL_FM_RX Audio Mixer MultiMedia5\" 1";
-      //String [] cmds = {cmd1, cmd2, cmd3, cmd4};
-      String [] cmds = {cmd1, cmd2};
-      com_uti.sys_run (cmds, true);//false);
-*/
-
-/*
-      com_uti.alsa_bool_set ("SLIMBUS_0_RX Audio Mixer MultiMedia1", 0);    // Wired headset audio off
-      com_uti.ssd_commit ();
-      com_uti.alsa_bool_set ("INTERNAL_FM_RX Audio Mixer MultiMedia1", 1);
-      com_uti.ssd_commit ();
-      com_uti.alsa_bool_set ("INTERNAL_FM_RX Audio Mixer MultiMedia4", 1);
-      com_uti.ssd_commit ();
-      com_uti.alsa_bool_set ("INTERNAL_FM_RX Audio Mixer MultiMedia5", 1);
-      com_uti.ssd_commit ();
-*/
-      //if (m_svc_acb != null)
-      //  m_svc_acb.cb_audio_state_chngd ("start");
-
-  }
-
-  private boolean s2_tx = false;
 
   public svc_aud (Context c, svc_acb cb_aud, com_api svc_com_api) {                              // Constructor
 
@@ -232,13 +164,13 @@ dai_set (true);
     m_AM = (AudioManager) c.getSystemService (Context.AUDIO_SERVICE);
 
 
-/* Make buffer size a multiple of AudioManager.getProperty (PROPERTY_OUTPUT_FRAMES_PER_BUFFER). Otherwise your callback will occasionally get two calls per timeslice rather than one.
-    Unless your CPU usage is really light, this will probably end up glitching.
+    /* Make buffer size a multiple of AudioManager.getProperty (PROPERTY_OUTPUT_FRAMES_PER_BUFFER). Otherwise your callback will occasionally get two calls per timeslice rather than one.
+        Unless your CPU usage is really light, this will probably end up glitching.
 
-Use the sample rate provided by AudioManager.getProperty (PROPERTY_OUTPUT_SAMPLE_RATE). Otherwise your buffers take a detour through the system resampler.
+    Use the sample rate provided by AudioManager.getProperty (PROPERTY_OUTPUT_SAMPLE_RATE). Otherwise your buffers take a detour through the system resampler.
 
-API level 17 / 4.2+
- */
+    API level 17 / 4.2+ */
+
     String hw_rate_str = "";
     String hw_size_str = "";
     try {
@@ -249,7 +181,6 @@ API level 17 / 4.2+
       com_uti.loge ("AudioManager.getProperty Throwable e: " + e);
       e.printStackTrace ();
     }
-
     try {
       m_samplerate = Integer.parseInt (hw_rate_str);
     }
@@ -258,31 +189,27 @@ API level 17 / 4.2+
       e.printStackTrace ();
     }
     com_uti.logd ("m_samplerate 1: " + m_samplerate);
+
     if (m_samplerate >= 8000 && m_samplerate <= 192000)
       m_samplerate = m_samplerate;
     else
       m_samplerate = 44100;
     com_uti.logd ("m_samplerate 2: " + m_samplerate);
-//at_min_size =
+
+    //at_min_size =
 
     if (com_uti.device == com_uti.DEV_GEN)
       m_samplerate = 48000;
-    else if (com_uti.device == com_uti.DEV_QCV && old_htc)                       // Still no good w/ 48K x 3840
-      m_samplerate = 48000;//24000;//48000;//22050;//48000;//24000;//22050;//24000;//48000;//22050;//8000;//22050;
     else if (com_uti.device == com_uti.DEV_QCV)
-      m_samplerate = 48000;//Feb28 back to 44.1     48000;//22050;//Feb10!!!!  48000;                                         // !!!! Different than prior default of 44100
+      m_samplerate = 48000;
     else if (com_uti.device == com_uti.DEV_ONE)
-      m_samplerate = 48000;//24000;//48000;//22050;//48000;//22050;//44100;//8000;
+      m_samplerate = 48000;
     else if (com_uti.device == com_uti.DEV_XZ2)
       m_samplerate = 48000;
-    else if (com_uti.device == com_uti.DEV_LG2 && com_uti.android_version >= 21) {
+    else if (com_uti.device == com_uti.DEV_LG2 && com_uti.android_version >= 21)
       m_samplerate = 48000;
-    }
-    else if (com_uti.device == com_uti.DEV_LG2) {
-      m_samplerate = 44100;//48000;//22050;//44100;//Mar03  48000;//Mar02  44100;//Feb28 back to 44.1     48000;                                         // !!!! Different than prior default of 44100
-      if (com_uti.lg2_stock_get ())
-        m_samplerate = 44100;//22050;//44100;//48000;//22050;//44100;
-    }
+    else if (com_uti.device == com_uti.DEV_LG2)
+      m_samplerate = 44100;
     else if (com_uti.device == com_uti.DEV_GS1)
       m_samplerate = 44100;
     else if (com_uti.device == com_uti.DEV_GS2)
@@ -290,19 +217,11 @@ API level 17 / 4.2+
     else if (com_uti.device == com_uti.DEV_GS3)
       m_samplerate = 44100;
 
-
-    if (android.os.Build.MANUFACTURER.toUpperCase (Locale.getDefault ()).equals ("SONY")
-            && (com_uti.device != com_uti.DEV_XZ2 || com_uti.android_version < 21)  // Add because FXP on Z2 needs 48k
-            && (com_uti.device != com_uti.DEV_QCV || com_uti.android_version < 21)  // Add because FXP on Z1 needs 48k too
-    )
+    if (android.os.Build.MANUFACTURER.toUpperCase (Locale.getDefault ()).equals ("SONY") && com_uti.android_version < 21)
       m_samplerate = 44100;
-
     com_uti.logd ("m_samplerate 3: " + m_samplerate);
 
-//!!DISABLE!!    m_samplerate = 44100;   // !! Fixed now !!
-//!!DISABLE!!    com_uti.logd ("m_samplerate 4 forced all to: " + m_samplerate);
-
-    m_hw_size = 3840;//320;//3840;//4096;        If wrong, 3840 works better on Qualcomm at least
+    m_hw_size = 3840;
     try {
       m_hw_size = 2 * m_channels * Integer.parseInt (hw_size_str);
     }
@@ -314,36 +233,8 @@ API level 17 / 4.2+
     if (m_hw_size >= 64 && m_hw_size <= pcm_size_max)
       m_hw_size = m_hw_size;
     else
-      m_hw_size = 3840;//320;//3840;//4096;
+      m_hw_size = 3840;
     com_uti.logd ("m_hw_size 2: " + m_hw_size);
-
-    if (com_uti.device == com_uti.DEV_GEN)
-      m_hw_size = 16384;
-    else if (com_uti.device == com_uti.DEV_QCV && old_htc)   // HTC OneXL misreports as 2048, but atminsize shows same as MotoG
-      m_hw_size = 320;//1920;//3840;//320;//3840;//1920;//320; // Still no good w/ 48K x 3840
-    else if (com_uti.device == com_uti.DEV_QCV && com_uti.m_manufacturer.equals ("SONY"))
-      m_hw_size = 5120;//320;
-    else if (com_uti.device == com_uti.DEV_QCV)
-      m_hw_size = 5120;//3840;//320;//3840;                                    // ?? Actual buffersize = 960 bytes ?
-    else if (com_uti.device == com_uti.DEV_ONE)         // ?? HTC J One Try 8160 ?? (25.5 * 320)
-      m_hw_size = 320;//3840 / 1;//1920;//960;//2304;//3072;
-    else if (com_uti.device == com_uti.DEV_XZ2)
-      m_hw_size = 5120;//320
-    else if (com_uti.device == com_uti.DEV_LG2) {
-      if (com_uti.lg2_stock_get ())
-        m_hw_size = 16384;//32768;//4096;//1024;
-      else
-        m_hw_size = 3840;//320;//3840;
-    }
-    else if (com_uti.device == com_uti.DEV_GS1)
-      m_hw_size = 3520;
-    else if (com_uti.device == com_uti.DEV_GS2)
-      m_hw_size = 4096;
-    else if (com_uti.device == com_uti.DEV_GS3)
-      m_hw_size = 4224;
-// Sony C6603: 1024
-
-    com_uti.logd ("m_hw_size 3: " + m_hw_size);
 
     if (com_uti.device == com_uti.DEV_QCV && old_htc)
       m_hw_size = 5120 * 2;
@@ -351,12 +242,13 @@ API level 17 / 4.2+
       m_hw_size = 5120 * 2;
     else
       m_hw_size = AudioRecord.getMinBufferSize (44100, AudioFormat.CHANNEL_IN_STEREO, AudioFormat.ENCODING_PCM_16BIT);
-    com_uti.logd ("m_hw_size 4: " + m_hw_size);
+    com_uti.logd ("m_hw_size 3: " + m_hw_size);
 
     if (m_hw_size > pcm_size_max)
       m_hw_size = pcm_size_max;
     if (m_hw_size < pcm_size_min)
       m_hw_size = pcm_size_min;
+    com_uti.logd ("m_hw_size 4: " + m_hw_size);
 
  }
 
@@ -407,6 +299,24 @@ API level 17 / 4.2+
   }
 
 
+    // Transmit
+
+  private void audio_transmit_pause () {
+    audio_transmit_stop ();
+  }
+  private void audio_transmit_stop () {
+    dai_set (false);
+  }
+  private void audio_transmit_start () {
+    dai_set (true);
+    if (m_AM != null) {
+      int max_musi_vol = m_AM.getStreamMaxVolume  (AudioManager.STREAM_MUSIC);
+      int cur_musi_vol = m_AM.getStreamVolume  (AudioManager.STREAM_MUSIC);
+      if (cur_musi_vol != max_musi_vol)
+        m_AM.setStreamVolume (AudioManager.STREAM_MUSIC, max_musi_vol, 0);//AudioManager.FLAG_SHOW_UI);    // Maximize volume and display volume change
+    }
+  }
+
 
     // Player and overall audio state control: (public's now via m_com_api)
 
@@ -426,8 +336,8 @@ API level 17 / 4.2+
       if (s2_tx) {
         audio_transmit_start ();
         m_com_api.audio_state = desired_state;
-        //if (m_svc_acb != null)
-        //  m_svc_acb.cb_audio_state_chngd (desired_state);
+        if (m_svc_acb != null)
+          m_svc_acb.cb_audio_state (m_com_api.audio_state);
       }
       else
         audio_start ();
@@ -436,8 +346,8 @@ API level 17 / 4.2+
       if (s2_tx) {
         audio_transmit_stop ();
         m_com_api.audio_state = desired_state;
-        //if (m_svc_acb != null)
-        //  m_svc_acb.cb_audio_state_chngd (desired_state);
+        if (m_svc_acb != null)
+          m_svc_acb.cb_audio_state (m_com_api.audio_state);
       }
       else
         audio_stop ();
@@ -446,8 +356,8 @@ API level 17 / 4.2+
       if (s2_tx) {
         audio_transmit_pause ();
         m_com_api.audio_state = desired_state;
-        //if (m_svc_acb != null)
-        //  m_svc_acb.cb_audio_state_chngd (desired_state);
+        if (m_svc_acb != null)
+          m_svc_acb.cb_audio_state (m_com_api.audio_state);
       }
       else
         audio_pause ();
@@ -510,11 +420,12 @@ API level 17 / 4.2+
     com_uti.logd ("audio_state: " + m_com_api.audio_state);
 
     if (! m_com_api.audio_state.equalsIgnoreCase ("start") && ! m_com_api.audio_state.equalsIgnoreCase ("pausing") && ! m_com_api.audio_state.equalsIgnoreCase ("stopping"))
-      return;   // !! What about Starting ??
+      return;
+    // To continue, current state must be Start, Pausing or Stopping        ?? What about Starting ??
 
-    pcm_audio_pause (true);
-
-    audio_output_off ();    // AFTER
+    pcm_audio_pause (true);                                             // Stop reading, then writing audio:    AudioRecorder, AudioTrack & threads
+// dai_set
+    audio_output_off ();                                                // setDeviceConnectionState if speaker on and headset plugged
 
     m_com_api.audio_state = "pause";
     if (m_svc_acb != null)
@@ -554,14 +465,14 @@ API level 17 / 4.2+
 
               if (state == BluetoothA2dp.STATE_CONNECTED || state == BluetoothA2dp.STATE_PLAYING) {
                 if (! m_over_a2dp) {
-                  mute_set (true);                                         // Restart audio
-                  mute_set (false);
+                  mute__set (true);                                         // Restart audio
+                  mute__set (false);
                 }
               }
               else {
                 if (m_over_a2dp) {
-                  mute_set (true);                                         // Restart audio
-                  mute_set (false);
+                  mute__set (true);                                         // Restart audio
+                  mute__set (false);
                 }
               }
             }
@@ -745,8 +656,6 @@ if (intent != null)
     if (s2_tx) {
       com_uti.logd ("s2_tx");
       return;
-      //return (0);
-      //return ("0");
     }
     com_uti.logd ("focusChange: " + focusChange + "  audio_state: " + m_com_api.audio_state);
     switch (focusChange) {
@@ -779,8 +688,6 @@ if (intent != null)
     if (s2_tx) {
       com_uti.logd ("s2_tx");
       return ("Stop");
-      //return (0);
-      //return ("0");
     }
     String str = "";
     return (m_com_api.audio_record_state);
@@ -821,24 +728,12 @@ if (intent != null)
     }
   }
 
-/* !!
-private final int getAndIncrement(int modulo) {
-    for (;;) {
-        int current = atomicInteger.get();
-        int next = (current + 1) % modulo;
-        if (atomicInteger.compareAndSet(current, next))
-            return current;
-    }
-}
-*/
 
     // pcm_read -> pcm_write
   private final Runnable pcm_write_runnable = new Runnable () {
     public void run () {
       com_uti.logd ("pcm_write_runnable run()");
-
       //native_priority_set (pcm_priority);
-
                                                                         // Setup temp vars before loop to minimize garbage collection
       byte [] aud_buf;
       int bufs = 0;
@@ -1285,7 +1180,10 @@ dai_delay = 0;  // !! No delay ??
   }
 
 
-  public int audio_routing_get () {
+  private int audio_routing_get () {
+    if (! com_uti.ena_log_audio_routing_get)
+      return (0);    
+
     int ctr = 0, bits = 0, ret = 0, ret_bits = 0;
     String bin_out = "";
     for (ctr = 31; ctr >= 0; ctr --) {

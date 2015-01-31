@@ -12,8 +12,6 @@
 #include "tnr_tnr.h"
 #include "tnr_tnr.c"
 
-#define EVT_LOCK_BYPASS             // Locking causes problems at beginning due to blocking iris_buf_get()
-
     // FM Chip specific code
 
   int dev_hndl      =     -1;
@@ -26,9 +24,6 @@
   int curr_stereo = 0;
 
   //extern struct v4l2_capability    v4l_cap;//     = {0};
-
-  #include <sys/system_properties.h>
-  int __system_property_set(const char *key, const char *value);
 
 /*
   int v4_get () {
@@ -473,39 +468,26 @@ enum iris_buf_t {
 
     // Chip API:
 
+#define V4L2_CTRL_CLASS_FM_TX           0x009b0000                      // FM Modulator controls
+#define V4L2_CID_FM_TX_CLASS_BASE               (V4L2_CTRL_CLASS_FM_TX | 0x900)
+    //#define V4L2_CID_FM_TX_CLASS                    (V4L2_CTRL_CLASS_FM_TX | 1)
+#define V4L2_CID_TUNE_POWER_LEVEL               (V4L2_CID_FM_TX_CLASS_BASE + 113)
+    //#define V4L2_CID_TUNE_ANTENNA_CAPACITOR         (V4L2_CID_FM_TX_CLASS_BASE + 114)
+
 
   int s2_tx = 0;
   int v4l_antenna = 0;
 
   int chip_imp_pwr_on (int pwr_rds) {
+
     int ret = 0;
     logd ("chip_imp_pwr_on");
     if (dev_hndl <= 0) {
       loge ("dev_hndl <= 0");
       return (-1);
     }
-/*  ret = chip_stro_req_set (3);                                            // Mono, to set index = 0 ?
-  if (ret) {
-    ret = chip_stro_req_set (0);                                          // Stereo
-    if (ret) {
-      //return (ret);
-      loge ("chip_imp_pwr_on chip_stro_req_seterror: %d", ret);                 // Continue since we use chip_imp_pwr_on () to detect V4L now and this is not vital
-    }
-  }*/
-    //chip_imp_mute_set (1);                                                      // Mute for now   !! Hangs when not on yet
-
-#define V4L2_CTRL_CLASS_FM_TX           0x009b0000      /* FM Modulator controls */
-
-#define V4L2_CID_FM_TX_CLASS_BASE               (V4L2_CTRL_CLASS_FM_TX | 0x900)
-//#define V4L2_CID_FM_TX_CLASS                    (V4L2_CTRL_CLASS_FM_TX | 1)
-
-#define V4L2_CID_TUNE_POWER_LEVEL               (V4L2_CID_FM_TX_CLASS_BASE + 113)
-//#define V4L2_CID_TUNE_ANTENNA_CAPACITOR         (V4L2_CID_FM_TX_CLASS_BASE + 114)
-
-    //chip_ctrl_get (V4L2_CID_TUNE_POWER_LEVEL);
 
     int new_state = 1;                                                    // Rx
-    //if (file_get ("/data/data/fm.a2d.s2/files/s2_tx"))
     if (pwr_rds == 107300)
       s2_tx = 1;
     else
@@ -517,68 +499,31 @@ enum iris_buf_t {
     else
       logd ("chip_imp_pwr_on PRIVATE_IRIS_STATE 1 success for: %d", new_state);
 
-
-    //chip_ctrl_get (V4L2_CID_TUNE_POWER_LEVEL);
-
     chip_ctrl_set (V4L2_CID_TUNE_POWER_LEVEL, 7);
-
-    //chip_ctrl_get (V4L2_CID_TUNE_POWER_LEVEL);
-
-    //chip_info_log ();
 
     v4l_tuner.index = 0;                                                  // Tuner index = 0
     v4l_tuner.type = V4L2_TUNER_RADIO;
     memset (v4l_tuner.reserved, 0, sizeof (v4l_tuner.reserved));
-    // !! Need power on first ??
     ret = ioctl (dev_hndl, VIDIOC_G_TUNER, & v4l_tuner);
     if (ret < 0) {
       loge ("chip_imp_pwr_on VIDIOC_G_TUNER errno: %d", errno);
-      //return (-1);                                                        // Not anymore (Must return error since we use chip_powr_on () to detect V4L now)
       if (errno == EINVAL)
         return (-1);
     }
     else {
       logd ("chip_imp_pwr_on VIDIOC_G_TUNER success name: %s  type: %d  cap: 0x%x  lo: %d  hi: %d  sc: %d  am: %d  sig: %d  afc: %d", v4l_tuner.name,
           v4l_tuner.type, v4l_tuner.capability, v4l_tuner.rangelow , v4l_tuner.rangehigh, v4l_tuner.rxsubchans, v4l_tuner.audmode, v4l_tuner.signal, v4l_tuner.afc);
-
-    // chip_imp_pwr_on VIDIOC_G_TUNER success name: FM  type: 1  cap: 0x1  lo: 1400000  hi: 1728000  sc: 3  am: 0  sig: 0  afc: 0
-
-    // chip_imp_pwr_on VIDIOC_G_TUNER success name: FM  type: 1  cap: 0x1  lo: 1400000  hi: 1728000  sc: 3  am: 1  sig: 0  afc: 0
-    // 1400/16 = 87.5, 1728/16 = 108
-
-    // chip_imp_pwr_on VIDIOC_G_TUNER success name: FM  type: 1  cap: 0x1  lo: 0  hi: 0  sc: 3  am: 1  sig: 0  afc: 0
-    // type: 1 = V4L2_TUNER_RADIO
-    // cap:  1 = V4L2_TUNER_CAP_LOW (62.5 Hz)       !! No V4L2_TUNER_CAP_STEREO	= 0x0010 ?? !! But have mono/stereo in sc
-    // !! lo/hi = 0 ??
-    // sc = V4L2_TUNER_SUB_MONO	0x0001	| V4L2_TUNER_SUB_STEREO	0x0002
-
-    // am: V4L2_TUNER_MODE_STEREO   1
-    // am: V4L2_TUNER_MODE_MONO     0
-
-    
-    //chip_imp_mute_set (1);                                                // Mute for now
-
-//    ms_sleep (100);
-
-    //if (v4l_tuner.capability & V4L2_TUNER_CAP_LOW)                    // Don't need
-    //  tuner_cap_low = 1;
     }
 
-
-   ret = chip_ctrl_get (V4L2_CID_PRIVATE_IRIS_ANTENNA);
-
+    ret = chip_ctrl_get (V4L2_CID_PRIVATE_IRIS_ANTENNA);
 
     v4l_antenna = 0;
-/*
-    if (! strncasecmp (prop_get ("ro.product.device"), "LT29", 4))      // 29i = TX
-      v4l_antenna = 3;
-    if (! strncasecmp (prop_get ("ro.product.device"), "LT30", 4))      // 30p/30at/30a = T
-      v4l_antenna = 3;
-    if (! strncasecmp (prop_get ("ro.product.device"), "MINT", 4))      // FreeXperia T
-      v4l_antenna = 3;
-    if (! strncasecmp (prop_get ("ro.product.device"), "HAYA", 4))      // FreeXperia TX "HAYABUSA"
-      v4l_antenna = 3;
-*/
+
+    //if (! strncasecmp (prop_get ("ro.product.device"), "LT29", 4))      // 29i = TX
+    //if (! strncasecmp (prop_get ("ro.product.device"), "LT30", 4))      // 30p/30at/30a = T
+    //if (! strncasecmp (prop_get ("ro.product.device"), "MINT", 4))      // FreeXperia T
+    //if (! strncasecmp (prop_get ("ro.product.device"), "HAYA", 4))      // FreeXperia TX "HAYABUSA"
+
     if (! strncasecmp (prop_get ("ro.product.manufacturer"), "SONY", 4)) {
       if (! strncasecmp (prop_get ("ro.product.device"), "C2",    2) || ! strncasecmp (prop_get ("ro.product.device"), "S39",     3) || ! strncasecmp (prop_get ("ro.product.device"), "C19", 3) ||
           //! strncasecmp (prop_get ("ro.product.device"), "C53",   3) || ! strncasecmp (prop_get ("ro.product.device"), "M35",     3) || //! strncasecmp (prop_get ("ro.product.device"), "C19", 3) ||
@@ -588,22 +533,21 @@ enum iris_buf_t {
       else
         v4l_antenna = 3;
     }
-    //if (! strncasecmp (prop_get ("ro.product.manufacturer"), "SEMC", 4))
-    //  v4l_antenna = 3;
 
     if (v4l_antenna >= 2) {
       ret = chip_ctrl_set (V4L2_CID_PRIVATE_IRIS_ANTENNA, v4l_antenna - 2);                     // 0 = External/headset antenna for OneS/XL/Evo 4G/All others, 1 = internal for Xperia T - Z1
      logd ("chip_imp_pwr_on PRIVATE_IRIS_ANTENNA ret: %d  v4l_antenna: %d", ret, v4l_antenna);
     }
+
     if (pwr_rds) {
       if (chip_ctrl_set (V4L2_CID_PRIVATE_IRIS_RDSON, 1) < 0)           // 0 = OFF, 1 = ON
         loge ("chip_imp_pwr_on PRIVATE_IRIS_RDSON 1 error");
       else
         logd ("chip_imp_pwr_on PRIVATE_IRIS_RDSON 1 success");
 
-      if (s2_tx) {
-        rds_pi_set (34357); // WSTX
-        rds_pt_set (9); // Varioed/Top 40
+      if (s2_tx) {                                                      // !! Doesn't work ??
+        rds_pi_set (34357);                                             // WSTX
+        rds_pt_set (9);                                                 // Varied/Top 40
         rds_ps_set ("SpiritTx");
         rds_rt_set ("rt34567890123456rt34567890123456rt34567890123456rt34567890123456");
       }
@@ -617,8 +561,6 @@ enum iris_buf_t {
         chip_ctrl_get (V4L2_CID_PRIVATE_IRIS_RDSD_BUF);
       }
     }
-
-    //ms_sleep (200);
 
     band_setup ();
 
@@ -653,13 +595,11 @@ enum iris_buf_t {
 
     logd ("chip_imp_pwr_off RDS off done");
 
-    // The close () powers down       !!! NO !!! Need the below:
-    // ?? !! Actually keeps running on AT&T OneX(L), mute will cover it.
+        // The close () does not power down the chip. Keeps running on AT&T OneX(L), and mute will cover it.
     if (chip_ctrl_set (V4L2_CID_PRIVATE_IRIS_STATE, 0) < 0)              // 0 = FM_OFF, 1 = FM_RECV, 2 = FM_TRANS, 3 = FM_RESET
       loge ("chip_imp_pwr_off PRIVATE_IRIS_STATE 0 error");
     else
       logd ("chip_imp_pwr_off PRIVATE_IRIS_STATE 0 success");
-
 
     ms_sleep (2020);
     logd ("chip_imp_pwr_off done");
@@ -677,19 +617,14 @@ enum iris_buf_t {
     }
     v4l_freq.tuner = 0;                                                   // Tuner index = 0
     v4l_freq.type = V4L2_TUNER_RADIO;
-    //if (!tuner_cap_low)
-    //  v4l_freq.frequency = (freq * FREQ_FRAC) / 1000;     // FREQ_FRAC(tion?) = 16
-    //else
-      v4l_freq.frequency = freq * 16;                                     // in units of 62.5 Hz ALWAYS for FM tuner. 62.5 KHz is too coarse for FM -> 250 KHz, Need 50 KHz
+    v4l_freq.frequency = freq * 16;                                     // in units of 62.5 Hz ALWAYS for FM tuner. 62.5 KHz is too coarse for FM -> 250 KHz, Need 50 KHz
     memset (v4l_freq.reserved, 0, sizeof (v4l_freq.reserved));
     ret = ioctl (dev_hndl, VIDIOC_S_FREQUENCY, & v4l_freq);
     if (ret < 0) {
-      //loge ("chip_imp_freq_set VIDIOC_S_FREQUENCY errno: %d", errno);
       loge ("chip_imp_freq_set VIDIOC_S_FREQUENCY errno: %d  freq: %d  v4l_freq.frequency: %d", errno, freq, v4l_freq.frequency);
-// Get these errors every 3-4 seconds But set frequency from UI works !
-//  01-28 18:43:01.749 E/s2svcsvc( 2667): cb_tuner_key: !!!!!!!!!!!!!!!!!!!!!!!!! Kickstarting stalled audio !!!!!!!!!!!!!!!!!!!!!!!!!!
-//  01-28 18:43:01.799 E/s2tnrqcv(11401): chip_imp_freq_set VIDIOC_S_FREQUENCY errno: 22
-
+        // Get these errors every 3-4 seconds But set frequency from UI works !
+        //  01-28 18:43:01.749 E/s2svcsvc( 2667): cb_tuner_key: !!!!!!!!!!!!!!!!!!!!!!!!! Kickstarting stalled audio !!!!!!!!!!!!!!!!!!!!!!!!!!
+        //  01-28 18:43:01.799 E/s2tnrqcv(11401): chip_imp_freq_set VIDIOC_S_FREQUENCY errno: 22
       return (-1);
     }
     curr_freq_val = freq;
@@ -736,48 +671,7 @@ enum iris_buf_t {
 
   int chip_imp_vol_set (int vol) {
     int ret = 0;
-/*
-https://www.codeaurora.org/git/projects/qrd-gb-dsds-7225/repository/revisions/3296eb78dea791708825e13271064ebcbf12c389/entry/kernel/drivers/media/radio/radio-tavarua.c
-
-static struct v4l2_queryctrl tavarua_v4l2_queryctrl[] = {        {
-                .id               = V4L2_CID_AUDIO_VOLUME,
-                .type               = V4L2_CTRL_TYPE_INTEGER,
-                .name               = "Volume",
-                .minimum       = 0,
-                .maximum       = 15,
-                .step               = 1,
-                .default_value = 15,        },
-*/
     return (0);
-/*
-
-  v4l_vol = vol / 4096;                                                 // 0 - 15
-
-  if (v4l_vol >= 15)
-    v4l_vol = 65535;
-  else if (v4l_vol == 14)
-    v4l_vol = 30000;
-
-  if (chip_ctrl_set (V4L2_CID_AUDIO_VOLUME, v4l_vol) < 0)
-    loge ("chip_imp_vol_set AUDV error");
-  else
-    logd ("chip_imp_vol_set AUDV success");
-
-*/
-/*
-  if (v4l_mixer_hndl > 0) {
-    v4l_vol = vol / 655;                                                // !! ?? Need 0 - 100 ??
-    v4l_vol |= (v4l_vol << 8);                                          // Stereo
-
-    ret = ioctl (v4l_mixer_hndl, SOUND_MIXER_WRITE_LINE, & v4l_vol);
-    if (ret < 0) {
-      loge ("chip_imp_vol_set SOUND_MIXER_WRITE_LINE errno: %d", errno);
-      return (-1);
-    }
-    logd ("chip_imp_vol_set SOUND_MIXER_WRITE_LINE success");
-  }
-  return (0);
-*/
   }
 
     // Get:
@@ -821,37 +715,13 @@ static struct v4l2_queryctrl tavarua_v4l2_queryctrl[] = {        {
     }
     static int timesb = 0;
     if (timesb ++ % 10 == 0)
-      //logd ("chip_imp_rssi_get VIDIOC_G_TUNER success: %d", v4l_tuner.signal);  // At 87.5 got 180 and 185
       if (ena_log_tnr_extra)
         logd ("chip_imp_rssi_get VIDIOC_G_TUNER success name: %s  type: %d  cap: 0x%x  lo: %d  hi: %d  sc: %d  am: %d  sig: %d  afc: %d", v4l_tuner.name,
             v4l_tuner.type, v4l_tuner.capability, v4l_tuner.rangelow , v4l_tuner.rangehigh, v4l_tuner.rxsubchans, v4l_tuner.audmode, v4l_tuner.signal, v4l_tuner.afc);
-/*  if (v4l_tuner.signal < -10)
-    rssi = -3;
-  else if (v4l_tuner.signal < 0)
-    rssi = -2;
-  else if (v4l_tuner.signal == 0)
-    rssi = 0;
-  else if (v4l_tuner.signal == 1)
-    rssi = 1;
-  else if (v4l_tuner.signal == 2)
-    rssi = 2;
-  else if (v4l_tuner.signal < 10)
-    rssi = 3;
-  else if (v4l_tuner.signal < 100)
-    rssi = 4;
-  //else if (v4l_tuner.signal < 1024)
-  //  rssi = 5;
-  //else
-  //  rssi = (v4l_tuner.signal / 1024) + 5;                               // rssi = 0 - 63    Now: -3 to 68
-*/
-// Get 21-22        (168 - 176)
-  //rssi = (v4l_tuner.signal / 8);
-
     rssi = v4l_tuner.signal - 150;                                        // 151 seen before proper power up ?      2014: ?  150 (0x96) = -106 to 205 (0xCD) = -51
     rssi *= 3;
     rssi /= 2;                                        // Multiply by 1.5 to scale similar to other chips / Broadcom (-144)
     //logd ("chip_imp_rssi_get: %d", rssi);
-  // RSSI -16 on N4 and OF means v4l_tuner.signal = 139
     return (rssi);
   }
 
@@ -862,32 +732,12 @@ static struct v4l2_queryctrl tavarua_v4l2_queryctrl[] = {        {
     int ret = ioctl (dev_hndl, VIDIOC_G_TUNER, & v4l_tuner);
     if (ret < 0) {
       loge ("chip_imp_stro_get VIDIOC_G_TUNER errno: %d", errno);
-      //return (-1);                                                        // Not anymore (Must return error since we use chip_powr_on () to detect V4L now)
       if (errno == EINVAL)
         return (-1);
     }
     else {
-//      logd ("chip_imp_stro_get VIDIOC_G_TUNER success name: %s  type: %d  cap: 0x%x  lo: %d  hi: %d  sc: %d  am: %d  sig: %d  afc: %d", v4l_tuner.name,
-//          v4l_tuner.type, v4l_tuner.capability, v4l_tuner.rangelow , v4l_tuner.rangehigh, v4l_tuner.rxsubchans, v4l_tuner.audmode, v4l_tuner.signal, v4l_tuner.afc);
-
-    // chip_imp_stro_get VIDIOC_G_TUNER success name: FM  type: 1  cap: 0x1  lo: 1400000  hi: 1728000  sc: 3  am: 0  sig: 0  afc: 0
-
-    // chip_imp_stro_get VIDIOC_G_TUNER success name: FM  type: 1  cap: 0x1  lo: 1400000  hi: 1728000  sc: 3  am: 1  sig: 0  afc: 0
-    // 1400/16 = 87.5, 1728/16 = 108
-
-    // chip_imp_stro_get VIDIOC_G_TUNER success name: FM  type: 1  cap: 0x1  lo: 0  hi: 0  sc: 3  am: 1  sig: 0  afc: 0
-    // type: 1 = V4L2_TUNER_RADIO
-    // cap:  1 = V4L2_TUNER_CAP_LOW (62.5 Hz)       !! No V4L2_TUNER_CAP_STEREO	= 0x0010 ?? !! But have mono/stereo in sc
-    // !! lo/hi = 0 ??
-    // sc = V4L2_TUNER_SUB_MONO	0x0001	| V4L2_TUNER_SUB_STEREO	0x0002
-
-    // am: V4L2_TUNER_MODE_STEREO   1
-    // am: V4L2_TUNER_MODE_MONO     0
-
-curr_stereo = v4l_tuner.audmode;
+      curr_stereo = v4l_tuner.audmode;
     }
-
-
 
     return (curr_stereo);
   }
@@ -937,14 +787,14 @@ enum iris_evt_t {
 #ifdef  NOT_USED
     char misc_buf [MISC_BUF_SIZE];
     memset (misc_buf, 0, sizeof (misc_buf));
-logd ("chip_imp_events_process before iris_buf_get()");
+    logd ("chip_imp_events_process before iris_buf_get()");
     ret = iris_buf_get (misc_buf, sizeof (misc_buf), BUF_EVENTS);   // Get events...
     if (ret < 0) {
       loge ("chip_imp_events_process EVENTS errno: %d", errno);
       return (-1);                                                      // No RDS
     }
-logd ("chip_imp_events_process EVENTS success: %d", ret);
-buf_display (misc_buf, ret);
+    logd ("chip_imp_events_process EVENTS success: %d", ret);
+    buf_display (misc_buf, ret);
     int event = misc_buf [0];
     switch (event) {
       case IRIS_EVT_RADIO_READY:    // 0
@@ -964,11 +814,11 @@ buf_display (misc_buf, ret);
         iris_rds_buf_handle (BUF_RAW_RDS);
         break;
       case IRIS_EVT_NEW_RT_RDS:
-logd ("Got IRIS_EVT_NEW_RT_RDS");
+        logd ("Got IRIS_EVT_NEW_RT_RDS");
         iris_rds_buf_handle (BUF_RT_RDS);
         break;
       case IRIS_EVT_NEW_PS_RDS:
-logd ("Got IRIS_EVT_NEW_PS_RDS");
+        logd ("Got IRIS_EVT_NEW_PS_RDS");
         iris_rds_buf_handle (BUF_PS_RDS);
         break;
       case IRIS_EVT_ERROR:
@@ -1030,8 +880,8 @@ logd ("Got IRIS_EVT_NEW_PS_RDS");
   }
 
     // Seek:
-/* Search options */
-enum search_t {
+
+  enum search_t {
 	SEEK,
 	SCAN,
 	SCAN_FOR_STRONG,
@@ -1040,11 +890,10 @@ enum search_t {
 	RDS_SCAN_PTY,
 	RDS_SEEK_PI,
 	RDS_AF_JUMP,
-};
+  };
 
 
-#define VIDIOC_S_HW_FREQ_SEEK    _IOW('V', 82, struct v4l2_hw_freq_seek)
-
+    #define VIDIOC_S_HW_FREQ_SEEK    _IOW('V', 82, struct v4l2_hw_freq_seek)
 
   int chip_imp_seek_start (int dir) {
     int ret = 0;
@@ -1058,7 +907,6 @@ enum search_t {
     v4l_seek.wrap_around = 1;                                           // ? yes
     v4l_seek.seek_upward = dir;                                         // ? always down ? If non-zero, seek upward from the current frequency, else seek downward.
     v4l_seek.spacing = 0;//curr_freq_inc * 1000;                        // ? 0 ok
-    //v4l2_hw_freq_seek
     ret = ioctl (dev_hndl, VIDIOC_S_HW_FREQ_SEEK, & v4l_seek);
     if (ret < 0) {
       loge ("chip_imp_seek_start VIDIOC_S_HW_FREQ_SEEK error: %d", ret);
@@ -1074,35 +922,8 @@ enum search_t {
       new_freq = chip_imp_freq_get ();
     }
     logd ("chip_imp_seek_start complete tenths of a second: %d  orig_freq: %d", ctr, orig_freq);
-    //if (ctr >= 50)
-    //  chip_imp_seek_stop ();
 
     return (new_freq);
-
-/*  int freq = 0, ctr = 0;
-    int this_freq = 88500;
-    for (ctr = 0; ctr < 2; ctr ++) {                                      // Do up to 2 seeks, 1st to freq or end of band, 2nd from end of band if at end of band
-      if (ctr > 0) {
-        if (dir)
-          this_freq = curr_freq_lo;
-        else
-          this_freq = curr_freq_hi;
-        chip_imp_freq_set (this_freq);
-      }
-      if (dir)
-        ret = ioctl (dev_hndl, Si4709_IOC_SEEK_UP, & freq);
-      else
-        ret = ioctl (dev_hndl, Si4709_IOC_SEEK_DOWN, & freq);
-      if (ret < 0) {
-        loge ("chip_imp_seek_start IOCTL Si4709_SEEK error: %3.3d", ret);
-        return (-1);
-      }
-      logd ("chip_imp_seek_start IOCTL Si4709_SEEK success freq: %3.3d", freq);
-      if (freq)
-        break;
-    }
-    this_freq = freq * 10;
-    return (this_freq);*/
   }
 
   int chip_imp_seek_stop () {
@@ -1189,6 +1010,7 @@ enum search_t {
       logd ("chip_emph75_set PRIVATE_IRIS_EMPHASIS success emph75: %d", emph75);
     return (0);
   }
+
 /*
   int rbds_set (int rbds) {
     logd ("rbds_set: %3.3d", rbds);

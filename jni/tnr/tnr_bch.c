@@ -9,8 +9,6 @@
 #include "tnr_tnr.h"
 #include "tnr_tnr.c"
 
-#define EVT_LOCK_BYPASS
-
 // Unix datagrams requires other write permission for /dev/socket, or somewhere else (ext, not FAT) writable.
 
 //#define CS_AF_UNIX        // Use network sockets to avoid filesystem permission issues.
@@ -1060,8 +1058,6 @@ Seek:
         }
       }
     }
-    //if (shim_hci_enable == 0)
-    //else
     if (stat ("/system/vendor/lib/libbt-vendor.so", & sb) == 0) {                 // If Bluedroid file exists...
       if (sb.st_size > 60000 && file_get ("/system/vendor/lib/libbt-vendoro.so")){// If our lib and have old lib to call  (If just large but no old, assume original
         if (file_get ("/dev/ttyHS0") || file_get ("/dev/ttyHS99")) {
@@ -1078,19 +1074,9 @@ Seek:
     int ret = 0;
     if (shim_hci_enable) {
       ret = shim_hci_start ();
-//bc_g2_pcm_set ();
     }
     else
       ret = uart_hci_start ();
-
-/* 
-    int ret = shim_hci_start ();                                        // Always try shim mode first (Can't use, doesn't return error
-    loge ("shim_hci_start (): %d", ret);
-    if (ret == 0)
-      return (ret);
-    else
-      return (uart_hci_start ());
-*/
   }
 
   int chip_imp_api_off () {
@@ -1101,76 +1087,6 @@ Seek:
       return (uart_hci_stop ());
   }
 
-
-/*
-void test_stuff() {
-    // bcm2048_set_fm_automatic_stereo_mono
-  reg_set (0x01, 0x02);               //BCM2048_I2C_FM_CTRL |= BCM2048_STEREO_MONO_AUTO_SELECT (BC_VAL_CTL_AUTO)
-}
-
-    // BCM2048 default initialization sequence
-int bcm2048_init(struct bcm2048_device *bdev) {
-	int err;
-	err = bcm2048_set_power_state (bdev, BCM2048_POWER_ON);
-	if (err < 0)
-		goto exit;
-	err = bcm2048_set_audio_route (bdev, BCM2048_AUDIO_ROUTE_DAC);
-	if (err < 0)
-		goto exit;
-	err = bcm2048_set_dac_output (bdev, BCM2048_DAC_OUTPUT_LEFT |
-		BCM2048_DAC_OUTPUT_RIGHT);
-exit:
-	return err;
-}
-
-    // BCM2048 default deinitialization sequence
-int bcm2048_deinit(struct bcm2048_device *bdev) {
-	int err;
-	err = bcm2048_set_audio_route(bdev, 0);
-	if (err < 0)
-		goto exit;
-	err = bcm2048_set_dac_output(bdev, 0);
-	if (err < 0)
-		goto exit;
-	err = bcm2048_set_power_state(bdev, BCM2048_POWER_OFF);
-	if (err < 0)
-		goto exit;
-exit:
-	return err;
-}
-
-    // BCM2048 probe sequence
-int bcm2048_probe(struct bcm2048_device *bdev) {
-	int err;
-	err = bcm2048_set_power_state(bdev, BCM2048_POWER_ON);
-	if (err < 0)
-		goto unlock;
-	err = bcm2048_checkrev(bdev);
-	if (err < 0)
-		goto unlock;
-	err = bcm2048_set_mute(bdev, BCM2048_DEFAULT_MUTE);
-	if (err < 0)
-		goto unlock;
-	err = bcm2048_set_region (bdev, BCM2048_DEFAULT_REGION);
-	if (err < 0)
-		goto unlock;
-	err = bcm2048_set_fm_search_rssi_threshold(bdev,
-					BCM2048_DEFAULT_RSSI_THRESHOLD);
-	if (err < 0)
-		goto unlock;
-	err = bcm2048_set_fm_automatic_stereo_mono(bdev, BCM2048_ITEM_ENABLED);
-	if (err < 0)
-		goto unlock;
-	err = bcm2048_get_rds_wline(bdev);
-	if (err < BCM2048_DEFAULT_RDS_WLINE)
-		err = bcm2048_set_rds_wline(bdev, BCM2048_DEFAULT_RDS_WLINE);
-	if (err < 0)
-		goto unlock;
-	err = bcm2048_set_power_state(bdev, BCM2048_POWER_OFF);
-unlock:
-	return err;
-}
-*/
 
 /*
 void bc_reg_dump (int lo, int hi, int bytes) {
@@ -1190,158 +1106,11 @@ void bc_reg_dump (int lo, int hi, int bytes) {
 }
 */
 
-int bc_reg_ctl       = 0;                                               // BC_REG_CTL       // 0x01  Band select, mono/stereo blend, mono/stereo select
-int bc_reg_aud_ctl0  = 0;                                               // BC_REG_AUD_CTL0  // 0x05  Mute, volume, de-emphasis, route parameters, BW select
-
-/* OneV w/ 4330                                                         DHD 4329
-1:
-0...
-09-01 23:53:07.606 D/fm_hrdw (15238): bc_reg_dump 0x5: 0x2 (2)
-0...
-09-01 23:53:07.687 D/fm_hrdw (15238): bc_reg_dump 0x8: 0x6 (6)          0
-0...
-09-01 23:53:07.877 D/fm_hrdw (15238): bc_reg_dump 0xf: 0xde (222)       0x87
-0...
-09-02 00:11:59.591 D/fm_hrdw (15795): bc_reg_dump 0x20: 0x1 (1)
-09-02 00:11:59.611 D/fm_hrdw (15795): bc_reg_dump 0x21: 0x58 (88)       0x50
-0...
-09-02 00:11:59.811 D/fm_hrdw (15795): bc_reg_dump 0x28: 0xff (255)
-09-02 00:11:59.831 D/fm_hrdw (15795): bc_reg_dump 0x29: 0x22 (34)
-0...
-09-02 00:11:59.891 D/fm_hrdw (15795): bc_reg_dump 0x2b: 0x3a (58)
-0...
-09-02 00:12:00.061 D/fm_hrdw (15795): bc_reg_dump 0x30: 0x1d (29)
-09-02 00:12:00.081 D/fm_hrdw (15795): bc_reg_dump 0x31: 0x2a (42)
-09-02 00:12:00.111 D/fm_hrdw (15795): bc_reg_dump 0x32: 0x4a (74)
-09-02 00:12:00.141 D/fm_hrdw (15795): bc_reg_dump 0x33: 0x24 (36)
-09-02 00:12:00.161 D/fm_hrdw (15795): bc_reg_dump 0x34: 0xea (234)
-0...
-09-02 00:12:00.221 D/fm_hrdw (15795): bc_reg_dump 0x36: 0x60 (96)
-09-02 00:12:00.241 D/fm_hrdw (15795): bc_reg_dump 0x37: 0x88 (136)      0
-09-02 00:12:00.271 D/fm_hrdw (15795): bc_reg_dump 0x38: 0x48 (72)       0
-0...                                                                    3b=xd
-09-02 00:12:00.432 D/fm_hrdw (15795): bc_reg_dump 0x3e: 0x14 (20)       0x3a
-09-02 00:12:00.462 D/fm_hrdw (15795): bc_reg_dump 0x3f: 0x72 (114)
-0...                                                                    42=x14,x4
-09-02 00:12:00.602 D/fm_hrdw (15795): bc_reg_dump 0x44: 0xab (171)
-09-02 00:12:00.632 D/fm_hrdw (15795): bc_reg_dump 0x45: 0x32 (50)
-0...
-09-02 00:12:00.712 D/fm_hrdw (15795): bc_reg_dump 0x48: 0x98 (152)
-0...
-09-02 00:12:00.762 D/fm_hrdw (15795): bc_reg_dump 0x4a: 0x12 (18)       0xd
-0...                                                                    4c=xa0
-09-02 00:12:00.852 D/fm_hrdw (15795): bc_reg_dump 0x4d: 0x44 (68)
-0...
-0x50 = 0x50
-
-2 only diff:
-09-01 23:53:08.457 D/fm_hrdw (15238): bc_reg_dump 0x8: 0x206 (518)          2 byte
-
-4:
-0...
-*/
-
-// 09-01 23:53:07.386 D/fm_hrdw (15238): hci_manuf_get HCI Version: 6  Revision: 4786  LMP Version: 6  Subversion: 16643  Manuf: 15
-// 4786 = 0x12b2
-// 16643 = 0x4103
-// 0x00: Bluetooth HCI Specification 1.0
-// LMP = Link Manager Protocol
-// Revision = Manufacturer controlled
-// Others = BT SIG standards
-
-/* Good after BT:
-09-01 23:52:59.589 D/fm_hrdw (15238): uart_baudrate_get termios_osp: 4098  termios_isp: 4098
-09-01 23:52:59.589 D/fm_hrdw (15238): uart_baudrate_get: 115200
-09-01 23:52:59.589 D/fm_hrdw (15238): baudrate_set: 115200
-09-01 23:52:59.589 D/fm_hrdw (15238): reset_start
-09-01 23:52:59.619 D/fm_hrdw (15238): patchram_set
-...
-09-01 23:52:59.619 D/fm_hrdw (15238): patchram_set fd: 85
-09-01 23:53:01.631 E/fm_hrdw (15238): tmo_read timeout reached of 2000 milliseconds
-
-09-01 23:53:01.631 D/fm_hrdw (15238): patchram_set read 1 ret: 0
-09-01 23:53:01.691 D/fm_hrdw (15238): patchram_set read 3 ret: 139  len: 139
-...
-*/
-/* Bad before BT:
-09-02 00:37:30.828 D/fm_hrdw ( 3845): uart_baudrate_get termios_osp: 13  termios_isp: 13
-09-02 00:37:30.828 D/fm_hrdw ( 3845): uart_baudrate_get: 9600
-09-02 00:37:30.828 D/fm_hrdw ( 3845): baudrate_set: 115200
-09-02 00:37:30.838 D/fm_hrdw ( 3845): reset_start
-09-02 00:37:30.858 D/fm_hrdw ( 3845): patchram_set
-...
-09-02 00:37:30.858 D/fm_hrdw ( 3845): patchram_set fd: 98
-09-02 00:37:32.870 E/fm_hrdw ( 3845): tmo_read timeout reached of 2000 milliseconds
-
-09-02 00:37:32.870 D/fm_hrdw ( 3845): patchram_set read 1 ret: 0
-09-02 00:37:32.930 D/fm_hrdw ( 3845): patchram_set read 3 ret: 139  len: 139
-09-02 00:37:33.730 E/fm_hrdw ( 3845): tmo_read timeout reached of 800 milliseconds
-09-02 00:37:33.730 E/fm_hrdw ( 3845): uart_recv error 1 rret: 0  flush: 0
-09-02 00:37:33.730 E/fm_hrdw ( 3845): hci_xact error rret: -1
-09-02 00:37:33.730 E/fm_hrdw ( 3845): patchram_set hci_xact 2 error: 139
-09-02 00:37:33.730 E/fm_hrdw ( 3845): uart_start patchram_set error
-*/
-
-
-
-// 3f 00 = "Customer_Extension"
-/*
-01-15 19:46:39.924 D/fm_hrdw ( 2104): bc_mute_set: 0
-
-01-15 19:46:40.064 D/fm_hrdw ( 2104): bc_g2_pcm_set 1
-01-15 19:46:40.064 E/fm_hrdw ( 2104): do_acc_hci hci err: 252 Unknown HCI Error
-01-15 19:46:40.064 E/fm_hrdw ( 2104): hci_cmd error res_len: 8  hci_err: 252 Unknown HCI Error
-01-15 19:46:40.064 D/fm_hrdw ( 2104): 00 04 0f 04 00 01 00 fc 
-01-15 19:46:40.064 D/fm_hrdw ( 2104): hci_cmd failed command ogf: 0x3f  ocf: 0x0  cmd_len: 13  res_max: 252
-01-15 19:46:40.064 D/fm_hrdw ( 2104): 00 00 00 00 01 00 fc 05 f3 88 01 02 05 
-01-15 19:46:40.064 E/fm_hrdw ( 2104): bc_g2_pcm_set hci error: 252 Unknown HCI Error
-
-01-15 19:46:40.114 D/fm_hrdw ( 2104): uart_recv flushed bytes: 7
-01-15 19:46:40.114 D/fm_hrdw ( 2104): ff 04 ff 04 f3 00 88 00 
-01-15 19:46:40.114 D/fm_hrdw ( 2104): uart_cmd uart_recv fret: 8  flushed: 0xf3
-
-
-01-15 19:46:40.194 D/fm_hrdw ( 2104): regional_set
-01-15 19:46:40.194 D/fm_hrdw ( 2104): bc_rbds_set: 1
-*/
-
-/*
-int bc_g2_pcm_set () {
-loge ("bc_g2_pcm_set");
-      ms_sleep (55);
-      reg_set (0xfb | 0x20000,  0x00000000);                            // Audio PCM ????       fb 00 00 00 00 00 
-      ms_sleep (55);
-      int inc = 100;
-      ms_sleep (55);
-      reg_set (0xfd | 0x10000, inc);
-      ms_sleep (55);
-      reg_set (0xf8 | 0x10000,  0x00ff);                                // Vol Max              f8 00 ff 00 
-
-loge ("bc_g2_pcm_set_orig");
-  unsigned char res_buf [MAX_HCI];
-  int res_len;
-  logd ("bc_g2_pcm_set 1");     // hcitool cmd 3f 00 f3 88 01 02 05
-
-  unsigned char hci_buf [] = {0, 0, 0, 0, 0, 0, 0, 0, 0xf3, 0x88, 0x01, 0x02, 0x05};
-
-  res_len = hci_cmd (0x3f, 0x00, hci_buf, sizeof (hci_buf), res_buf, sizeof (res_buf));
-  if (res_buf [7]) {
-    loge ("bc_g2_pcm_set hci error: %d %s", res_buf [7], hci_err_get (res_buf [7]));
-    return (res_buf [7]);
-  }
-  if (res_len < 1 + 8)
-    loge ("bc_g2_pcm_set hci_cmd error res_len: %d", res_len);
-  else 
-    loge ("bc_g2_pcm_set OK");
-  return (0);
-}
-*/
-
+  int bc_reg_ctl       = 0;                                               // BC_REG_CTL       // 0x01  Band select, mono/stereo blend, mono/stereo select
+  int bc_reg_aud_ctl0  = 0;                                               // BC_REG_AUD_CTL0  // 0x05  Mute, volume, de-emphasis, route parameters, BW select
 
   int version_sdk;
   char version_sdk_prop_buf       [DEF_BUF];
-
-
 
   int band_setup ();
 
@@ -1422,7 +1191,6 @@ loge ("bc_g2_pcm_set_orig");
       logd ("chip_imp_pwr_on success writing 0x01");
     ms_sleep (22);
 
-        // Always get error here ; don't need ? Default anyway ?
     if (reg_set (0x14, MAX_RDS_BLOCKS * 3) < 0) {//0x78) < 0) {                                         //0x7e);  //BC_REG_RDS_WLINE,         // 0x14  FIFO water line set level
       loge ("chip_imp_pwr_on error writing 0x14");                            // ?? Usually fails ??
     }
@@ -1430,71 +1198,13 @@ loge ("bc_g2_pcm_set_orig");
       logd ("chip_imp_pwr_on success writing 0x14");
     ms_sleep (22);
 
-    //reg_set (0xfb | 0x20000,  0x00000000);                              // Audio PCM ????       fb 00 00 00 00 00 
-
-
-    bc_reg_aud_ctl0 = 0;//0x23; //0x03;   //!! Mute for now     0x5c;   // radio-bcm2048.c also sets I2S     ROUTE_I2S_ENABLE |= 0x20 !!!! Test for Galaxy Tab etc.
-
-                            // Set: AUD_CTL0: RF_MUTE_DISABLE + MANUAL_MUTE_OFF + DAC_OUT_LEFT_ON + DAC_OUT_RIGHT_ON + ROUTE_DAC_ENABLE + ROUTE_I2S_DISABLE + DEMPH_75US
-
-
-    //bc_reg_aud_ctl0 = 0x60; // 
-    //bc_reg_aud_ctl0 = 0x5c; // 
-
     bc_reg_aud_ctl0 = 0x7c;//0x6c;     // 75 us, I2S, DAC, DAC left & right, no RF mute
-
-    //bc_reg_aud_ctl0 = 0xff;
 
     int bc_rev_id = reg_get (0x28);                                     // REV_ID always 0xff
     logd ("chip_imp_pwr_on bc_rev_id: %d", bc_rev_id);
     //logd ("reg 0: %d", reg_get (0x00));
 
     chip_imp_mute_set (0);                                                  // Unmute
-
-    //band_setup ();  // !! Done explicitly later via chip_imp_extra_cmd() with intern_band set
-
-    //chip_stro_req_set (curr_stro_req);
-    //chip_autoaf_set (curr_autoaf);
-    //chip_imp_freq_set (curr_freq_val);                                    // Don't set frequency until band is set
-
-
-    //!!!!!!!!!!!!!!!1
-    //chip_imp_vol_set (65535);                                             // Set volume...
-
-
-
-/*
-    reg_set (0x00 |       0,  0x03);                                    // FM + RDS = On        00 00 03 
-    reg_set (0x02 |       0,  0x02);                                    //  RDS + Flush         02 00 02 
-ms_sleep (50);
-    reg_set (0xfb | 0x20000,  0x00000000);                              // Audio PCM ????       fb 00 00 00 00 00 
-    reg_set (0x01 |       0,  0x02);                                    // NotJap + Stro Blnd   01 00 02 
-
-// Read 1 byte 0x44 from 0x4d        BC_REG_PCM_ROUTE = 0x4d,  // 0x4d  Controls routing of FM audio output to either PCM or Bluetooth SCO     0x44 or 0x40 on power-up
-
-ms_sleep (50);
-int reg = reg_get (0x4d);
-//ms_sleep (50);
-//reg_set (0x05 | 0x10000,  0x005c);                                  // 75 DAC No Mute       05 00 5c 00 
-
-ms_sleep (50);
-int inc = 100;
-reg_set (0xfd | 0x10000, inc);
-    //reg_set (0x14 |       0,  0x40);                                    // RDS WLINE 64         14 00 40 
-
-//ms_sleep (50);
-//    reg_set (0x05 | 0x10000,  0x006c);                                  // 75 I2S No Mute       05 00 6c 00 
-
-//    reg_set (0x0a | 0x10000,  0x5fb4);                                  // Freq 88.5            0a 00 b4 5f 
-
-//    reg_set (0x10 | 0x10000,  0x0003);                                  // IRQ MASKS            10 00 03 00 
-//    reg_set (0x09 |       0,  0x01);                                    // SrchTune Mode Prst   09 00 01 
-ms_sleep (50);
-    reg_set (0xf8 | 0x10000,  63);//0x00ff);                                  // Vol Max              f8 00 ff 00 
-
-    logd ("chip_imp_pwr_on done before sleep");
-    ms_sleep (500);
-*/
 
     prop_buf_get ("ro.product.board",            product_board_prop_buf);
     if (! strncasecmp (product_board_prop_buf, "GALBI", strlen ("GALBI")))        is_lg2 = 1;
@@ -1530,40 +1240,20 @@ ms_sleep (50);
       if (shim_hci_enable == 0) {                               // If LG G2 and UART:   See bt-ven.c not yet in bt-hci.c
         unsigned char res_buf [MAX_HCI];
         int res_len;
-        //logd ("bc_g2_pcm_set 1");     // hcitool cmd 3f 00 f3 88 01 02 05
-        unsigned char hci_buf [] = {0, 0, 0, 0, 0, 0, 0, 0, 0xf3, 0x88, 0x01, 0x02, 0x05};
+        unsigned char hci_buf [] = {0, 0, 0, 0, 0, 0, 0, 0, 0xf3, 0x88, 0x01, 0x02, 0x05};  // hcitool cmd 3f 00 f3 88 01 02 05
         res_len = hci_cmd (0x3f, 0x00, hci_buf, sizeof (hci_buf), res_buf, sizeof (res_buf));
         if (res_buf [7]) {
-          logd ("WAS bc_g2_pcm_set hci error: %d %s", res_buf [7], hci_err_get (res_buf [7]));      // !!!! Always error
-          //return (res_buf [7]);
+          logd ("chip_imp_pwr_on g2 hci error: %d %s", res_buf [7], hci_err_get (res_buf [7]));      // !!!! Always error
         }
         if (res_len < 1 + 8)
-          logd ("WAS bc_g2_pcm_set hci_cmd error res_len: %d", res_len);                            // !!!! Always error
+          logd ("chip_imp_pwr_on g2 hci_cmd error res_len: %d", res_len);                            // !!!! Always error
         else 
-          logd ("WAS bc_g2_pcm_set OK");
+          logd ("chip_imp_pwr_on g2 OK");
       }
     }
-/*
-01-29 05:35:34.096 D/s2tnrbch( 7101): LG G2 BC detected, return success buf [0] buf [7]
-01-29 05:35:34.096 E/s2tnrbch( 7101): do_acc_hci hci err: 252 Unknown HCI Error
-01-29 05:35:34.096 E/s2tnrbch( 7101): hci_cmd error res_len: 8  hci_err: 252 Unknown HCI Error
-01-29 05:35:34.096 D/s2tnrbch( 7101): hci_cmd failed command ogf: 0x3f  ocf: 0x0  cmd_len: 13  res_max: 252
-
-01-29 05:35:34.096 E/s2tnrbch( 7101): WAS bc_g2_pcm_set hci error: 252 Unknown HCI Error
-01-29 05:35:34.096 E/s2tnrbch( 7101): WAS bc_g2_pcm_set hci_cmd error res_len: 0
-
-01-29 05:35:34.096 D/s2tnrbch( 7101): chip_imp_pwr_on done
-01-29 05:35:34.096 D/s2tnrbch( 7101): chip_imp_mute_set: 000
-
-01-29 05:35:34.096 E/s2tnrbch( 7101): uart_send rret: 7
-01-29 05:35:34.096 E/s2tnrbch( 7101): 04 ff 04 f3 00 88 00 
-
-01-29 05:35:34.106 D/s2d.....( 7101): rx_start: 0
-01-29 05:35:34.106 D/s2comuti( 7059): daemon_set: key: tuner_state  val: Start  res: Start
-*/
 
 
-    int vol_val = 0x00ff;//40;                                             // Target max about 27,000
+    int vol_val = 0x00ff;                                               // Target max about 27,000
     if (is_m7 && version_sdk >= 21) {                                   // For HTC One M7 Lollipop
       vol_val = 0x0040;                                                 // Target max about 27,000
       if (file_get ("/system/framework/htcirlibs.jar"))                 // If HTC One M7 GPE       (Stock Android 5 too ????)
@@ -1624,14 +1314,9 @@ ms_sleep (50);
       bc_reg_aud_ctl0 |= 0x03;                                            // !! Must set FM mute bit so no blast of high volume on 4330/20780 !!  ?? RF Mute ???
     }
     else {
-bc_reg_aud_ctl0 |= 0x1d;//0x1c;                                     // Set: AUD_CTL0: dacs on, dac enable, no mutes, no i2s         !! Now RF mute
-//bc_reg_aud_ctl0 |= 0x01;
-      //!! No volume control without low bit set
-      //  bc_reg_aud_ctl0 |= 0x1c;                                            // Set: AUD_CTL0: dacs on, dac enable, no mutes, no i2s
-      //bc_reg_aud_ctl0 |= 0x20;                                          // Set: AUD_CTL0: + i2s !!!! Test for Galaxy Tab etc.
+      bc_reg_aud_ctl0 |= 0x1d;//0x1c;                                     // Set: AUD_CTL0: dacs on, dac enable, no mutes, no i2s         !! Now RF mute
     }
 
-//bc_reg_aud_ctl0 = 0x20; // I2S only
     if (reg_set (0x05 | 0x10000, bc_reg_aud_ctl0) < 0) {                  //
       loge ("bc_mute_set error writing 0x05");
     }
@@ -1651,59 +1336,23 @@ bc_reg_aud_ctl0 |= 0x1d;//0x1c;                                     // Set: AUD_
   int chip_imp_stro_set (int stereo) {                                        //
     int ret = 0;
 
-//stereo = 0;
-    logd ("chip_imp_stro_set: %3.3d", stereo);
-    // Default 0 = Blend Auto, 1 = Switch Auto, 2 = Stereo Force, 3 = Mono Force
-    bc_reg_ctl &= ~0x0e;                                                  // bits 1-3 = 0
+    logd ("chip_imp_stro_set: %3.3d", stereo);                          // Default 0 = Blend Auto, 1 = Switch Auto, 2 = Stereo Force, 3 = Mono Force
+    bc_reg_ctl &= ~0x0e;                                                // bits 1-3 = 0
     if (stereo != 0)
-      bc_reg_ctl |= 0x06;                                                 // Set CTL: + STEREO + AUTO
+      bc_reg_ctl |= 0x06;                                               // Set CTL: + STEREO + AUTO
     /*else if (stereo == 1)
-      bc_reg_ctl |= 0x0e;                                                 // Set CTL: + STEREO + AUTO + SWITCH
+      bc_reg_ctl |= 0x0e;                                               // Set CTL: + STEREO + AUTO + SWITCH
     else if (stereo == 2)
-      bc_reg_ctl |= 0x04;//0x0c;                                          // Set CTL: + STEREO + SWITCH (? Or 4 for STEREO only ?
+      bc_reg_ctl |= 0x04;//0x0c;                                        // Set CTL: + STEREO + SWITCH (? Or 4 for STEREO only ?
     else if (stereo == 0)*/
     else
-      bc_reg_ctl |= 0x00;                                                 // Set CTL: MONO
+      bc_reg_ctl |= 0x00;                                               // Set CTL: MONO
     if (reg_set (0x01, bc_reg_ctl) < 0) {
       loge ("chip_imp_stro_set error writing 0x01");
-      //return (-1);
     }
     return (0);
   }
 
-
-//xfc
-
-/* 4330/20780:
-// Galaxy Mini S5570 : v111001 -> v111004       if (!bc_20780) -> if (1)
-// ... vol_poke () created. Same code except if error doesn't ms_sleep (4000); and bc_20780 = 1;
-// -> chip_imp_pwr_on () does bc_vol0xf8_set = 0;
-
-// After one time (each power up on New) reg 0xF8 test which sets bc_vol0xf8 = 0; or bc_vol0xf8 = 1; ...
-Old:
-If bc_20780 and bc_vol0xf8 are both 0, do a volpoke.
-If timeout error, sleep 4 seconds and set bc_20780 = 1;
-If bc_20780 | bc_vol0xf8, set reg F8 and done.
-Else if (! bc_20780) do bc_ar_set (); if never before done
-
-New:
-Commented Same as line 1 above
-No timout error set as in 2 above
-Same as 3 above
-Else unconditional bc_ar_set (); and bc_vol_poke ();
-
-Difference: Assume bc_20780 = 1
-Old: set reg F8 and done
-
-*/
-
-/*
-Galaxy Y        Stock:  /system/bin/BCM4330B1_002.001.003.0485.0506.hcd
-
-Galaxy Nexus    Stock:  /system/vendor/firmware/bcm4330.hcd
-
-Galaxy 5 gt-i5500m Mad: /system/bin/BCM2049B0_BCM20780B0_002.001.022.0170.0174.hcd
-*/
 
 int bc_ar_set () {                                                      // Broadcom Audio route set (probably does something else?)
   unsigned char res_buf [MAX_HCI];
@@ -1711,10 +1360,8 @@ int bc_ar_set () {                                                      // Broad
 
   logd ("bc_ar_set 1");
 
-
     // bc_ar_1 Poke: a hcitool cmd 3f a 5 c0 41 f 0 20 00 00 00
     // bc_ar_1 Peek: a hcitool cmd 3f a 4 c0 41 f 0
-
 
   unsigned char bc_ar_1_buf [] = {0, 0, 0, 0, 0, 0, 0, 0, 5, 0xc0, 0x41, 0x0f, 0, 0x20};   // Cmd 0x0a = Super_Peek_Poke, 5 = ARM_Memory_Poke, Address: 0x000f41c0, Data: 0x00000020 (Don't need the 3 trailing 0's)
   //  char bc_ar_1_buf [] = {0, 0, 0, 0, 0, 0, 0, 0, 5, 0xc0, 0x41, 0x0f, 0, 0x20, 0, 0, 0};  // Add 3 trailing 0's
@@ -1743,69 +1390,6 @@ int bc_ar_set () {                                                      // Broad
     loge ("bc_ar_set 2 hci_cmd error res_len: %d", res_len);
 
   return (0);
-}
-
-/* Unknown: Seen on stock app for i5500:
-
-//COMMAND "Super_Peek_Poke" 0x00A: ARM_Memory_Poke 0x0020169c, 0x0000bd74           0xbd74 = 48, 500
-//[pid  5731] write (8, " 01 0a fc 09 05 9c 16 20 00 74 bd 00 00", 13) = 13
-//[pid  5740] read (8, " 04 0e 05 01 0a fc 00 74", 1704) = 8
-
-    // 4330/20780 Poke: a hcitool cmd 3f a 5 9c 16 20 0 74 bd 00 00
-    // 4330/20780 Peek: a hcitool cmd 3f a 4 9c 16 20 0                                  (Hangs on 4329)
-
-    char bc_ar_a_buf [] = {0, 0, 0, 0, 0, 0, 0, 0, 5, 0x9c, 0x16, 0x20, 0x00, 0x74, 0xbd, 0x00, 0x00};
-    res_len = hci_cmd (0x3f, 0x0a,bc_ar_a_buf, sizeof (bc_ar_a_buf), res_buf, sizeof (res_buf));
-    if (res_buf [7])
-      loge ("bc_ar_set a hci error: %d %s", res_buf [7], hci_err_get (res_buf [7]));
-    if (res_len < 1+8)
-      loge ("bc_ar_set a hci_cmd error res_len: %d", res_len);
-
-    //int ret = reg_set (0xfb | 0x20000, 0);
-*/
-
-/*  I/AudioFlinger      steps 0-15          Simply multiplies these by 2.5
-setFmVolume 0, 6, 13, 20, 26, 33, 40, 46, 53, 60, 66, 73, 80, 86, 93, 100 */
-
-/*
-    // 4330/20780 Poke: a hcitool cmd 3f a 5 9c 16 20 0 74 bd 00 00                      (Hangs on 4329)
-    // 4330/20780 Peek: a hcitool cmd 3f a 4 9c 16 20 0                                  (Hangs on 4329)
-
-    // bc_ar_1 Poke: a hcitool cmd 3f a 5 c0 41 f 0 20 00 00 00
-    // bc_ar_1 Peek: a hcitool cmd 3f a 4 c0 41 f 0
-
-    // bc_ar_2 Poke: a hcitool cmd 3f a 5 e4 41 f 0 00 00 00 00
-    // bc_ar_2 Peek: a hcitool cmd 3f a 4 e4 41 f 0
-
-    // bc_vol Poke: a hcitool cmd 3f a 5 e0 41 f 0 ff 0 0 0
-    // bc_vol Peek: a hcitool cmd 3f a 4 e0 41 f 0
-
-get F8:
-a hcitool cmd 3f 15 f8 1 2
-
-*/
-
-int bc_vol_poke (int vol) {
-  logd ("bc_vol_poke: %d", vol);
-
-  unsigned char res_buf [MAX_HCI];
-    // bc_vol Poke: a hcitool cmd 3f a 5 e0 41 f 0 ff 0 0 0
-    // bc_vol Peek: a hcitool cmd 3f a 4 e0 41 f 0
-
-    // Cmd 0x0a = Super_Peek_Poke, 5 = ARM_Memory_Poke, Address: 0x000f41e0, Data: 0x000000?? (volume)
-    // Poke: a hcitool cmd 3f a 5 e0 41 f 0 ff 0 0 0                    // Volume = 255 = Max
-    unsigned char cmd_buf [] = {0, 0, 0, 0, 0, 0, 0, 0, 5, 0xe0, 0x41, 0x0f, 0, 0};// Last byte here written with volume. Don't need 3 trailing 0's
-
-    //char cmd_buf [] = {0, 0, 0, 0, 0, 0, 0, 0, 5, 0xe0, 0x41, 0x0f, 0, 0, 0, 0, 0};  // Add 3 trailing 0's
-
-    cmd_buf [5 + 8] = vol / 256;                                           // Write last byte above (14th) with volume value 0 - 0xff
-
-    int res_len = hci_cmd (0x3f, 0x0a, (unsigned char *) cmd_buf, sizeof (cmd_buf), res_buf, sizeof (res_buf));
-    if (res_buf [7])
-      loge ("bc_vol_poke hci error: %d %s", res_buf [7], hci_err_get (res_buf [7]));
-    if (res_len < 1 + 8)
-      loge ("bc_vol_poke hci_cmd error res_len: %d", res_len);
-
 }
 
 
@@ -2004,9 +1588,6 @@ int bc_vol_poke (int vol) {
   }
   int rbds_set (int rbds) {
     logd ("rbds_set: %3.3d",rbds);
-// BCM2048_I2C_RDS_CTRL0 
-//#define BCM2048_RBDS_RDS_SELECT		0x01
-//#define BCM2048_FLUSH_FIFO		0x02
 
   logd ("bc_rbds_set: %d", rbds);
 
@@ -2015,50 +1596,8 @@ int bc_vol_poke (int vol) {
   else
     reg_set (0x02, 0x02); //  ?? correct ? + flush
 
-// BCM2048_I2C_RDS_CTRL0
-//#define BCM2048_RBDS_RDS_SELECT		0x01
-//#define BCM2048_FLUSH_FIFO		0x02
-
-
-// 
-/*
-  int orig= reg_get (0x02);
-  if (rbds)
-    reg_set (0x02, orig + ???);              // Set: RDS_CTL0: FLUSH_FIFO + RBDS for North America.
-  else
-    reg_set (0x02, orig + ???);              // Set: RDS_CTL0: FLUSH_FIFO + RDS  for everywhere else.
-
-//Reg ops same order as in TI wl128x driver:
-  //reg_set (0x2f, 1);                        // Flush the RDS FIFO
-
-  reg_get (0x12);                            // Read the flags to clear pending events
-
-  //reg_set (0x14,MAX_RDS_BLOCKS);           // RDS mem/FIFO set to 64/80 blocks = 192/240 bytes
-  ////reg_set (0x14,(MAX_RDS_BLOCKS*3)/4);   // RDS mem set to 48 blocks = 144 bytes
-  return (0);
-*/
     return (0);
   }
-
-/*
-//regional_set (curr_freq_lo, curr_freq_hi, curr_freq_inc, curr_freq_odd, curr_emph75, curr_rbds);
-int regional_set (int lo, int hi, int inc, int odd, int emph75, int rbds) {
-  logd ("regional_set");
-
-  //if (inc < 100)                                                            // !!!! Hack !!!!          !!!! ????
-  //  inc = 100;
-
-  if (inc < 50)
-    inc = 50;
-
-  chip_rbds_set (rbds);                                                      // Rbds before band for Tavarua V4L
-  intern_band_set (lo, hi);
-  curr_freq_inc_set (inc);
-  freq_odd_set (odd);
-  chip_emph75_set (emph75);
-  return (0);
-}
-*/
 
   int band_setup () {
     //logd ("band_setup");
@@ -2071,25 +1610,6 @@ int regional_set (int lo, int hi, int inc, int odd, int emph75, int rbds) {
     emph75_set (intern_band);
     rbds_set (intern_band);
   }
-
-/*
-  int band_setup () {
-    band_set (curr_freq_lo, curr_freq_hi);
-    freq_inc_set (curr_freq_inc);
-    if (curr_freq_inc >= 200) {                                         // If US
-      emph75_set (1);
-      rbds_set (1);
-    }
-    else {
-      emph75_set (0);
-      rbds_set (0);
-    }
-  }
-*/
-
-    // Disabled internal functions:
-/*  int chip_info_log () {
-  }*/
 
 
   int chip_imp_extra_cmd (const char * command, char ** parameters) {
@@ -2112,9 +1632,6 @@ int regional_set (int lo, int hi, int inc, int odd, int emph75, int rbds) {
       else if (full_val >= 200000 && full_val <= 200255) {
         int vol_reg_val = full_val - 200000;
         reg_set (0xf8 | 0x10000,  vol_reg_val);//0x000f);//0x00ff);                                // Vol Max              f8 00 ff 00 
-      }
-      else if (full_val == 230000) {
-        //bc_g2_pcm_set ();
       }
 
     return (0);

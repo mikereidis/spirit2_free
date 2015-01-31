@@ -192,13 +192,10 @@ com_uti.logd ("FREQ CODE freq: " + freq + "  hci: " + hci + "  port: " + port);
       if (! m_com_api.tuner_state.equalsIgnoreCase ("start") && ! m_com_api.tuner_state.equalsIgnoreCase ("starting")) {         // If not already started or starting
         m_com_api.tuner_state = "Starting"; // !! Already set
 
-        int ret = 0;
-        //com_uti.file_delete ("s2d_stop");
-
-        String s2_tx = "";
+        String cmd_line = "killall libs2d.so 1>/dev/null 2>/dev/null ; /data/data/fm.a2d.sf/lib/libs2d.so " + com_uti.device + "       " + " 1>/dev/null 2>/dev/null";
         if (com_uti.s2_tx_get ())
-          s2_tx = " s2_tx ";
-        ret = com_uti.sys_run ("killall libs2d.so 1>/dev/null 2>/dev/null ; /data/data/fm.a2d.sf/lib/libs2d.so " + com_uti.device + s2_tx + " 1>/dev/null 2>/dev/null", true);//  &", true);
+          cmd_line =      "killall libs2d.so 1>/dev/null 2>/dev/null ; /data/data/fm.a2d.sf/lib/libs2d.so " + com_uti.device + " s2_tx " + " 1>/dev/null 2>/dev/null";
+        int ret = com_uti.sys_run (cmd_line, true);
 
         com_uti.logd ("daemon kill/start ret: " + ret);
 
@@ -207,31 +204,26 @@ com_uti.logd ("FREQ CODE freq: " + freq + "  hci: " + hci + "  port: " + port);
         com_uti.logd ("1010 ms delay starting before tuner_state = start");
         com_uti.ms_sleep (1010);
 
-        String res = com_uti.daemon_set ("tuner_state", "Start");
-        com_uti.logd ("res: " + res);
+        m_com_api.tuner_state = com_uti.daemon_set ("tuner_state", "Start");
+        com_uti.logd ("m_com_api.tuner_state: " + m_com_api.tuner_state);
 
-        m_com_api.tuner_state = res;//"Start";         // State = Start
-        com_uti.logd ("start tuner_state: " + m_com_api.tuner_state);
-
-        if (! com_uti.s2_tx_get ())                                     // If not transmit mode...
+        //if (! com_uti.s2_tx_get ())                                     // If not transmit mode...
           poll_start ();                                                // Start polling for changes
       }
     }
     // STOP:
     else if (state.equalsIgnoreCase ("stop")) {                         // STOP:
       if (! m_com_api.tuner_state.equalsIgnoreCase ("stop")) {          // If not already stopped...
-        poll_stop ();                                                     // Stop polling for changes
+        poll_stop ();                                                   // Stop polling for changes
         m_com_api.tuner_state = "Stopping";
 
         String res = com_uti.daemon_set ("tuner_state", "Stop");
         com_uti.logd ("res: " + res);
 
-        com_uti.ms_sleep (505);//500);                                         // Wait 500 ms for s2d daemon to stop, before killing (which may kill network socket or tuner access)
+        com_uti.ms_sleep (505);                                         // Wait 500 ms for s2d daemon to stop, before killing (which may kill network socket or tuner access)
 
         m_com_api.tuner_state = "Stop";
 
-        //com_uti.file_create ("s2d_stop");
-        //com_uti.sys_run ();
         //com_uti.loge ("!!!! Should run killall libs2d.so here, after waiting a bit. But killing may kill UDP port !!!!");
         //com_uti.sys_run ("killall libs2d.so", true);  // To be sure
       }
@@ -250,7 +242,7 @@ com_uti.logd ("FREQ CODE freq: " + freq + "  hci: " + hci + "  port: " + port);
       return;
     poll_tmr = new Timer ("Poll", true);                                // Start poll timer so volume will be set before FM chip power up, and applied at chip power up.
     if (poll_tmr != null) {
-      poll_tmr.schedule (new poll_tmr_hndlr (), 3000, poll_ms);         // After 3 seconds every poll_ms ms
+      poll_tmr.schedule (new poll_tmr_hndlr (), 1000, poll_ms);         // After 1 seconds every poll_ms ms
     }
     //ms_sleep (10);                                                    // Wait 10 milliseconds.
     is_polling = true;
@@ -275,8 +267,6 @@ com_uti.logd ("FREQ CODE freq: " + freq + "  hci: " + hci + "  port: " + port);
   private int       new_freq_int    = -1;
   private class poll_tmr_hndlr extends TimerTask {
     public void run () {
-      //if (com_uti.file_get ("/sdcard/spirit/tnr_pof"))
-      //  return;
 
       if (tuner_state_callbacks) {
         m_com_api.tuner_state = com_uti.daemon_get ("tuner_state");
@@ -286,67 +276,50 @@ com_uti.logd ("FREQ CODE freq: " + freq + "  hci: " + hci + "  port: " + port);
 
       if (! m_com_api.tuner_state.equalsIgnoreCase ("start"))                                             // Done if state not started
         return;
-if (false) {
-      new_freq_str          = com_uti.daemon_get ("tuner_freq");
-      m_com_api.tuner_rssi  = com_uti.daemon_get ("tuner_rssi");
-      m_com_api.tuner_most  = com_uti.daemon_get ("tuner_most");
-      m_com_api.tuner_rds_pi= com_uti.daemon_get ("tuner_rds_pi");
-      m_com_api.tuner_rds_pt= com_uti.daemon_get ("tuner_rds_pt");
-      m_com_api.tuner_rds_ps= com_uti.daemon_get ("tuner_rds_ps");
-      m_com_api.tuner_rds_rt= com_uti.daemon_get ("tuner_rds_rt                                                                    ").trim ();    // !!!! Must have ~ 64 characters due to s2d design.
-}
-{                // 16 spaces: 16*6 + 64 + 4 * 6 = 96 + 64 + 24 = 184
-try {
-      String bulk = com_uti.daemon_get ("tuner_bulk                                                                                                                                                                                            ")
-            ;//.trim ();
 
-com_uti.logv ("bulk: \"" + bulk + "\"");
+      try {
+        String bulk = com_uti.daemon_get ("tuner_bulk                                                                                                                                                                                            ")
+            ;//.trim ();                                                // !!!! Must have ~ 64 - 184 characters due to s2d design.  // 16*6 + 64 + 4 * 6 = 96 + 64 + 24 = 184
+        com_uti.logv ("bulk: \"" + bulk + "\"");
 
-      String [] buar = {""};
-      buar = bulk.split ("mArK", 7);
+        String [] buar = {""};
+        buar = bulk.split ("mArK", 7);
 
-// Still get these on Galaxies: E/s2comuti(21003): int_get: Exception e: java.lang.NumberFormatException: Invalid double: "88500mArK704"
-if (buar.length <= 1)
-  return;
-
-      if (buar.length > 0) {
-        new_freq_str          = buar [0];
-        com_uti.logv ("new_freq_str: \"" + new_freq_str + "\"");
+        if (buar.length <= 1)                                             // Still get these on Galaxies: E/s2comuti(21003): int_get: Exception e: java.lang.NumberFormatException: Invalid double: "88500mArK704"
+          return;
+        if (buar.length > 0) {
+          new_freq_str          = buar [0];
+          com_uti.logv ("new_freq_str: \"" + new_freq_str + "\"");
+        }
+        if (buar.length > 1) {
+          m_com_api.tuner_rssi  = buar [1];
+          com_uti.logv ("m_com_api.tuner_rssi: \"" + m_com_api.tuner_rssi + "\"");
+        }
+        if (buar.length > 2) {
+          m_com_api.tuner_most  = buar [2];
+          com_uti.logv ("m_com_api.tuner_most: \"" + m_com_api.tuner_most + "\"");
+        }
+        if (buar.length > 3) {
+          m_com_api.tuner_rds_pi= buar [3];
+          com_uti.logv ("m_com_api.tuner_rds_pi: \"" + m_com_api.tuner_rds_pi + "\"");
+        }
+        if (buar.length > 4) {
+          m_com_api.tuner_rds_pt= buar [4];
+          com_uti.logv ("m_com_api.tuner_rds_pt: \"" + m_com_api.tuner_rds_pt + "\"");
+        }
+        if (buar.length > 5) {
+          m_com_api.tuner_rds_ps= buar [5];
+          com_uti.logv ("m_com_api.tuner_rds_ps: \"" + m_com_api.tuner_rds_ps + "\"");
+        }
+        if (buar.length > 6) {
+          m_com_api.tuner_rds_rt= buar [6].trim ();
+          com_uti.logv ("m_com_api.tuner_rds_rt: \"" + m_com_api.tuner_rds_rt + "\"");
+        }
       }
-if (buar.length <= 1)
-  return;
-
-      if (buar.length > 1) {
-        m_com_api.tuner_rssi  = buar [1];
-        com_uti.logv ("m_com_api.tuner_rssi: \"" + m_com_api.tuner_rssi + "\"");
+      catch (Throwable e) {
+        com_uti.loge ("Throwable: " + e);
+        e.printStackTrace ();
       }
-      if (buar.length > 2) {
-        m_com_api.tuner_most  = buar [2];
-        com_uti.logv ("m_com_api.tuner_most: \"" + m_com_api.tuner_most + "\"");
-      }
-      if (buar.length > 3) {
-        m_com_api.tuner_rds_pi= buar [3];
-        com_uti.logv ("m_com_api.tuner_rds_pi: \"" + m_com_api.tuner_rds_pi + "\"");
-      }
-      if (buar.length > 4) {
-        m_com_api.tuner_rds_pt= buar [4];
-        com_uti.logv ("m_com_api.tuner_rds_pt: \"" + m_com_api.tuner_rds_pt + "\"");
-      }
-      if (buar.length > 5) {
-        m_com_api.tuner_rds_ps= buar [5];
-        com_uti.logv ("m_com_api.tuner_rds_ps: \"" + m_com_api.tuner_rds_ps + "\"");
-      }
-      if (buar.length > 6) {
-        m_com_api.tuner_rds_rt= buar [6].trim ();
-        com_uti.logv ("m_com_api.tuner_rds_rt: \"" + m_com_api.tuner_rds_rt + "\"");
-      }
-}
-    catch (Throwable e) {
-      com_uti.loge ("Throwable: " + e);
-      e.printStackTrace ();
-    }
-}
-
 
 
         // Freq:
@@ -364,7 +337,7 @@ if (buar.length <= 1)
         // RSSI:
       //m_com_api.tuner_rssi = com_uti.daemon_get ("tuner_rssi");
       if (last_poll_rssi != (last_poll_rssi = com_uti.int_get (m_com_api.tuner_rssi)))
-//        m_svc_tcb.cb_tuner_key ("tuner_rssi", m_com_api.tuner_rssi);                        // Inform change
+        m_svc_tcb.cb_tuner_key ("tuner_rssi", m_com_api.tuner_rssi);                        // Inform change
 
         // MOST:
       //m_com_api.tuner_most = com_uti.daemon_get ("tuner_most");

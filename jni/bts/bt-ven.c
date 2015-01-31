@@ -44,7 +44,7 @@ a mount -o remount,rw /system ; adb push libs/armeabi/libbt-vendor.so /sdcard/ ;
   //int hcd_num = 0;
 
   int shim_hci_enable = 1;//0;                                              // Default 0 = UART, 1 = Bluedroid SHIM
-#include "tnr/bch_hci.c"
+  #include "tnr/bch_hci.c"
 
 
   static bt_vendor_callbacks_t * bt_ven_cbacks = NULL;

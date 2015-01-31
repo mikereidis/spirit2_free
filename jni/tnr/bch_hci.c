@@ -138,8 +138,8 @@ drwxrwxr-x    2 root     net_raw        220 May 16 05:04 socket
 #ifdef  CS_AF_UNIX
 #define DEF_API_SRVSOCK    "/dev/socket/srv_sprt"
 #define DEF_API_CLISOCK    "/dev/socket/cli_sprt"
-char api_srvsock[DEF_BUF] =DEF_API_SRVSOCK;
-char api_clisock[DEF_BUF] =DEF_API_CLISOCK;
+char api_srvsock [DEF_BUF] = DEF_API_SRVSOCK;
+char api_clisock [DEF_BUF] = DEF_API_CLISOCK;
 #endif
 
 #ifdef  CS_AF_UNIX
@@ -160,13 +160,13 @@ char api_clisock[DEF_BUF] =DEF_API_CLISOCK;
 
 //unsigned char res_buf [MAX_HCI] = {0};
 
-int do_daemon_hci ( char *cmd_buf, int cmd_len, char *res_buf, int res_max ) {
-  if (cmd_len==1 && cmd_buf [0] == 0x73) {
+int do_daemon_hci (char * cmd_buf, int cmd_len, char * res_buf, int res_max ) {
+  if (cmd_len == 1 && cmd_buf [0] == 0x73) {
     logd ("do_daemon_hci got ready inquiry");
     res_buf [0] = cmd_buf [0];
     return (1);
   }
-  else if (cmd_len==1 && cmd_buf [0] == 0x7f) {
+  else if (cmd_len == 1 && cmd_buf [0] == 0x7f) {
     logd ("do_daemon_hci got stop");
     res_buf [0] = cmd_buf [0];
     exiting = 1;

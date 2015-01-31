@@ -125,6 +125,7 @@ public final class com_uti  {
 
 
   public  static final boolean ena_log_pcm_stat = true;
+  public  static final boolean ena_log_audio_routing_get = true;
 
   private static final boolean ena_log_verbo = false;
   private static final boolean ena_log_debug = true;
@@ -2455,6 +2456,16 @@ It should be noted that operation in this region is the same as it is for all RD
     return (ret);
   }
 
+/*
+private final int getAndIncrement(int modulo) {
+    for (;;) {
+        int current = atomicInteger.get();
+        int next = (current + 1) % modulo;
+        if (atomicInteger.compareAndSet(current, next))
+            return current;
+    }
+}
+*/
 
 }
 

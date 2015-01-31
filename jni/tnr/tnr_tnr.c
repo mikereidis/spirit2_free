@@ -5,41 +5,6 @@
 
   #include "utils.c"
 
-    // FM Chip specific functions in this code called from generic plug.c code:
-
-  int chip_lock_val = 0;
-  char * curr_lock_cmd = "none";
-  int chip_lock_get (char * cmd) {
-#ifdef EVT_LOCK_BYPASS
-    return (0);
-#endif
-
-    int retries = 0;
-    int max_msecs = 3030;
-    int sleep_ms = 101; // 10
-    while (retries ++ < max_msecs / sleep_ms) {
-      chip_lock_val ++;
-      if (chip_lock_val == 1) {
-        curr_lock_cmd = cmd;
-        return (0);
-      }
-      chip_lock_val --;
-      if (chip_lock_val < 0)
-        chip_lock_val = 0;
-      loge ("sleep_ms: %d  retries: %d  cmd: %s  curr_lock_cmd: %s", sleep_ms, retries, cmd, curr_lock_cmd);
-      ms_sleep (sleep_ms);
-    }
-    loge ("chip_lock_get retries exhausted");
-    return (-1);
-  }
-  int chip_lock_ret () {
-    if (chip_lock_val > 0)
-      chip_lock_val --;
-    if (chip_lock_val < 0)
-      chip_lock_val = 0;
-    return (0);
-  }
-
 /*
     // API start/stop
   int chip_imp_api_on   (int freq_lo, int freq_hi, int freq_inc);
@@ -363,46 +328,48 @@ int freq_dn_get (int freq) {                                            // Calle
   int last_af_count_get_s = 0;
   int af_regional_count = 0;
 
-  char g1 [256] = "";
+  //char g1 [256] = "";
   unsigned char rds_grpd [8] = {0};
-  char g2 [256] = "";
+  //char g2 [256] = "";
 
   int curr_af_num = 0;                                                    // Current number of AF table entries
 
     // Values: Current (under construction), Candidate (complete, but must be repeated before confirmed), Confirmed (Displayable, with few if any visual/logical defects.)
-int curr_pi = 0;         // Program ID. Canada non-national = 0xCxxx.   // 88.5: 0x163e, 106.1: 0xc448, 105.3: 0xc87d, 106.9: 0xdc09, 91.5: 0xb102, 89.1: 0, 89.9: 0x15d6, 93.9: 0xccb6
-int cand_pi = 0;
-int conf_pi = 0;
 
-int curr_pt = -1;         // 88.5: 5 = Rock   106.1: 6 = Classic Rock
-int cand_pt = -1;
-int conf_pt = -1;
+  int cand_pi_ctr = 0;
+  int curr_pi = 0;         // Program ID. Canada non-national = 0xCxxx.   // 88.5: 0x163e, 106.1: 0xc448, 105.3: 0xc87d, 106.9: 0xdc09, 91.5: 0xb102, 89.1: 0, 89.9: 0x15d6, 93.9: 0xccb6
+  int cand_pi = 0;
+  int conf_pi = 0;
+
+  int cand_pt_ctr = 0;
+  int curr_pt = -1;         // 88.5: 5 = Rock   106.1: 6 = Classic Rock
+  int cand_pt = -1;
+  int conf_pt = -1;
+
+  //char g3 [256] = "";
+  char curr_ps [9] = "        ";  // Current PS: Assembled here to start.
+
+  //char g14a [256] = "";
+  char cand_ps [9] = "        ";  // Candidate PS: When all bytes are set, curr_ps is copied to cand_ps.
+
+  //char g2a [256] = "";
+  char conf_ps [9] = "        ";  // Confirmed PS: When a new Current PS matches Candidate PS, the candidate is considered confirmed and copied here where the App can retrieve it.
 
 
-char g3 [256] = "";
-char curr_ps [9] = "        ";  // Current PS: Assembled here to start.
+  //char g5 [256] = "";
+  char curr_rt [65] = "                                                                ";     // Current RT.
 
-char g14a [256] = "";
-char cand_ps [9] = "        ";  // Candidate PS: When all bytes are set, curr_ps is copied to cand_ps.
+  //char g15 [256] = "";
+  char cand_rt [65] = "                                                                ";     // Candidate RT.
 
-char g2a [256] = "";
-char conf_ps [9] = "        ";  // Confirmed PS: When a new Current PS matches Candidate PS, the candidate is considered confirmed and copied here where the App can retrieve it.
+  //char g4 [256] = "";
+  char conf_rt [65] = "                                                                ";     // Confirmed RT.
 
+  //char g6 [256] = "";
+  char conf_rf [65] = {0};                                              // Confirmed RT with no trailing spaces.
+  //char g7 [256] = "";
 
-char g5 [256] = "";
-char curr_rt [65] = "                                                                ";     // Current RT.
-
-char g15 [256] = "";
-char cand_rt [65] = "                                                                ";     // Candidate RT.
-
-char g4 [256] = "";
-char conf_rt [65] = "                                                                ";     // Confirmed RT.
-
-char g6 [256] = "";
-char conf_rt_fix [65] = {0};                                              // Confirmed RT with no trailing spaces.
-char g7 [256] = "";
-
-char g16 [256] = "";
+  //char g16 [256] = "";
 
 
 
@@ -698,7 +665,7 @@ char g16 [256] = "";
   }
 */
 
-    // Minimum: rx_start or tx_start, pause, resume, reset
+    // Minimum: rx_start or tx_start, pause2, resume, reset
   int rx_start (void ** session_data, const struct fmradio_vendor_callbacks_t * callbacks, int low_freq, int high_freq, int default_freq, int grid) {
     logd ("rx_start callbacks: %p  lo: %d  hi: %d  def: %d  grid: %d", callbacks, low_freq, high_freq, default_freq, grid);
     if (callbacks) {
@@ -736,8 +703,8 @@ char g16 [256] = "";
     logd ("tx_start lo: %d  hi: %d  def: %d  grid: %d", low_freq, high_freq, default_freq, grid);
     return (0);
   }
-  int pause_CONFLICT (void ** session_data) {                           // Name will conflict with C pause() otherwise
-    logd ("pause");
+  int pause2 (void ** session_data) {                           // Name will conflict with C pause2() otherwise
+    logd ("pause2");
     chip_api_mute_set (1);                                              // Mute
     return (0);
   }
@@ -910,7 +877,7 @@ char xfrm (char rds_char) {
   struct fmradio_vendor_methods_t vendor_funcs = {
     rx_start,                                                           // Set 5 callbacks, chip_api_api_on(), chip_api_pwr_on(), rx_thread_start().
     tx_start,                                                           // --
-    pause_CONFLICT,                                                     // chip_api_mute_set(1). Mute audio on chip. Could also set chip to low power. Name conflicts with C library pause()
+    pause2,                                                     // chip_api_mute_set(1). Mute audio on chip. Could also set chip to low power. Name conflicts with C library pause2()
     resume,                                                             // chip_api_mute_set(0). Unmute "                                             "
     reset,                                                              // AKA "off" or "rx_stop": rx_thread_stop(), chip_api_pwr_off(), chip_api_api_off()
     set_frequency,                                                      // Set freq: chip_api_freq_set(), rds_reset()
