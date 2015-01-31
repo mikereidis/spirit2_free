@@ -1085,7 +1085,7 @@ dai_delay = 0;  // !! No delay ??
     com_uti.logd ("reads_processed: " + reads_processed + " writes_processed: " + writes_processed);
   }
 
-  private void audio_output_off () {                                                    // Called only from audio_pause, after pcm read and write stopped
+  private void audio_output_off () {                                    // Called only from audio_pause, after pcm read and write stopped
     if (s2_tx) {                                                        // Do nothing if transmit mode...
       return;
     }
@@ -1114,10 +1114,10 @@ dai_delay = 0;  // !! No delay ??
 
     boolean need_restart = false;
     if (m_com_api.audio_state.equalsIgnoreCase ("start") && (com_uti.device == com_uti.DEV_GS1 || com_uti.device == com_uti.DEV_GS2 || com_uti.device == com_uti.DEV_GS3))
-      //pcm_audio_stop (true);                                            // If audio started and device needs restart... (GS3 only needs for OmniROM, but make universal)
+      //pcm_audio_stop (true);                                          // If audio started and device needs restart... (GS3 only needs for OmniROM, but make universal)
       need_restart = true;
 
-    if (new_audio_output.equalsIgnoreCase ("speaker")) {                                        // If -> Speaker...
+    if (new_audio_output.equalsIgnoreCase ("speaker")) {                // If -> Speaker...
       if (need_restart)
         pcm_audio_stop (true);
       setDeviceConnectionState (DEVICE_OUT_WIRED_HEADSET, DEVICE_STATE_UNAVAILABLE, "");        // Headset unavailable

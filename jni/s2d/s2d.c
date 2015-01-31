@@ -827,7 +827,27 @@ sock_rx_tmo_set (sockfd, 100);
 //Read-only on Nameless Lollipop:
   static char * codec_reg_sa44     = "/sys/devices/platform/soc-audio/WM8994 AIF1/codec_reg";      // Only access on stock, additional on CM11 unofficial for N7100
   static char * codec_reg_sa44_esc = "/sys/devices/platform/soc-audio/WM8994\\ AIF1/codec_reg";     // Space Escaped
-  
+
+  int is_note2_set = 0;
+  int is_note2_val = 0;
+  int is_note2 () {
+    if (is_note2_set)
+      return (is_note2_val);
+
+    is_note2_val = 0;
+    prop_buf_get ("ro.product.device",           product_device_prop_buf);
+
+    if (! strncasecmp (product_device_prop_buf, "T03G",     strlen ("T03G")))     // Galaxy Note2 3G
+      is_note2_val = 1;
+    else if (! strncasecmp (product_device_prop_buf, "GT-N71",   strlen ("GT-N71")))
+      is_note2_val = 1;
+    else if (! strncasecmp (product_device_prop_buf, "GALAXYN71",strlen ("GALAXYN71")))
+      is_note2_val = 1;
+
+    loge ("is_note2_val: %d", is_note2_val);
+    is_note2_set = 1;
+    return (is_note2_val);
+  }  
 
   int gs3_digital_input_on () {
 
@@ -854,6 +874,10 @@ sock_rx_tmo_set (sockfd, 100);
     alsa_bool_set ("AIF1ADC1 HPF Switch", 0);   // Or "AIF1ADC1 HPF Mode" = 0 = HiFi
 
 
+    alsa_enum_set ("AIF1ADCL Source", 0);
+    alsa_enum_set ("AIF1ADCR Source", 1);       // !! Set to Left (0) on recent KK/LOL ROMs January 2015
+
+
     if (file_get (codec_reg_omni)) {
        codec_reg = codec_reg_omni;
        codec_reg_esc = codec_reg_omni;
@@ -867,7 +891,7 @@ sock_rx_tmo_set (sockfd, 100);
        codec_reg_esc = codec_reg_sa44_esc;
     }
 
-    if (/*is_note2 () &&*/ file_get (codec_reg)) {                    // !! Should verify N7100 better, but should be benign anyway
+    if (is_note2 () && file_get (codec_reg)) {                    // !! Should verify N7100 better, but should be benign anyway
       if (file_get (codec_reg_omni))
         cached_sys_run ("echo -n    2 2320 > /sys/kernel/debug/asoc/Midas_WM1811/wm8994-codec/codec_reg 2>/dev/null");
       else if (file_get (codec_reg_cm11))
@@ -888,7 +912,7 @@ sock_rx_tmo_set (sockfd, 100);
     return (0);
   }
   int gs3_digital_input_off () {                                     // Set back to assumed defaults
-    alsa_bool_set ("MIXINR IN2R Switch", 1);
+    //alsa_bool_set ("MIXINR IN2R Switch", 0);
     return (0);
   }
 
