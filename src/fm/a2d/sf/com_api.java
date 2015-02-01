@@ -76,8 +76,8 @@ public class com_api {
   public  String tuner_rds_ta       = "";                               // ro ... ... Values:   0 - 65535   TA Traffic Announcement code
   public  String tuner_rds_taf      = "";                               // ro ... ... Values:   0 - 2^32-1  TAF TA Frequency
 
-  public int num_radio_update   = 0;
-  public int num_key_set        = 0;
+  public int num_api_radio_update   = 0;
+  public int num_key_set            = 0;
 
 
     // Code:
@@ -142,9 +142,9 @@ public class com_api {
   }
 
 
-  public void radio_update (Intent intent) {
-    num_radio_update ++;
-    com_uti.logw ("num_radio_update: " + num_radio_update + "  intent: " + intent);
+  public void api_radio_update (Intent intent) {
+    num_api_radio_update ++;
+    com_uti.logw ("num_api_radio_update: " + num_api_radio_update + "  intent: " + intent);
 
     Bundle extras = intent.getExtras ();
 

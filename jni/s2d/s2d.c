@@ -818,6 +818,8 @@ sock_rx_tmo_set (sockfd, 100);
     //IN2R = -16.5 to +30 * ( 0/IN2RP (FM Left) - 0/IN2RN (FM Right) )
     //-> MIXINR:  0, +30      = -16.5 to +30 or  13.5 to +60                  */
 
+#define NOTE2_1_CHANNEL_LOW_HACK
+#ifdef NOTE2_1_CHANNEL_LOW_HACK
   static char * codec_reg          = "/sys/kernel/debug/asoc/T0_WM1811/wm8994-codec/codec_reg";
   static char * codec_reg_esc      = "/sys/kernel/debug/asoc/T0_WM1811/wm8994-codec/codec_reg";    // Space Escaped
 
@@ -848,6 +850,7 @@ sock_rx_tmo_set (sockfd, 100);
     is_note2_set = 1;
     return (is_note2_val);
   }  
+#endif
 
   int gs3_digital_input_on () {
 
@@ -877,38 +880,30 @@ sock_rx_tmo_set (sockfd, 100);
     alsa_enum_set ("AIF1ADCL Source", 0);
     alsa_enum_set ("AIF1ADCR Source", 1);       // !! Set to Left (0) on recent KK/LOL ROMs January 2015
 
-
+#ifdef NOTE2_1_CHANNEL_LOW_HACK
     if (file_get (codec_reg_omni)) {
-       codec_reg = codec_reg_omni;
-       codec_reg_esc = codec_reg_omni;
+       codec_reg    = codec_reg_omni;
+       codec_reg_esc= codec_reg_omni;
     }
     else if (file_get (codec_reg_cm11)) {
-       codec_reg = codec_reg_cm11;
-       codec_reg_esc = codec_reg_cm11;
+       codec_reg    = codec_reg_cm11;
+       codec_reg_esc= codec_reg_cm11;
     }
     else if (file_get (codec_reg_sa44)) {
-       codec_reg = codec_reg_sa44;
-       codec_reg_esc = codec_reg_sa44_esc;
+       codec_reg    = codec_reg_sa44;
+       codec_reg_esc= codec_reg_sa44_esc;
     }
 
     if (is_note2 () && file_get (codec_reg)) {                    // !! Should verify N7100 better, but should be benign anyway
       if (file_get (codec_reg_omni))
-        cached_sys_run ("echo -n    2 2320 > /sys/kernel/debug/asoc/Midas_WM1811/wm8994-codec/codec_reg 2>/dev/null");
+        cached_sys_run ("echo -n    2 2320 > /sys/kernel/debug/asoc/Midas_WM1811/wm8994-codec/codec_reg 2>/dev/null ; echo -n   18  116 > /sys/kernel/debug/asoc/Midas_WM1811/wm8994-codec/codec_reg 2>/dev/null");
       else if (file_get (codec_reg_cm11))
-        cached_sys_run ("echo -n    2 2320 > /sys/kernel/debug/asoc/T0_WM1811/wm8994-codec/codec_reg 2>/dev/null");
+        cached_sys_run ("echo -n    2 2320 > /sys/kernel/debug/asoc/T0_WM1811/wm8994-codec/codec_reg    2>/dev/null ; echo -n   18  116 > /sys/kernel/debug/asoc/T0_WM1811/wm8994-codec/codec_reg    2>/dev/null");
       else
-        cached_sys_run ("echo -n    2 2320 > /sys/devices/platform/soc-audio/WM8994\\ AIF1/codec_reg 2>/dev/null");
-      sys_commit ();
-
-      if (file_get (codec_reg_omni))
-        cached_sys_run ("echo -n   18  116 > /sys/kernel/debug/asoc/Midas_WM1811/wm8994-codec/codec_reg 2>/dev/null");
-      else if (file_get (codec_reg_cm11))
-        cached_sys_run ("echo -n   18  116 > /sys/kernel/debug/asoc/T0_WM1811/wm8994-codec/codec_reg 2>/dev/null");
-      else
-        cached_sys_run ("echo -n   18  116 > /sys/devices/platform/soc-audio/WM8994\\ AIF1/codec_reg 2>/dev/null");
+        cached_sys_run ("echo -n    2 2320 > /sys/devices/platform/soc-audio/WM8994\\ AIF1/codec_reg    2>/dev/null ; echo -n   18  116 > /sys/devices/platform/soc-audio/WM8994\\ AIF1/codec_reg    2>/dev/null");
       sys_commit ();
     }
-
+#endif
     return (0);
   }
   int gs3_digital_input_off () {                                     // Set back to assumed defaults

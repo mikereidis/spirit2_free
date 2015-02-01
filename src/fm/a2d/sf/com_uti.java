@@ -104,7 +104,7 @@ public final class com_uti  {
 
   private static int band_freq_lo = 87500, band_freq_hi = 108000, band_freq_inc = 100, band_freq_odd = 0;
 
-
+  public static final int s2_notif_id = 2112;                           // No relevance except to uniquely identify notification !! Spirit1 uses same !!
 
   public com_uti () {                                                    // Default constructor
     //com_uti.logd ("m_obinits: " + m_obinits++);   // !! Can't log from internal code, class is not set up yet !!
@@ -746,6 +746,9 @@ failure to promptly write the input stream or read the output stream of the subp
     if (log)
       logd ("exists: " + exists + "  \'" + filename + "\'");
     return (exists);
+  }
+  public static boolean quiet_file_get (String filename) {
+    return (file_get (filename, false));
   }
   public static boolean file_get (String filename) {
     return (file_get (filename, true));

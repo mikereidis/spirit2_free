@@ -18,6 +18,7 @@ import android.media.MediaMetadataRetriever;
 import android.media.RemoteControlClient;
 import android.os.Bundle;
 import android.os.IBinder;
+import android.os.PowerManager;
 import android.widget.Toast;
 
 
@@ -93,7 +94,7 @@ public class svc_svc extends Service implements svc_tcb, svc_acb {  // Service c
       m_svc_tap = new svc_tnr (this, this, m_com_api);                  // Instantiate tuner        class
 
 
-        startForeground (2112, new Notification.Builder (m_context).build ());
+        startForeground (com_uti.s2_notif_id, new Notification.Builder (m_context).build ());
     }
     catch (Throwable e) {
       e.printStackTrace ();
@@ -114,12 +115,12 @@ public class svc_svc extends Service implements svc_tcb, svc_acb {  // Service c
   public void onDestroy () {
     com_uti.logd ("");
 
-    com_uti.logd ("com_uti.num_daemon_get:       " + com_uti.num_daemon_get);
-    com_uti.logd ("com_uti.num_daemon_set:       " + com_uti.num_daemon_set);
+    com_uti.logd ("com_uti.num_daemon_get:              " + com_uti.num_daemon_get);
+    com_uti.logd ("com_uti.num_daemon_set:              " + com_uti.num_daemon_set);
 
     if (m_com_api != null) {
-      com_uti.logd ("m_com_api.num_key_set:      " + m_com_api.num_key_set);
-      com_uti.logd ("m_com_api.num_radio_update: " + m_com_api.num_radio_update);
+      com_uti.logd ("m_com_api.num_key_set:             " + m_com_api.num_key_set);
+      com_uti.logd ("m_com_api.num_api_radio_update:    " + m_com_api.num_api_radio_update);
     }
 
 
@@ -258,11 +259,29 @@ public class svc_svc extends Service implements svc_tcb, svc_acb {  // Service c
 
     // For state and status updates:
 
-  private void displays_update (String caller) {                        // Update all "displays"
-    //com_uti.logd ("caller: " + caller);
+  private PowerManager pmgr = null;
 
-    Intent radio_status_intent = radio_status_send ();                  // Update widgets, apps, etc. and get resulting Intent
-    m_com_api.radio_update (radio_status_intent);                       // Get current data in Radio API using Intent (To update all dynamic/external data)
+  private void displays_update (String caller) {                        // Update all "displays"
+
+    if (pmgr == null)
+      pmgr = (PowerManager) m_context.getSystemService (Context.POWER_SERVICE);
+
+    boolean screen_on = pmgr.isScreenOn ();
+    if (! screen_on)
+      return;
+
+    com_uti.loge ("caller: " + caller);
+
+if (! com_uti.quiet_file_get ("/sdcard/spirit/api_radio_update_dis")) {
+    Intent radio_status_intent = radio_status_send ();                  // Build Intent to send and Update widgets, GUI(s), other components and 
+    m_com_api.api_radio_update (radio_status_intent);                   // Get current data in Radio API using Intent
+}
+
+if (! com_uti.quiet_file_get ("/sdcard/spirit/notif_radio_update_dis")) {
+}
+
+if (! com_uti.quiet_file_get ("/sdcard/spirit/remote_radio_update_dis")) {
+}
 
   }
 
@@ -619,19 +638,17 @@ public class svc_svc extends Service implements svc_tcb, svc_acb {  // Service c
 
   public void cb_tuner_key (String key, String val) {
     com_uti.logv ("key: " + key + "  val: " + val);
-///*
+
     if (com_uti.device == com_uti.DEV_QCV && m_svc_aap.audio_blank_get ()) {   // If we need to kickstart audio...
       com_uti.loge ("!!!!!!!!!!!!!!!!!!!!!!!!! Kickstarting stalled audio m_com_api.tuner_freq: " + m_com_api.tuner_freq);
       //m_svc_tap.tuner_set ("tuner_stereo", m_com_api.tuner_stereo);     // Set Stereo (Frequency also works, and others ?)
-
       m_svc_aap.audio_blank_set (false);
-
-String temp_freq = m_com_api.tuner_freq;
+      String temp_freq = m_com_api.tuner_freq;
       m_svc_tap.tuner_set ("tuner_freq", "88800");     // Set Frequency to 88.8
-m_com_api.tuner_freq = temp_freq;
+      m_com_api.tuner_freq = temp_freq;
       m_svc_tap.tuner_set ("tuner_freq", m_com_api.tuner_freq);     // Set Frequency
     }
-//*/
+
     if (key == null)
       return;
     else if (key.equalsIgnoreCase ("tuner_state"))
@@ -695,7 +712,7 @@ m_com_api.tuner_freq = temp_freq;
     com_uti.prefs_set (m_context, "tuner_freq", new_freq);
   }
   private void cb_tuner_rssi (String rssi) {
-    displays_update ("cb_tuner_rssi");
+    //displays_update ("cb_tuner_rssi");
   }
 // Qual:
   private void cb_tuner_qual (String qual) {

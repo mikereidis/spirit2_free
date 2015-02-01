@@ -80,7 +80,7 @@ public class svc_bcr extends BroadcastReceiver {                        // !! Op
       com_uti.logd ("gui_act.m_com_api: " + gui_act.m_com_api);
     }
 
-    gui_act.m_com_api.radio_update (intent);                                    // Context change issues between broadcasts ???
+    gui_act.m_com_api.api_radio_update (intent);                        // Context change issues between broadcasts ???
 
     com_uti.logv ("tuner_state: " + gui_act.m_com_api.tuner_state + "  audio_state: " + gui_act.m_com_api.audio_state);
   }

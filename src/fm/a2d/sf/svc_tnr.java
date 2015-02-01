@@ -245,6 +245,7 @@ com_uti.logd ("FREQ CODE freq: " + freq + "  hci: " + hci + "  port: " + port);
       poll_tmr.schedule (new poll_tmr_hndlr (), 1000, poll_ms);         // After 1 seconds every poll_ms ms
     }
     //ms_sleep (10);                                                    // Wait 10 milliseconds.
+//poll_ctr = 0;
     is_polling = true;
   }
   private void poll_stop () {
@@ -265,8 +266,15 @@ com_uti.logd ("FREQ CODE freq: " + freq + "  hci: " + hci + "  port: " + port);
   private int       new_rds_pt      = -1;
   private String    new_freq_str    = "-1";
   private int       new_freq_int    = -1;
+
+//private int poll_ctr = 0;
+
   private class poll_tmr_hndlr extends TimerTask {
     public void run () {
+
+//poll_ctr ++;
+      //if (poll_ctr >= 16)
+      //  return;
 
       if (tuner_state_callbacks) {
         m_com_api.tuner_state = com_uti.daemon_get ("tuner_state");
@@ -337,21 +345,24 @@ com_uti.logd ("FREQ CODE freq: " + freq + "  hci: " + hci + "  port: " + port);
         // RSSI:
       //m_com_api.tuner_rssi = com_uti.daemon_get ("tuner_rssi");
       if (last_poll_rssi != (last_poll_rssi = com_uti.int_get (m_com_api.tuner_rssi)))
+//if (poll_ctr < 16)
         m_svc_tcb.cb_tuner_key ("tuner_rssi", m_com_api.tuner_rssi);                        // Inform change
 
         // MOST:
       //m_com_api.tuner_most = com_uti.daemon_get ("tuner_most");
-      if (! last_poll_most.equals (m_com_api.tuner_most))
-//        m_svc_tcb.cb_tuner_key ("tuner_most", last_poll_most = m_com_api.tuner_most);       // Inform change
+      //if (! last_poll_most.equals (m_com_api.tuner_most))
+      // m_svc_tcb.cb_tuner_key ("tuner_most", last_poll_most = m_com_api.tuner_most);       // Inform change
 
         // RDS ps:
       //m_com_api.tuner_rds_ps = com_uti.daemon_get ("tuner_rds_ps");
       if (! last_poll_rds_ps.equals (m_com_api.tuner_rds_ps))
+//if (poll_ctr < 16)
         m_svc_tcb.cb_tuner_key ("tuner_rds_ps", last_poll_rds_ps = m_com_api.tuner_rds_ps); // Inform change
 
         // RDS rt:
       //m_com_api.tuner_rds_rt = com_uti.daemon_get ("tuner_rds_rt                                                                    ").trim ();    // !!!! Must have ~ 64 characters due to s2d design.
       if (! last_poll_rds_rt.equals (m_com_api.tuner_rds_rt))
+//if (poll_ctr < 16)
         m_svc_tcb.cb_tuner_key ("tuner_rds_rt", last_poll_rds_rt = m_com_api.tuner_rds_rt); // Inform change
 
         // RDS pi:
@@ -360,6 +371,7 @@ com_uti.logd ("FREQ CODE freq: " + freq + "  hci: " + hci + "  port: " + port);
       if (last_poll_rds_pi != new_rds_pi) {
         last_poll_rds_pi = new_rds_pi;
         m_com_api.tuner_rds_picl = com_uti.tnru_rds_picl_get (m_com_api.tuner_band, new_rds_pi);
+//if (poll_ctr < 16)
         m_svc_tcb.cb_tuner_key ("tuner_rds_pi", m_com_api.tuner_rds_pi);                    // Inform change
       }
 
@@ -369,6 +381,7 @@ com_uti.logd ("FREQ CODE freq: " + freq + "  hci: " + hci + "  port: " + port);
       if (last_poll_rds_pt != new_rds_pt) {
         last_poll_rds_pt = new_rds_pt;
         m_com_api.tuner_rds_pt = m_com_api.tuner_rds_ptyn = com_uti.tnru_rds_ptype_get (m_com_api.tuner_band, new_rds_pt);
+//if (poll_ctr < 16)
         m_svc_tcb.cb_tuner_key ("tuner_rds_pt", m_com_api.tuner_rds_pt);                    // Inform change
       }
     }

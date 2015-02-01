@@ -129,12 +129,12 @@ public class gui_act extends Activity {     //public class gui_act extends Fragm
     api_bcr_stop ();
     gui_stop ();
 
-    com_uti.logd ("com_uti.num_daemon_get:       " + com_uti.num_daemon_get);
-    com_uti.logd ("com_uti.num_daemon_set:       " + com_uti.num_daemon_set);
+    com_uti.logd ("com_uti.num_daemon_get:              " + com_uti.num_daemon_get);
+    com_uti.logd ("com_uti.num_daemon_set:              " + com_uti.num_daemon_set);
 
     if (m_com_api != null) {
-      com_uti.logd ("m_com_api.num_key_set:      " + m_com_api.num_key_set);
-      com_uti.logd ("m_com_api.num_radio_update: " + m_com_api.num_radio_update);
+      com_uti.logd ("m_com_api.num_key_set:             " + m_com_api.num_key_set);
+      com_uti.logd ("m_com_api.num_api_radio_update:    " + m_com_api.num_api_radio_update);
     }
 
     // super.onDestroy dismisses any dialogs or cursors the activity was managing. If the logic in onDestroy has something to do with these things, then order may matter.
@@ -197,7 +197,7 @@ public class gui_act extends Activity {     //public class gui_act extends Fragm
             return;
 
           if (m_com_api != null && m_gui_gap != null) {
-            m_com_api.radio_update (intent);
+            m_com_api.api_radio_update (intent);
 
             m_gui_gap.gap_radio_update (intent);
           }
