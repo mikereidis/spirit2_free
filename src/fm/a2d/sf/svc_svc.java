@@ -7,7 +7,6 @@ import android.app.Notification;
 import android.app.NotificationManager;
 import android.app.PendingIntent;
 import android.app.Service;
-import android.bluetooth.BluetoothAdapter;
 import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
@@ -23,6 +22,7 @@ import android.widget.Toast;
 
 
 import java.io.BufferedReader;
+import java.io.File;
 import java.io.FileReader;
 import java.io.FileOutputStream;
 import java.lang.reflect.Method;
@@ -35,10 +35,10 @@ public class svc_svc extends Service implements svc_tcb, svc_acb {  // Service c
     // Also see AndroidManifest.xml.
 
     // Action: Commands sent to this service
-  //"fm.a2d.sf.action.set"
+  //"fm.a2d.sf.action.set"  = com_uti.api_action_id
 
     // Result: Broadcast multiple status/state data items to all registered listeners; apps, widgets, etc.
-  //"fm.a2d.sf.result.get"
+  //"fm.a2d.sf.result.get"  = com_uti.api_result_id
 
 
     // No constructor
@@ -64,17 +64,22 @@ public class svc_svc extends Service implements svc_tcb, svc_acb {  // Service c
 
   private boolean               rfkill_state_set_on = false;
 
-  private BluetoothAdapter      m_bt_adapter    = null;
-
   private AudioManager          m_AM = null;
 
-  private boolean s2_tx = false;
+  private boolean s2_tx             = false;
+  private boolean remote_rcc_enable = false;
+  private boolean service_update_gui = true;
+  private boolean service_update_notification = true;
+  private boolean service_update_remote = true;
 
   @Override
   public void onCreate () {                                             // When service newly created...
     com_uti.logd ("stat_creates: " + stat_creates++);
 
     try {
+
+      com_uti.devnum_set (m_context);                                   // Set/get device number
+
       //com_uti.strict_mode_set (true);                                 // Enable strict mode; disabled for now
       com_uti.strict_mode_set (false);                                  // !!!! Disable strict mode so we can send network packets from Java
 
@@ -83,6 +88,19 @@ public class svc_svc extends Service implements svc_tcb, svc_acb {  // Service c
       s2_tx = com_uti.s2_tx_get ();
       if (s2_tx)
         com_uti.logd ("s2_tx");
+
+      if (s2_tx) {                                                      // If Transmit mode
+        remote_rcc_enable = false;
+      }
+      else if (com_uti.android_version <  21) {                          // Else if receive mode and Kitkat or earlier
+// && com_uti.bt_get () ) {     // Needed for lockscreen and AVRCP on BT devices
+        remote_rcc_enable = true;
+      }
+      else if (com_uti.android_version >= 21) {                          // Else if receive mode and Lollipop or later
+// Needed for AVRCP on BT devices only ?
+        remote_rcc_enable = true;
+      }
+
 
       if (m_com_api == null) {
         m_com_api = new com_api (this);                                 // Instantiate Common API   class
@@ -93,8 +111,24 @@ public class svc_svc extends Service implements svc_tcb, svc_acb {  // Service c
 
       m_svc_tap = new svc_tnr (this, this, m_com_api);                  // Instantiate tuner        class
 
+      String update_gui = com_uti.prefs_get (m_context, "service_update_gui", "");
+      if (update_gui.equalsIgnoreCase ("Disable"))
+        service_update_gui = false;
+      else
+        service_update_gui = true;
+      String update_notification = com_uti.prefs_get (m_context, "service_update_notification", "");
+      if (update_notification.equalsIgnoreCase ("Disable"))
+        service_update_notification = false;
+      else
+        service_update_notification = true;
+      String update_remote = com_uti.prefs_get (m_context, "service_update_remote", "");
+      if (update_remote.equalsIgnoreCase ("Disable"))
+        service_update_remote = false;
+      else
+        service_update_remote = true;
 
-        startForeground (com_uti.s2_notif_id, new Notification.Builder (m_context).build ());
+      //foreground_start ();
+
     }
     catch (Throwable e) {
       e.printStackTrace ();
@@ -102,14 +136,13 @@ public class svc_svc extends Service implements svc_tcb, svc_acb {  // Service c
   }
 
     // Continuing methods in lifecycle order:  (Some don't apply to services, more for activities)
-/*
-  @Override
+
+    /*@Override
   public void onStart (Intent intent, int param_int) {
     com_uti.logd ("");
     super.onStart (intent, param_int);
     com_uti.logd ("");
-  }
-*/
+  }*/
 
   @Override
   public void onDestroy () {
@@ -120,15 +153,40 @@ public class svc_svc extends Service implements svc_tcb, svc_acb {  // Service c
 
     if (m_com_api != null) {
       com_uti.logd ("m_com_api.num_key_set:             " + m_com_api.num_key_set);
-      com_uti.logd ("m_com_api.num_api_radio_update:    " + m_com_api.num_api_radio_update);
+      com_uti.logd ("m_com_api.num_api_service_update:  " + m_com_api.num_api_service_update);
     }
 
+    if (! m_com_api.audio_state.equalsIgnoreCase ("stop"))
+      com_uti.loge ("destroy with m_com_api.audio_state: " + m_com_api.audio_state);
+
+    if (! m_com_api.tuner_state.equalsIgnoreCase ("stop"))
+      com_uti.loge ("destroy with m_com_api.tuner_state: " + m_com_api.tuner_state);
+
+    if (! m_com_api.tuner_api_state.equalsIgnoreCase ("stop"))
+      com_uti.loge ("destroy with m_com_api.tuner_api_state: " + m_com_api.tuner_api_state);
+
+    //tuner_state_set ("stop");                                         // This might take a while, and hang, since presumably tuner should already be stopped when onDestroy() is called
+                                                                        // Just settle for the error logging above
+
+    foreground_stop ();                                                 // !! match startForeground()
 
 
-    //tuner_state_set ("stop");
-    //m_svc_tap = null;
+    m_svc_tap = null;
   }
 
+
+  private void foreground_start () {
+    //if (service_update_remote || service_update_notification) // Stops media buttons ?
+
+      com_uti.logd ("Calling startForeground");
+      startForeground (com_uti.s2_notif_id, new Notification.Builder (m_context).build ());
+  }
+
+  private void foreground_stop () {
+      com_uti.logd ("Calling stopForeground");
+      stopForeground (true);                                            // Stop Foreground (for audio) and remove notification (true)       !! match startForeground()
+
+  }
 
   @Override
   public IBinder onBind (Intent arg0) {
@@ -152,49 +210,100 @@ public class svc_svc extends Service implements svc_tcb, svc_acb {  // Service c
       com_uti.loge ("action == null");
       return (start_type);
     }
-    if (! action.equalsIgnoreCase ("fm.a2d.sf.action.set")) {
+    if (! action.equalsIgnoreCase (com_uti.api_action_id)) {//"fm.a2d.sf.action.set")) {
       com_uti.loge ("action: " + action);
       return (start_type);
     }
 
     Bundle extras = intent.getExtras ();
-    com_uti.logd ("extras: " + extras);
-    if (extras == null)
+    if (extras == null) {
+      com_uti.loge ("NULL extras");
       return (start_type);
+    }
+    com_uti.logd ("extras: " + extras.describeContents ());
 
     String val = "";
 
-    val = extras.getString ("param", "");                               // !! Audio setParameters() access !!
-    if (! val.equalsIgnoreCase ("")) {
-      com_uti.setParameters (val);
+// audio_android_smo    // ?? setMode == setPhoneState ???
+    if (! (val = extras.getString ("audio_android_smo", "")).equalsIgnoreCase (""))
+      m_AM.setMode (com_uti.int_get (val));
+
+// audio_android_sso
+    if (! (val = extras.getString ("audio_android_sso", "")).equalsIgnoreCase ("")) {
+      if (com_uti.int_get (val) == 0)
+        m_AM.setSpeakerphoneOn (false);
+      else
+        m_AM.setSpeakerphoneOn (true);
     }
 
-// radio_freq : preset or seek
-    val = extras.getString ("radio_freq", "");
+// audio_android_spa
+    if (! (val = extras.getString ("audio_android_spa", "")).equalsIgnoreCase (""))
+      m_AM.setParameters (val);
+
+// audio_android_gpa
+    if (! (val = extras.getString ("audio_android_gpa", "")).equalsIgnoreCase (""))
+      com_uti.logd ("m_AM.getParameters (): " + m_AM.getParameters (val));
+
+// audio_android_sfc
+    if (! (val = extras.getString ("audio_android_sfc", "")).equalsIgnoreCase (""))
+      com_uti.logd ("com_uti.setForceUse (FOR_COMMUNICATION): " + com_uti.setForceUse (com_uti.FOR_COMMUNICATION, com_uti.int_get (val)));
+// audio_android_sfm
+    if (! (val = extras.getString ("audio_android_sfm", "")).equalsIgnoreCase (""))
+      com_uti.logd ("com_uti.setForceUse (FOR_MEDIA): "         + com_uti.setForceUse (com_uti.FOR_MEDIA,         com_uti.int_get (val)));
+// audio_android_sfr
+    if (! (val = extras.getString ("audio_android_sfr", "")).equalsIgnoreCase (""))
+      com_uti.logd ("com_uti.setForceUse (FOR_RECORD): "        + com_uti.setForceUse (com_uti.FOR_RECORD,        com_uti.int_get (val)));
+// audio_android_sfd
+    if (! (val = extras.getString ("audio_android_sfd", "")).equalsIgnoreCase (""))
+      com_uti.logd ("com_uti.setForceUse (FOR_DOCK): "          + com_uti.setForceUse (com_uti.FOR_DOCK,          com_uti.int_get (val)));
+
+
+// audio_android_gdc
+    if (! (val = extras.getString ("audio_android_gdc", "")).equalsIgnoreCase (""))
+      com_uti.logd ("com_uti.getDeviceConnectionState (): " + com_uti.getDeviceConnectionState (com_uti.int_get (val), ""));
+// audio_android_sdu
+    if (! (val = extras.getString ("audio_android_sdu", "")).equalsIgnoreCase (""))
+      com_uti.logd ("com_uti.setDeviceConnectionState (UNAVAILABLE): " + com_uti.setDeviceConnectionState (com_uti.int_get (val), com_uti.DEVICE_STATE_UNAVAILABLE, ""));
+// audio_android_sda
+    if (! (val = extras.getString ("audio_android_sda", "")).equalsIgnoreCase (""))
+      com_uti.logd ("com_uti.setDeviceConnectionState (AVAILABLE): " + com_uti.setDeviceConnectionState (com_uti.int_get (val), com_uti.DEVICE_STATE_AVAILABLE, ""));
+
+
+
+// tuner_seek_state
+    val = extras.getString ("tuner_seek_state", "");
+    if (! val.equals ("")) {
+      //com_uti.loge ("preset related tuner_seek_state val: " + val);
+      m_svc_tap.tuner_set ("tuner_seek_state", val);
+    }
+
+// service_seek_state : preset or seek
+    val = extras.getString ("service_seek_state", "");
+    //com_uti.loge ("preset or seek extras.getString (\"service_seek_state\", \"\") val: " + val);
+    //com_uti.loge ("preset_num: " + preset_num);
+    //com_uti.loge ("preset_curr: " + preset_curr);
     if (val.equalsIgnoreCase ("down")) {
-      if (preset_num <= 1)
-        m_svc_tap.tuner_set ("tuner_scan_state", val);
+      if (preset_num <= 1) {
+        m_svc_tap.tuner_set ("tuner_seek_state", val);
+      }
       else
-        preset_change (0);
+        preset_next (false);
     }
-    if (val.equalsIgnoreCase ("up")) {
+    else if (val.equalsIgnoreCase ("up")) {
       if (preset_num <= 1)
-        m_svc_tap.tuner_set ("tuner_scan_state", val);
+        m_svc_tap.tuner_set ("tuner_seek_state", val);
       else
-        preset_change (1);
+        preset_next (true);
     }
-    if (val.equalsIgnoreCase ("scan"))
-      m_svc_tap.tuner_set ("tuner_scan_state", val);
+    else if (val.equalsIgnoreCase ("")) {
+    }
+    else {
+    }
 
     // Tuner:
     val = extras.getString ("tuner_state", "");
     if (! val.equals (""))
       tuner_state_set (val);
-
-// tuner_scan_state
-    val = extras.getString ("tuner_scan_state", "");
-    if (! val.equals (""))
-      m_svc_tap.tuner_set ("tuner_scan_state", val);
 
     val = extras.getString ("tuner_freq", "");
     if (! val.equals (""))
@@ -214,9 +323,14 @@ public class svc_svc extends Service implements svc_tcb, svc_acb {  // Service c
       com_uti.prefs_set (m_context, "tuner_stereo", val);
     }
 
-    val = extras.getString ("tuner_extra_cmd", "");
+    val = extras.getString ("tuner_extension", "");
     if (! val.equals ("")) {
-      m_svc_tap.tuner_set ("tuner_extra_cmd", val);
+      m_svc_tap.tuner_set ("tuner_extension", val);
+    }
+
+    val = extras.getString ("tuner_rds_state", "");
+    if (! val.equals ("")) {
+      tuner_rds_state_set (val);
     }
 
     val = extras.getString ("tuner_rds_af_state", "");
@@ -224,16 +338,41 @@ public class svc_svc extends Service implements svc_tcb, svc_acb {  // Service c
       tuner_rds_af_state_set (val);
     }
 
+    val = extras.getString ("tuner_vol", "");
+    if (! val.equals (""))
+      com_uti.daemon_set ("tuner_vol", val);
+
+    com_uti.extras_daemon_set ("tuner_rds_pi", extras);
+    com_uti.extras_daemon_set ("tuner_rds_pt", extras);
+    com_uti.extras_daemon_set ("tuner_rds_ps", extras);
+    com_uti.extras_daemon_set ("tuner_rds_rt", extras);
+
+    com_uti.extras_daemon_set ("tuner_acdb", extras);
+
 
     // Audio:
+    val = extras.getString ("audio_mode", "");
+    if (! val.equals ("")) {
+      m_svc_aap.audio_mode_set (val);
+      com_uti.prefs_set (m_context, "audio_mode", m_com_api.audio_mode);
+    }
+
     val = extras.getString ("audio_state", "");
     if (! val.equals (""))
       audio_state_set (val);
 
+    val = extras.getString ("audio_digital_amp", "");
+    if (! val.equals ("")) {
+      m_svc_aap.audio_digital_amp_set ();//val);
+      //com_uti.prefs_set (m_context, "audio_digital_amp", m_com_api.audio_digital_amp);
+    }
+
     val = extras.getString ("audio_output", "");
     if (! val.equals ("")) {
-      m_svc_aap.audio_output_set (val);
-      com_uti.prefs_set (m_context, "audio_output", val);
+      if (m_com_api.audio_state.equalsIgnoreCase ("start"))             // If audio is started...
+        m_svc_aap.audio_output_set (val, true);                         // Set new audio output with restart
+                                                                        // Save audio output preference     !! Toggle may be converted
+      com_uti.prefs_set (m_context, "audio_output", m_com_api.audio_output);
     }
 
     val = extras.getString ("audio_stereo", "");
@@ -246,7 +385,23 @@ public class svc_svc extends Service implements svc_tcb, svc_acb {  // Service c
     if (! val.equals (""))
       m_svc_aap.audio_record_state_set (val);
 
-    radio_status_send ();                                               // Return results
+    val = extras.getString ("service_update_gui", "");
+    if (val.equalsIgnoreCase ("Disable"))
+      service_update_gui = false;
+    else
+      service_update_gui = true;
+    val = extras.getString ("service_update_notification", "");
+    if (val.equalsIgnoreCase ("Disable"))
+      service_update_notification = false;
+    else
+      service_update_notification = true;
+    val = extras.getString ("service_update_remote", "");
+    if (val.equalsIgnoreCase ("Disable"))
+      service_update_remote = false;
+    else
+      service_update_remote = true;
+
+    service_update_send ();                                             // Update GUI/Widget/Remote/Notification with latest data
 
     }
     catch (Throwable e) {
@@ -270,291 +425,294 @@ public class svc_svc extends Service implements svc_tcb, svc_acb {  // Service c
     if (! screen_on)
       return;
 
-    com_uti.loge ("caller: " + caller);
+    com_uti.logw ("caller: " + caller);
 
-if (! com_uti.quiet_file_get ("/sdcard/spirit/api_radio_update_dis")) {
-    Intent radio_status_intent = radio_status_send ();                  // Build Intent to send and Update widgets, GUI(s), other components and 
-    m_com_api.api_radio_update (radio_status_intent);                   // Get current data in Radio API using Intent
-}
+    if (screen_on && service_update_gui) {
+      Intent service_update_intent = service_update_send ();            // Send Intent to send and Update widgets, GUI(s), other components and 
+      m_com_api.api_service_update (service_update_intent);             // Update our copy of data in Radio API using Intent
+    }
 
-if (! com_uti.quiet_file_get ("/sdcard/spirit/notif_radio_update_dis")) {
-}
-
-if (! com_uti.quiet_file_get ("/sdcard/spirit/remote_radio_update_dis")) {
-}
+    if (screen_on && service_update_notification) {
+    }
 
   }
 
 
-  private void tuner_extras_put (Intent send_intent) {
+  private void tuner_extras_put (Intent intent) {
 
-    send_intent.putExtra ("tuner_state",        m_com_api.tuner_state);//m_svc_tap.tuner_get ("tuner_state"));
-    send_intent.putExtra ("tuner_band",         m_com_api.tuner_band);//m_svc_tap.tuner_get ("tuner_band"));
+    intent.putExtra ("tuner_state",        m_com_api.tuner_state);      // m_svc_tap.tuner_get ("tuner_state"));
+    intent.putExtra ("tuner_band",         m_com_api.tuner_band);       // m_svc_tap.tuner_get ("tuner_band"));
 
-
-
-//Just Use cached value now; don't go to daemon
-//    String freq_khz = m_svc_tap.tuner_get ("tuner_freq");
+    // Just Use cached value now; don't go to daemon
+    //    String freq_khz = m_svc_tap.tuner_get ("tuner_freq");
 
     String freq_khz = m_com_api.tuner_freq;
 
     int ifreq = com_uti.int_get (freq_khz);
-//!! ifreq = com_uti.tnru_freq_fix (ifreq + 25);
+
+    //!! ifreq = com_uti.tnru_freq_fix (ifreq + 25);
+
     if (ifreq >= 50000 && ifreq < 500000) {
       m_com_api.tuner_freq = ("" + (double) ifreq / 1000);
-      m_com_api.int_tuner_freq = ifreq;
+      m_com_api.tuner_freq_int = ifreq;
     }
-    com_uti.logv ("m_com_api.tuner_freq: " + m_com_api.tuner_freq + "  m_com_api.int_tuner_freq: " + m_com_api.int_tuner_freq);
-    send_intent.putExtra ("tuner_freq",         m_com_api.tuner_freq);
+    com_uti.logv ("m_com_api.tuner_freq: " + m_com_api.tuner_freq + "  m_com_api.tuner_freq_int: " + m_com_api.tuner_freq_int);
+    intent.putExtra ("tuner_freq",         m_com_api.tuner_freq);
 
 
 
-    //send_intent.putExtra ("tuner_stereo",       m_svc_tap.tuner_get ("tuner_stereo"));
-    //send_intent.putExtra ("tuner_thresh",       m_svc_tap.tuner_get ("tuner_thresh"));
-    //send_intent.putExtra ("tuner_scan_state",   m_svc_tap.tuner_get ("tuner_scan_state"));
+    //intent.putExtra ("tuner_stereo",       m_svc_tap.tuner_get ("tuner_stereo"));
+    //intent.putExtra ("tuner_thresh",       m_svc_tap.tuner_get ("tuner_thresh"));
+    //intent.putExtra ("tuner_seek_state",   m_svc_tap.tuner_get ("tuner_seek_state"));
 
-    //send_intent.putExtra ("tuner_rds_state",    m_svc_tap.tuner_get ("tuner_rds_state"));
-    //send_intent.putExtra ("tuner_rds_af_state", m_svc_tap.tuner_get ("tuner_rds_af_state"));
-    //send_intent.putExtra ("tuner_rds_ta_state", m_svc_tap.tuner_get ("tuner_rds_ta_state"));
+    //intent.putExtra ("tuner_rds_state",    m_svc_tap.tuner_get ("tuner_rds_state"));
+    //intent.putExtra ("tuner_rds_af_state", m_svc_tap.tuner_get ("tuner_rds_af_state"));
+    //intent.putExtra ("tuner_rds_ta_state", m_svc_tap.tuner_get ("tuner_rds_ta_state"));
 
-    //send_intent.putExtra ("tuner_extra_cmd",    m_svc_tap.tuner_get ("tuner_extra_cmd"));
-    //send_intent.putExtra ("tuner_extra_resp",   m_svc_tap.tuner_get ("tuner_extra_resp"));
+    //intent.putExtra ("tuner_extension",          m_svc_tap.tuner_get ("tuner_extension"));
 
-    send_intent.putExtra ("tuner_rssi",         m_com_api.tuner_rssi);      //m_svc_tap.tuner_get ("tuner_rssi"));
-    //send_intent.putExtra ("tuner_qual",         m_svc_tap.tuner_get ("tuner_qual"));
-    send_intent.putExtra ("tuner_most",         m_com_api.tuner_most);      //m_svc_tap.tuner_get ("tuner_most"));
+    intent.putExtra ("tuner_rssi",         m_com_api.tuner_rssi);      //m_svc_tap.tuner_get ("tuner_rssi"));
+    //intent.putExtra ("tuner_qual",         m_svc_tap.tuner_get ("tuner_qual"));
+    intent.putExtra ("tuner_pilot ",         m_com_api.tuner_pilot);      //m_svc_tap.tuner_get ("tuner_pilot "));
 
-    send_intent.putExtra ("tuner_rds_pi",       m_com_api.tuner_rds_pi);    //m_svc_tap.tuner_get ("tuner_rds_pi"));
-    send_intent.putExtra ("tuner_rds_picl",     m_com_api.tuner_rds_picl);  //m_svc_tap.tuner_get ("tuner_rds_picl"));
-    //send_intent.putExtra ("tuner_rds_pt",       m_com_api.tuner_rds_pt);  //m_svc_tap.tuner_get ("tuner_rds_pt"));
-    send_intent.putExtra ("tuner_rds_ptyn",     m_com_api.tuner_rds_ptyn);  //m_svc_tap.tuner_get ("tuner_rds_ptyn"));
-    send_intent.putExtra ("tuner_rds_ps",       m_com_api.tuner_rds_ps);    //m_svc_tap.tuner_get ("tuner_rds_ps"));
-    send_intent.putExtra ("tuner_rds_rt",       m_com_api.tuner_rds_rt);    //m_svc_tap.tuner_get ("tuner_rds_rt"));
+    intent.putExtra ("tuner_rds_pi",       m_com_api.tuner_rds_pi);    //m_svc_tap.tuner_get ("tuner_rds_pi"));
+    intent.putExtra ("tuner_rds_picl",     m_com_api.tuner_rds_picl);  //m_svc_tap.tuner_get ("tuner_rds_picl"));
+    //intent.putExtra ("tuner_rds_pt",       m_com_api.tuner_rds_pt);  //m_svc_tap.tuner_get ("tuner_rds_pt"));
+    intent.putExtra ("tuner_rds_ptyn",     m_com_api.tuner_rds_ptyn);  //m_svc_tap.tuner_get ("tuner_rds_ptyn"));
+    intent.putExtra ("tuner_rds_ps",       m_com_api.tuner_rds_ps);    //m_svc_tap.tuner_get ("tuner_rds_ps"));
+    intent.putExtra ("tuner_rds_rt",       m_com_api.tuner_rds_rt);    //m_svc_tap.tuner_get ("tuner_rds_rt"));
 
-    //send_intent.putExtra ("tuner_rds_af",       m_svc_tap.tuner_get ("tuner_rds_af"));
-    //send_intent.putExtra ("tuner_rds_ms",       m_svc_tap.tuner_get ("tuner_rds_ms"));
-    //send_intent.putExtra ("tuner_rds_ct",       m_svc_tap.tuner_get ("tuner_rds_ct"));
-    //send_intent.putExtra ("tuner_rds_tmc",      m_svc_tap.tuner_get ("tuner_rds_tmc"));
-    //send_intent.putExtra ("tuner_rds_tp",       m_svc_tap.tuner_get ("tuner_rds_tp"));
-    //send_intent.putExtra ("tuner_rds_ta",       m_svc_tap.tuner_get ("tuner_rds_ta"));
-    //send_intent.putExtra ("tuner_rds_taf",      m_svc_tap.tuner_get ("tuner_rds_taf"));
+    //intent.putExtra ("tuner_rds_af",       m_svc_tap.tuner_get ("tuner_rds_af"));
+    //intent.putExtra ("tuner_rds_ms",       m_svc_tap.tuner_get ("tuner_rds_ms"));
+    //intent.putExtra ("tuner_rds_ct",       m_svc_tap.tuner_get ("tuner_rds_ct"));
+    //intent.putExtra ("tuner_rds_tmc",      m_svc_tap.tuner_get ("tuner_rds_tmc"));
+    //intent.putExtra ("tuner_rds_tp",       m_svc_tap.tuner_get ("tuner_rds_tp"));
+    //intent.putExtra ("tuner_rds_ta",       m_svc_tap.tuner_get ("tuner_rds_ta"));
+    //intent.putExtra ("tuner_rds_taf",      m_svc_tap.tuner_get ("tuner_rds_taf"));
   }
 
-  private Intent radio_status_send () {                                 // Send all radio state & status info
+  private Intent service_update_send () {                               // Send all radio state & status info
 
-    m_svc_aap.audio_sessid_get (); // Better to update here ?
+    m_svc_aap.audio_sessid_get ();                                      // Better to update here or in svc_tnr where polling takes place ?
 
-    com_uti.logv ("audio_state: " + m_com_api.audio_state + "  audio_output: " + m_com_api.audio_output +
-                "  audio_stereo: " + m_com_api.audio_stereo + "  audio_record_state: " + m_com_api.audio_record_state);
+    com_uti.logv ("audio_state: " + m_com_api.audio_state + "  audio_output: " + m_com_api.audio_output + "  audio_stereo: " + m_com_api.audio_stereo + "  audio_record_state: " + m_com_api.audio_record_state);
 
-    Intent send_intent = new Intent ("fm.a2d.sf.result.get");
-
-    send_intent.putExtra ("radio_phase",        m_com_api.radio_phase);
-    send_intent.putExtra ("radio_cdown",        m_com_api.radio_cdown);
-    send_intent.putExtra ("radio_error",        m_com_api.radio_error);
+    Intent intent = new Intent (com_uti.api_result_id);//"fm.a2d.sf.result.get");           // Create a new broadcast result Intent
+                                                                        // Send service data
     for (int ctr = 0; ctr < preset_num; ctr ++) {                       // Send preset list
-      send_intent.putExtra ("radio_freq_prst_" + ctr, plst_freq [ctr]);
-      send_intent.putExtra ("radio_name_prst_" + ctr, plst_name [ctr]);
+      intent.putExtra ("service_preset_freq_" + ctr, plst_freq [ctr]);
+      intent.putExtra ("service_preset_name_" + ctr, plst_name [ctr]);
     }
+                                                                        // Send audio data
+    intent.putExtra ("audio_state",        m_com_api.audio_state);
+    intent.putExtra ("audio_output",       m_com_api.audio_output);
+    intent.putExtra ("audio_stereo",       m_com_api.audio_stereo);
+    intent.putExtra ("audio_record_state", m_com_api.audio_record_state);
+    intent.putExtra ("audio_sessid",       m_com_api.audio_sessid);
+                                                                        // Send tuner data
+    if (m_svc_tap == null)
+      intent.putExtra ("tuner_state",      "stop");
+    else
+      tuner_extras_put (intent);
 
-    send_intent.putExtra ("audio_state",        m_com_api.audio_state);
-    send_intent.putExtra ("audio_output",       m_com_api.audio_output);
-    send_intent.putExtra ("audio_stereo",       m_com_api.audio_stereo);
+    m_com_api.service_update_send (intent, "", "");//m_com_api.service_phase, m_com_api.service_cdown); // Send Phase Update + More
 
-    send_intent.putExtra ("audio_record_state", m_com_api.audio_record_state);
-    send_intent.putExtra ("audio_sessid",       m_com_api.audio_sessid);
-
-    if (m_svc_tap == null) {
-      send_intent.putExtra ("tuner_state",      "stop");
-    }
-    else {
-      tuner_extras_put (send_intent);
-    }
-    try {
-      m_context.sendStickyBroadcast (send_intent);                      // Send Sticky Broadcast w/ all info
-    }
-    catch (Throwable e) {
-      e.printStackTrace ();
-    }
-    return (send_intent);
+    return (intent);
   }
 
 
     // Presets:
 
-  private int station_index_get (String freq) {//int freq) {
-    preset_curr_fix ();
-    if (preset_num > 0) {
-      if (freq.equals (plst_freq [preset_curr])) {
+
+
+  private int preset_curr_set (String freq) {                           // Set preset_curr to a valid preset index for passed frequency
+    com_uti.logd ("freq: " + freq);
+    if (preset_num > 0) {                                               // If we have any presets...
+      if (freq.equals (plst_freq [preset_curr])) {                      // If current preset and passed frequency matches...
+        com_uti.logd ("freq.equals (plst_freq [preset_curr] returning current preset_curr: " + preset_curr);
         return (preset_curr);
       }
       for (int ctr = 0; ctr < preset_num; ctr ++) {
-        if (freq.equals (plst_freq [preset_curr])) {
-          return (ctr);
+        if (freq.equals (plst_freq [ctr])) {
+          preset_curr = ctr;
+          com_uti.logd ("freq.equals (plst_freq [ctr] returning preset_curr = ctr: " + preset_curr);
+          return (preset_curr);
         }
       }
     }
-    return (-1);
+    preset_curr = 0;                                                    // Just use 0; may not be associated with a preset
+    com_uti.logd ("Frequency not found so returning preset_curr = 0: " + preset_curr);
+    return (preset_curr);
   }
-/*  private static String station_name_get (int freq) {
-    int idx = station_index_get (freq);
-    if (idx >= 0)
-      return (plst_name [idx]);
-    String def_name = "" + ((double) freq / 1000);
-    return (def_name);
-  }*/
 
   private int preset_curr_fix () {
-    if (preset_num < 0)
+    if (preset_num < 0)                                                 // First ensure number of presets is sane
       preset_num = 0;
     if (preset_num >= com_api.max_presets)
       preset_num = com_api.max_presets;
 
-    if (preset_curr < 0)
+    if (preset_curr < 0)                                                // Ensure preset_curr wraps to valid values
       preset_curr = preset_num - 1;
-    if (preset_curr < 0)
-      preset_curr = 0;
-
-    if (preset_curr >= preset_num)
+    if (preset_curr > preset_num - 1)
       preset_curr = 0;
     return (preset_curr);
   }
 
-  private void preset_next (boolean up) {
-    if (preset_num <= 0)
+  private void preset_next (boolean up) {                               // Tune to next preset, up (true) or down
+    com_uti.logd ("start preset_curr: " + preset_curr + "  preset_num: " + preset_num);
+    if (preset_num <= 0)                                                // If no presets, done
       return;
-    preset_curr = station_index_get (m_com_api.tuner_freq);
-    preset_curr_fix ();
+    preset_curr_fix ();                                                 // First fix any problems
+    preset_curr_set (m_com_api.tuner_freq);
     if (up)
       preset_curr ++;
     else
       preset_curr --;
-    preset_curr_fix ();
+    preset_curr_fix ();                                                 // Fix any problems
     String freq = plst_freq [preset_curr];
-    tuner_freq_set (freq);
-  }
-
-  private void preset_change (int up) {
-    if (up != 0)
-      preset_next (true);
-    else
-      preset_next (false);
-  }
-
-
-    // Phase/Countdown/Error stuff:
-
-  private void phase_cdown_set (String phase, int cdown) {
-    com_uti.logd ("phase: " + phase + "  cdown: " + cdown);
-    m_com_api.radio_phase = phase;
-    m_com_api.radio_cdown = "" + cdown;
-    //radio_status_send ();                                            // Update widgets, apps, etc. (displays_update too intense ?)
-  }
-
-  private void phase_error_set (String phase, String error) {
-    com_uti.loge ("phase: " + phase + "  error: " + error);
-    m_com_api.radio_phase = phase;
-    m_com_api.radio_error = error;
-    m_com_api.radio_cdown = "0";
-    //radio_status_send ();                                            // Update widgets, apps, etc. (displays_update too intense ?)
+    double freq_dou = com_uti.double_get (freq);
+    int freq_int = (int) (freq_dou * 1000);
+    com_uti.logd ("freq: " + freq + "  freq_int: " + freq_int + "  freq_dou: " + freq_dou + "  preset_curr: " + preset_curr + "  preset_num: " + preset_num);
+    if (! freq.equals (""))// && freq_int >= 50000 && freq_int <= 108000)
+      tuner_freq_set (freq);
   }
 
 
     // AUDIO:
 
-  private String audio_state_set (String state) {                       // Called only by onStartCommand()
-    com_uti.logd ("state: " + state);
-    if (state.equalsIgnoreCase ("toggle")) {                            // TOGGLE:
-      if (m_com_api.audio_state.equalsIgnoreCase ("start"))
-        state = "pause";
-      else
-        state = "start";
-    }
-    if (state.equalsIgnoreCase ("start")) {                             // If Audio Start...
-      if (! m_com_api.audio_state.equalsIgnoreCase ("start")) {         // If audio not started (Could be stopped or paused)
-        String stereo = com_uti.prefs_get (m_context, "audio_stereo", "Stereo");
-        m_svc_aap.audio_stereo_set (stereo);                            // Set audio stereo from prefs, before audio is started
+  private boolean need_audio_start_after_tuner_start = false;
 
-        if (m_com_api.tuner_state.equalsIgnoreCase ("start")) {         // If tuner started
-          m_svc_aap.audio_state_set ("Start");                          // Set Audio State synchronously
-        }
-        else {                                                          // Else if tuner not started
-          m_com_api.audio_state = "Starting";                           // Signal tuner state callback that audio needs to be started
-          tuner_state_set ("Start");                                    // Start tuner first, audio will start later via callback
-        }
-      }
+  private String audio_state_set (String desired_state) {               // Called only by onStartCommand()
+    com_uti.logd ("desired_state: " + desired_state);
+    if (desired_state.equalsIgnoreCase ("toggle")) {                    // TOGGLE:
+      if (m_com_api.audio_state.equalsIgnoreCase ("start"))
+        desired_state = "pause";
+      else
+        desired_state = "start";
     }
-    else                                                                // Else for Audio Stop or Pause...
-      m_svc_aap.audio_state_set (state);                                // Set Audio State synchronously
+                                                                        // If Audio Stop or Pause...
+    if (desired_state.equalsIgnoreCase ("Stop") || desired_state.equalsIgnoreCase ("Pause")) {
+      m_svc_aap.audio_state_set (desired_state);                        // Set Audio State synchronously
+      return (m_com_api.audio_state);                                   // Return current audio state
+    }
+
+    if (desired_state.equalsIgnoreCase ("Start")) {
+    }
+    else {
+      com_uti.loge ("Unexpected desired_state: " + desired_state);
+      return (m_com_api.audio_state);                                   // Return current audio state
+    }
+
+                                                                        // Else if Audio Start desired...
+    if (m_com_api.audio_state.equalsIgnoreCase ("start"))               // If audio already started...
+      return (m_com_api.audio_state);                                   // Return current audio state
+
+                                                                        // Else if audio stopped or paused and we want to start audio...
+    String mode = com_uti.prefs_get (m_context, "audio_mode", "Digital");
+    m_svc_aap.audio_mode_set (mode);                                    // Set audio mode from prefs, before audio is started
+
+    String stereo = com_uti.prefs_get (m_context, "audio_stereo", "Stereo");
+    m_svc_aap.audio_stereo_set (stereo);                                // Set audio stereo from prefs, before audio is started
+
+    if (m_com_api.tuner_state.equalsIgnoreCase ("start")) {             // If tuner started...
+      m_svc_aap.audio_state_set ("Start");                              // Set Audio State immediately & synchronously
+    }
+    else {                                                              // Else if tuner not started...
+      need_audio_start_after_tuner_start = true;                        // Signal tuner state callback that audio needs to be started after tuner finishes starting
+      tuner_state_set ("Start");                                        // Start tuner first, audio will start later via callback
+    }
 
     return (m_com_api.audio_state);                                     // Return current audio state
   }
 
 
-    // Callback called by svc_aud: audio_start(), audio_stop(), audio_pause()
-  public void cb_audio_state (String audio_state) {                     // Audio state changed callback from svc_aud
-    com_uti.logd ("audio_state: " + audio_state);
+    // Audio State callback called only by svc_aud: audio_state_set()
 
-    if (audio_state.equalsIgnoreCase ("start")) {                       // If audio state = Start...
+  public void cb_audio_state (String new_audio_state) {                 // Audio state changed callback from svc_aud
+    com_uti.logd ("new_audio_state: " + new_audio_state);
 
-      String audio_output = com_uti.prefs_get (m_context, "audio_output", "headset");
-      m_svc_aap.audio_output_set (audio_output);                        // Set Audio Output from prefs
-
+    if (new_audio_state.equalsIgnoreCase ("start")) {                   // If new audio state = Start...
+//      service_update_send ();                                           // Update GUI/Widget/Remote/Notification with latest data
     }
-    else if (audio_state.equalsIgnoreCase ("stop")) {                   // If audio state = Stop...
+    else if (new_audio_state.equalsIgnoreCase ("stop")) {               // Else if new audio state = Stop...
+//      service_update_send ();                                           // Update GUI/Widget/Remote/Notification with latest data
     }
-    else if (audio_state.equalsIgnoreCase ("pause")) {                  // If audio state = Pause...
+    else if (new_audio_state.equalsIgnoreCase ("pause")) {              // Else if new audio state = Pause...
+//      service_update_send ();                                           // Update GUI/Widget/Remote/Notification with latest data
       // Remote State = Still Playing
     }
+    else {
+      com_uti.loge ("Unexpected new_audio_state: " + new_audio_state);
+      return;
+    }
+
     displays_update ("cb_audio_state");                                 // Update all displays/data sinks
   }
 
 
     // TUNER:
 
-  private String tuner_state_set (String state) {                       // Called only by onStartCommand(), (maybe onDestroy in future)
-    com_uti.logd ("state: " + state);
-    if (state.equalsIgnoreCase ("toggle")) {                            // If Toggle...
+  private String tuner_state_set (String desired_state) {               // Called only by onStartCommand(), (maybe onDestroy in future)
+    com_uti.logd ("desired_state: " + desired_state);
+    if (desired_state.equalsIgnoreCase ("toggle")) {                    // If Toggle...
       if (m_com_api.tuner_state.equalsIgnoreCase ("start"))
-        state = "stop";
+        desired_state = "stop";
       else
-        state = "start";
+        desired_state = "start";
     }
-    if (state.equalsIgnoreCase ("start")) {                             // If Start...
-      tuner_state_start_tmr = new Timer ("t_api start", true);          // One shot Poll timer for file creates, SU commands, Bluedroid Init, then start tuner
-      if (tuner_state_start_tmr != null) {
-        tuner_state_start_tmr.schedule (new tuner_state_start_tmr_hndlr (), 10);    // Once after 0.01 seconds.
+
+    if (desired_state.equalsIgnoreCase ("start")) {                     // If Start...
+      tuner_state_start_tmr = new Timer ("tuner start", true);          // One shot Poll timer for file creates, SU commands, Bluedroid Init, then start tuner
+      if (tuner_state_start_tmr == null) {                              // If error...
+        com_uti.loge ("Fatal error");
         return (m_com_api.tuner_state);
-      }
+      }                                                                 // Else, Once after 0.01 seconds.
+      tuner_state_start_tmr.schedule (new tuner_state_start_tmr_hndlr (), 10);
+      return (m_com_api.tuner_state);
     }
-    else if (state.equalsIgnoreCase ("stop")) {                         // If Stop...
+    else if (desired_state.equalsIgnoreCase ("stop")) {                 // If Stop...
       m_svc_aap.audio_state_set ("Stop");                               // Set Audio State  synchronously to Stop
       m_svc_tap.tuner_set ("tuner_state", "stop");                      // Set Tuner State asynchronously to Stop
       return (m_com_api.tuner_state);                                   // Return new tuner state
     }
-                                                                        // Else if not stop...
-    return (state);
+
+    com_uti.loge ("Unexpected desired_state: " + desired_state);
+    return (m_com_api.tuner_state);                                     // Return current tuner state
   }
 
 
-    // Callback: tuner_state_chngd & tuner_state_set in svc_tap/tnr_afm calls cb_tuner_state indirectly w/ Stop, Starting, Pause
-  private void cb_tuner_state (String tuner_state) {
-    com_uti.logd ("tuner_state: " + tuner_state);
-    if (tuner_state.equalsIgnoreCase ("starting") || tuner_state.equalsIgnoreCase ("start")) {  // If tuner = Start or Starting...
-      m_com_api.tuner_state = "start";                                  // Tuner State = Start
+    // Tuner State callback called only by cb_tuner_key ("tuner_state") which is called for tuner_state only by:
+        // svc_tnr:tuner_state_set()        Start, Stop
+        // svc_tnr:poll_tmr_hndlr:run()     Start, Stop from daemon (still disabled)
+
+  private void cb_tuner_state (String new_tuner_state) {
+    com_uti.logd ("new_tuner_state: " + new_tuner_state);
+    if (new_tuner_state.equalsIgnoreCase ("start")) {                   // If tuner state is Start...
+      service_update_send ();                                           // Update GUI/Widget/Remote/Notification with latest data
+      foreground_start ();
       tuner_prefs_init ();                                              // Load tuner prefs
-      if (m_com_api.audio_state.equalsIgnoreCase ("starting")) {        // If Audio starting...
+      if (need_audio_start_after_tuner_start) {                         // If Audio starting...
+        need_audio_start_after_tuner_start = false;
         m_svc_aap.audio_state_set ("Start");                            // Set Audio State synchronously
       }
       return;
     }
-    if (tuner_state.equalsIgnoreCase ("stopping") || tuner_state.equalsIgnoreCase ("stop")) {   // If tuner = Stop or Stopping...
-      m_com_api.tuner_state = "stop";                                   // Tuner State = Stop
-      //m_svc_tap = null;
+    else if (new_tuner_state.equalsIgnoreCase ("stop")) {               // Else if tuner state is Stop...
+      service_update_send ();                                           // Update GUI/Widget/Remote/Notification with latest data
+      foreground_stop ();                                                 // !! match startForeground()
+
+        // Optional, but helps clear out old data/problems:
       com_uti.logd ("Before stopSelf()");
       stopSelf ();                                                      // Stop this service entirely
       com_uti.logd ("After  stopSelf()");
+
     }
+    else {
+      com_uti.loge ("Unexpected new_tuner_state: " + new_tuner_state);
+      return;
+    }
+
+//    displays_update ("cb_tuner_state");                                 // Update all displays/data sinks
   }
 
   private class tuner_state_start_tmr_hndlr extends TimerTask {
@@ -562,43 +720,43 @@ if (! com_uti.quiet_file_get ("/sdcard/spirit/remote_radio_update_dis")) {
     public void run () {
       int ret = 0;
 
-      phase_cdown_set ("Files Init", 5);
       ret = files_init ();                                              // /data/data/fm.a2d.sf/files/: busybox, ssd, s.wav, b1.bin, b2.bin
-      if (ret != 0) {
+      if (ret != 0)
         com_uti.loge ("files_init IGNORE Errors: " + ret);
-        //phase_error_set ("Files Init", "File Errors: " + ret);
-        //return;
-      }
-      if (com_uti.device == com_uti.DEV_ONE || com_uti.device == com_uti.DEV_LG2 || com_uti.device == com_uti.DEV_XZ2) {
-        phase_cdown_set ("BCom Init", 20);
-        ret = bcom_init ();
+
+      if (com_uti.devnum == com_uti.DEV_OM7 || com_uti.devnum == com_uti.DEV_LG2 || com_uti.devnum == com_uti.DEV_XZ2) {
+        m_com_api.service_update_send (null, "Broadcom Bluetooth Init", "10");// Send Phase Update
+        ret = bcom_bluetooth_init ();
         if (ret != 0) {
-          phase_error_set ("BCom Init", "BCom Error: " + ret);
+          m_com_api.service_update_send (null, "ERROR Broadcom Bluetooth Init", "-1");// Send Error Update
           return;
         }
       }
       com_uti.logd ("Starting Tuner...");
-      phase_cdown_set ("Tuner Start", 20);
-
-      m_svc_tap.tuner_set ("radio_nop",   "Start");                     // 1st packet always fails, so this is a NOP
 
       m_svc_tap.tuner_set ("tuner_state", "Start");                     // This starts the daemon
 
       if (tuner_state_start_tmr != null)
-        tuner_state_start_tmr.cancel ();                                // Stop one shot poll timer
+        tuner_state_start_tmr.cancel ();                                // Stop one shot poll timer (Not periodic so don't need ?)
 
-      com_uti.logd ("done");
+      if (m_com_api.tuner_state.equalsIgnoreCase ("start"))             // If tuner started...
+        com_uti.logd ("Done Success with m_com_api.tuner_state: " + m_com_api.tuner_state);
+      else
+        com_uti.loge ("Done Error with m_com_api.tuner_state: " + m_com_api.tuner_state);
     }
   }
 
 
     // Other non state machine tuner stuff:
 
+  private void tuner_rds_state_set (String val) {
+    m_svc_tap.tuner_set ("tuner_rds_state", val);
+    com_uti.prefs_set (m_context, "tuner_rds_state", val);
+  }
   private void tuner_rds_af_state_set (String val) {
     m_svc_tap.tuner_set ("tuner_rds_af_state", val);
     com_uti.prefs_set (m_context, "tuner_rds_af_state", val);
   }
-
 
   private void tuner_prefs_init () {                                    // Load tuner prefs
     String band = com_uti.prefs_get (m_context, "tuner_band", "EU");
@@ -609,7 +767,8 @@ if (! com_uti.quiet_file_get ("/sdcard/spirit/remote_radio_update_dis")) {
     String stereo = com_uti.prefs_get (m_context, "tuner_stereo", "Stereo");
     m_svc_tap.tuner_set ("tuner_stereo", stereo);
 
-    tuner_rds_af_state_set (com_uti.prefs_get (m_context, "tuner_rds_af_state", "stop")); // !! Always rewrites pref
+    tuner_rds_state_set     (com_uti.prefs_get (m_context, "tuner_rds_state",    "Start")); // !! Always rewrites pref
+    tuner_rds_af_state_set  (com_uti.prefs_get (m_context, "tuner_rds_af_state", "Stop"));  // !! Always rewrites pref
 
 
     int freq = com_uti.prefs_get (m_context, "tuner_freq", 88500);
@@ -619,8 +778,10 @@ if (! com_uti.quiet_file_get ("/sdcard/spirit/remote_radio_update_dis")) {
 
   private void tuner_freq_set (String freq) {//int freq) {                              // To fix float problems w/ 106.1 becoming 106099
     com_uti.logd ("freq: " + freq);
-    int ifreq = com_uti.tnru_band_new_freq_get (freq, m_com_api.int_tuner_freq); // Deal with up, down, etc.
+    int ifreq = com_uti.tnru_band_new_freq_get (freq, m_com_api.tuner_freq_int); // Deal with up, down, etc.
+
     //int ifreq = com_uti.tnru_khz_get (freq);
+
     ifreq += 25;                                                        // Round up...
     ifreq = ifreq / 50;                                                 // Nearest 50 KHz
     ifreq *= 50;                                                        // Back to KHz scale
@@ -639,24 +800,16 @@ if (! com_uti.quiet_file_get ("/sdcard/spirit/remote_radio_update_dis")) {
   public void cb_tuner_key (String key, String val) {
     com_uti.logv ("key: " + key + "  val: " + val);
 
-    if (com_uti.device == com_uti.DEV_QCV && m_svc_aap.audio_blank_get ()) {   // If we need to kickstart audio...
-      com_uti.loge ("!!!!!!!!!!!!!!!!!!!!!!!!! Kickstarting stalled audio m_com_api.tuner_freq: " + m_com_api.tuner_freq);
-      //m_svc_tap.tuner_set ("tuner_stereo", m_com_api.tuner_stereo);     // Set Stereo (Frequency also works, and others ?)
-      m_svc_aap.audio_blank_set (false);
-      String temp_freq = m_com_api.tuner_freq;
-      m_svc_tap.tuner_set ("tuner_freq", "88800");     // Set Frequency to 88.8
-      m_com_api.tuner_freq = temp_freq;
-      m_svc_tap.tuner_set ("tuner_freq", m_com_api.tuner_freq);     // Set Frequency
-    }
-
     if (key == null)
-      return;
+      com_uti.loge ("key: " + key);
     else if (key.equalsIgnoreCase ("tuner_state"))
       cb_tuner_state (val);
     else if (key.equalsIgnoreCase ("tuner_freq"))
       cb_tuner_freq (val);
     else if (key.equalsIgnoreCase ("tuner_rssi"))
       cb_tuner_rssi (val);
+    else if (key.equalsIgnoreCase ("tuner_pilot "))
+      cb_tuner_pilot(val);
     else if (key.equalsIgnoreCase ("tuner_qual"))
       cb_tuner_qual (val);
     else if (key.equalsIgnoreCase ("tuner_rds_pi"))
@@ -668,12 +821,7 @@ if (! com_uti.quiet_file_get ("/sdcard/spirit/remote_radio_update_dis")) {
     else if (key.equalsIgnoreCase ("tuner_rds_rt"))
       cb_tuner_rds_rt (val);
     else
-      return;
-
-    //else if (key.equalsIgnoreCase ("tuner_rds_picl"))                           // PI callback is good
-    //  cb_tuner_rds_picl (val);
-    //else if (key.equalsIgnoreCase ("tuner_rds_ptyn"))                           // PT callback is good
-    //  cb_tuner_rds_ptyn (val);
+      com_uti.loge ("key: " + key);
   }
 
 // Freq:
@@ -685,7 +833,7 @@ if (! com_uti.quiet_file_get ("/sdcard/spirit/remote_radio_update_dis")) {
 
     m_com_api.tuner_rssi         = "";//999";                            // ro ... ... Values:   RSSI: 0 - 1000
     m_com_api.tuner_qual         = "";//SN 99";                          // ro ... ... Values:   SN 99, SN 30
-    //m_com_api.tuner_most         = "";//Mono";                           // ro ... ... Values:   mono, stereo, 1, 2, blend, ... ?      1.5 ?
+    m_com_api.tuner_pilot        = "";//Mono";                           // ro ... ... Values:   mono, stereo, 1, 2, blend, ... ?      1.5 ?
 
     m_com_api.tuner_rds_pi       = "";//-1";                             // ro ... ... Values:   0 - 65535
     m_com_api.tuner_rds_picl     = "";//WKBW";                           // ro ... ... Values:   North American Call Letters or Hex PI for tuner_rds_pi
@@ -705,17 +853,26 @@ if (! com_uti.quiet_file_get ("/sdcard/spirit/remote_radio_update_dis")) {
 
     int new_freq = com_uti.tnru_freq_fix (25 + com_uti.tnru_khz_get (freq));
     m_com_api.tuner_freq = com_uti.tnru_mhz_get (new_freq);
-    m_com_api.int_tuner_freq = new_freq;
+    m_com_api.tuner_freq_int = new_freq;
 
     displays_update ("cb_tuner_freq");
 
     com_uti.prefs_set (m_context, "tuner_freq", new_freq);
   }
+// RSSI:
   private void cb_tuner_rssi (String rssi) {
+    //com_uti.loge ("rssi: " + rssi);
     //displays_update ("cb_tuner_rssi");
+  }
+// pilot:
+  private void cb_tuner_pilot (String pilot) {
+    //com_uti.loge ("pilot: " + pilot);
+    //displays_update ("cb_tuner_pilot ");
   }
 // Qual:
   private void cb_tuner_qual (String qual) {
+    com_uti.loge ("qual: " + qual);
+    //displays_update ("cb_tuner_qual");
   }
 // RDS:
   private void cb_tuner_rds_pi (String pi) {
@@ -733,14 +890,14 @@ if (! com_uti.quiet_file_get ("/sdcard/spirit/remote_radio_update_dis")) {
 
 
   private String lib_name_get () {
-    switch (com_uti.device) {
+    switch (com_uti.devnum) {
       case com_uti.DEV_UNK: return ("libs2t_gen.so");
       case com_uti.DEV_GEN: return ("libs2t_gen.so");
       case com_uti.DEV_GS1: return ("libs2t_ssl.so");
       case com_uti.DEV_GS2: return ("libs2t_ssl.so");
       case com_uti.DEV_GS3: return ("libs2t_ssl.so");
       case com_uti.DEV_QCV: return ("libs2t_qcv.so");
-      case com_uti.DEV_ONE: return ("libs2t_bch.so");
+      case com_uti.DEV_OM7: return ("libs2t_bch.so");
       case com_uti.DEV_LG2: return ("libs2t_bch.so");
       case com_uti.DEV_XZ2: return ("libs2t_bch.so");
     }
@@ -757,7 +914,6 @@ if (! com_uti.quiet_file_get ("/sdcard/spirit/remote_radio_update_dis")) {
     //String bb2_full_filename = com_uti.file_create (m_context, R.raw.b2_bin,     "b2.bin",        false);             // Not executable
 
     String add_full_filename = com_uti.file_create (m_context, R.raw.spirit_sh,  "99-spirit.sh",  true);
-
         // Check:
     int ret = 0;
 
@@ -779,54 +935,68 @@ if (! com_uti.quiet_file_get ("/sdcard/spirit/remote_radio_update_dis")) {
     return (ret);
   }
 
-
-  private int bcom_init () {    // Install shim if needed (May change BT state & warm restart). Determine UART or SHIM Mode & create/delete "use_shim" flag file for s2d. Turn BT off if needed.
+  private int bcom_bluetooth_init () {    // Install shim if needed (May change BT state & warm restart). Determine UART or SHIM Mode & create/delete "use_shim" flag file for s2d. Turn BT off if needed.
     com_uti.logd ("start");
 
-    boolean uart_mode = true;                                           // Default = UART MODE
+    m_com_api.tuner_api_mode = "UART";                                           // Default = UART MODE
+/*
     String short_filename = "use_shim";
     String full_filename = m_context.getFilesDir () + "/" + short_filename;
 
-    if (com_uti.file_get (full_filename)) {                               // If use_shim flag is set...
+    if (com_uti.file_get (full_filename)) {                             // If use_shim flag is set...
       com_uti.logd ("Removing file: " + full_filename);
-      com_uti.sys_run ("rm " + full_filename, true);                      // Remove file/flag
-    }
+      //File.delete (full_filename); //com_uti.sys_WAS_run ("rm " + full_filename, true);                    // Remove file/flag
 
-    if (com_uti.shim_files_possible_get ()) {                                             // If Bluedroid...
+      File dir = m_context.getFilesDir ();
+      File file = new File (dir, short_filename);
+      boolean deleted = file.delete ();
+      if (deleted)
+        com_uti.logd ("deleted: " + deleted);
+      else
+        com_uti.loge ("deleted: " + deleted);
+    }
+*/
+    if (com_uti.shim_files_possible_get ()) {                           // If Bluedroid...
       com_uti.logd ("Bluedroid support");
 
-      boolean fresh_shim_install = false;               // !!!! Need code to update shim when it changes !!!!   (Stable Jan 1, 2014 -> July 31/Nov 30, 2014)
-      if (! com_uti.shim_files_operational_get ()) {                                // If shim files not operational...
-        if (bt_get ()) {                                                // July 31, 2014: only install shim if BT is on
-          bt_set (false, true);                                             // Bluetooth off, and wait for off
+      boolean fresh_shim_install = false;                               // !!!! Need code to update shim when it changes !!!!   (Stable Jan 1, 2014 -> July 31/Nov 30, 2014)
+
+      boolean unfriendly_auto_install_and_reboot = false;
+      if (unfriendly_auto_install_and_reboot) {
+      if (! com_uti.shim_files_operational_get ()) {                    // If shim files not operational...
+        if (com_uti.bt_get ()) {                                        // July 31, 2014: only install shim if BT is on
+          com_uti.bt_set (false, true);                                 // Bluetooth off, and wait for off
           com_uti.logd ("Start 4 second delay after BT Off");
-          com_uti.ms_sleep (4000);                                          // Extra 4 second delay to ensure BT is off !!
+          com_uti.ms_sleep (4000);                                      // Extra 4 second delay to ensure BT is off !!
           com_uti.logd ("End 4 second delay after BT Off");
 
-          com_uti.shim_install ();                                              // Install shim
+          com_uti.shim_install ();                                      // Install shim
 
-          bt_set (true, true);                                              // Bluetooth on, and wait for on  (Need to set BT on so reboot has it on.)
+          com_uti.bt_set (true, true);                                  // Bluetooth on, and wait for on  (Need to set BT on so reboot has it on.)
+
             //Toast.makeText (m_context, "WARM RESTART PENDING FOR SHIM INSTALL !!", Toast.LENGTH_LONG).show ();  java.lang.RuntimeException: Can't create handler inside thread that has not called Looper.prepare()
         /* Don't need a delay before reboot because BT is on enough to stay on after reboot ?? (And we waited for On to be detected anyway)
             com_uti.logd ("Start 4 second delay after BT On");
-            com_uti.ms_sleep (4000);                                            // Extra 4 second delay to ensure BT is on
+            com_uti.ms_sleep (4000);                                    // Extra 4 second delay to ensure BT is on
             com_uti.logd ("End 4 second delay after BT On"); */
             //Toast.makeText (m_context, "WARM RESTART !!", Toast.LENGTH_LONG).show ();
-            //com_uti.sys_run ("kill `pidof system_server`", true);
-          com_uti.sys_run ("reboot", true);                                 // On M7 GPE requires reboot
+            //com_uti.sys_WAS_run ("kill `pidof system_server`", true);
+
+          com_uti.sys_run ("reboot now", true);                         // M7 GPE requires reboot
 
           fresh_shim_install = true;
         }
       }
+      }//if (unfriendly_auto_install_and_reboot) {
 
-      if (! fresh_shim_install && com_uti.shim_files_operational_get () && bt_get ()) {    // If not fresh shim install, and shim files operational, and BT is on...
+      if (! fresh_shim_install && com_uti.shim_files_operational_get () && com_uti.bt_get ()) {     // If not fresh shim install, and shim files operational, and BT is on...
         com_uti.logd ("Bluedroid shim installed & BT on");
         try {
-          FileOutputStream fos = m_context.openFileOutput (short_filename, Context.MODE_PRIVATE); // | MODE_WORLD_WRITEABLE      // Somebody got a NullPointerException here
+          /*FileOutputStream fos = m_context.openFileOutput (short_filename, Context.MODE_PRIVATE);   // | MODE_WORLD_WRITEABLE      // Somebody got a NullPointerException here
           if (fos != null) {
-            fos.close ();                                                 // Create "use_shim" flag file for lower level
-            uart_mode = false;                                            // SHIM MODE if success
-          }
+            fos.close ();*/                                               // Create "use_shim" flag file for lower level
+            m_com_api.tuner_api_mode = "SHIM";                                          // SHIM MODE if success
+          //}
         }
         catch (Throwable e) {
           com_uti.loge ("Exception, try UART mode");
@@ -835,10 +1005,10 @@ if (! com_uti.quiet_file_get ("/sdcard/spirit/remote_radio_update_dis")) {
       }
     }
 
-    if (uart_mode) {
-      if (bt_get ()) {
+    if (m_com_api.tuner_api_mode.equalsIgnoreCase ("UART")) {
+      if (com_uti.bt_get ()) {
         com_uti.logd ("UART mode needed but BT is on; turn BT Off");
-        bt_set (false, true);                                           // Bluetooth off, and wait for off
+        com_uti.bt_set (false, true);                                   // Bluetooth off, and wait for off
         com_uti.logd ("Start 4 second delay after BT Off");
         com_uti.ms_sleep (4000);                                        // Extra 4 second delay to ensure BT is off !!
         com_uti.logd ("End 4 second delay after BT Off");
@@ -854,7 +1024,7 @@ if (! com_uti.quiet_file_get ("/sdcard/spirit/remote_radio_update_dis")) {
 // BT Off KitKat:   service call bluetooth_manager 8        Older:  service call bluetooth 4
 
 
-    com_uti.logd ("done uart_mode: " + uart_mode);
+    com_uti.logd ("done m_com_api.tuner_api_mode: " + m_com_api.tuner_api_mode);
     return (0);
   }
 
@@ -884,7 +1054,7 @@ if (! com_uti.quiet_file_get ("/sdcard/spirit/remote_radio_update_dis")) {
     rfkill_state_get ();                                                // Display rfkill state
     String [] cmds = {("")};
     cmds [0] = ("echo " + state + " > /sys/class/rfkill/rfkill0/state");
-    com_uti.sys_run (cmds, true);                                         // Set rfkill state WITH SU/Root
+    com_uti.sys_WAS_run (cmds, true);                                         // Set rfkill state WITH SU/Root
     rfkill_state_get ();                                                // Display rfkill state
     if (state != 0)                                                     // If turning on...
       rfkill_state_set_on = true;
@@ -894,102 +1064,5 @@ if (! com_uti.quiet_file_get ("/sdcard/spirit/remote_radio_update_dis")) {
   }
 */
 
-  private void bt_wait (boolean wait_on) {
-    int ctr = 0;
-    boolean done = false;
-
-    while (! done && ctr ++ < 90 ) {                                    // While not done and 9 seconds has not elapsed...
-      com_uti.ms_sleep (100);                                             // Wait 0.1 second
-      if (wait_on)                                                      // If waiting for BT on...
-        done = bt_get ();                                               // Done if BT on
-      else                                                              // Else if waiting for BT off...
-        done = ! bt_get ();                                             // Done if BT off
-    }
-    return;
-  }
-
-
-  private boolean bta_get () {
-    m_bt_adapter = BluetoothAdapter.getDefaultAdapter ();                // Just do this once, shouldn't change
-    if (m_bt_adapter == null) {
-      com_uti.loge ("BluetoothAdapter.getDefaultAdapter () returned null");
-      return (false);
-    }
-    return (true);
-  }
-
-  private boolean bt_get () {                            // !! Should check with pid_get ("bluetoothd"), "brcm_patchram_plus", "btld", "hciattach" etc. for consistency w/ fm_hrdw
-    boolean ret = false;                                                //      BUT: if isEnabled () doesn't work, m_bt_adapter.enable () and m_bt_adapter.disable () may not work either.
-    if (m_bt_adapter == null)
-      if (! bta_get ())
-        return (false);
-    ret = m_bt_adapter.isEnabled ();
-    com_uti.logd ("bt_get isEnabled (): " + ret);
-    return (ret);
-  }
-
-// bttest is_enabled
-// bttest enable
-// bttest disable
-// Alternate/libbluedroid uses rfkill and ctl.stop/ctl.start bluetoothd
-
-  private int bt_set ( boolean bt_pwr, boolean wait ) {
-    if (m_bt_adapter == null)
-      if (! bta_get ())
-        return (-1);
-
-    boolean bt = bt_get ();
-    if (bt_pwr && bt) {
-      com_uti.logd ("bt_set BT already on");
-      return (0);
-    }
-    if (! bt_pwr && ! bt) {
-      com_uti.logd ("bt_set BT already off");
-      return (0);
-    }
-    if (bt_pwr) {                                                       // If request for BT on
-      com_uti.logd ("bt_set BT turning on");
-
-      try {
-        m_bt_adapter.enable ();                                       // Start enable BT
-      }
-      catch (Throwable e) {
-        com_uti.loge ("bt_set m_bt_adapter.disable () Exception");
-      }
-
-      if (! wait)                                                       // If no wait
-        return (0);                                                     // Done w/ no error
-
-      bt_wait (true);                                                   // Wait until BT is on or times out
-      bt = bt_get ();
-      if (bt) {
-        com_uti.logd ("bt_set BT on success");
-        return (0);
-      }
-      com_uti.loge ("bt_set BT on error");
-      return (-1);
-    }
-    else {
-      com_uti.logd ("bt_set BT turning off");
-      try {
-        m_bt_adapter.disable ();                                        // Start disable BT
-      }
-      catch (Throwable e) {
-        com_uti.loge ("bt_set m_bt_adapter.disable () Exception");
-      }
-
-      if (! wait)                                                       // If no wait
-        return (0);                                                     // Done w/ no error
-
-      bt_wait (false);                                                  // Wait until BT is off or times out
-      bt = bt_get ();
-      if (! bt) {
-        com_uti.logd ("bt_set BT off success");
-        return (0);
-      }
-      com_uti.loge ("bt_set BT off error");
-      return (-1);
-    }
-  }
-
 }
+

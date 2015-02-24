@@ -37,7 +37,5 @@ public interface svc_tcb {
 
   //tuner_rds_ptyn              // Use pt callback
 
-// API specific:
-  tuner_extra_resp  // via tuner_extra_cmdZ
 */
 }

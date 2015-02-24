@@ -3,7 +3,9 @@
 
 package fm.a2d.sf;
 
+import android.bluetooth.BluetoothAdapter;
 import android.net.NetworkInfo;
+import android.os.Bundle;
 import android.os.StrictMode;
 import android.os.Looper;
 import android.telephony.TelephonyManager;
@@ -30,17 +32,6 @@ import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 
 import java.io.FileInputStream;
-import java.io.UnsupportedEncodingException;
-import java.security.GeneralSecurityException;
-import java.security.spec.KeySpec;
-
-import javax.crypto.Cipher;
-import javax.crypto.SecretKey;
-import javax.crypto.SecretKeyFactory;
-import javax.crypto.spec.IvParameterSpec;
-import javax.crypto.spec.PBEKeySpec;
-import javax.crypto.spec.SecretKeySpec;
-
 
 import java.net.DatagramPacket;
 import java.net.DatagramSocket;
@@ -49,28 +40,46 @@ import java.net.InetAddress;
 
 public final class com_uti  {
 
-  private static int    m_obinits = 0;
+    // Stats:
+  private static int            m_obinits = 0;
+  private static int            string_daemon_cmd_num       = 0;
+  private static int            daemon_audio_data_get_num   = 0;
 
-  public static boolean ssd_via_sys_run = false;
-  private static String ssd_cmd = "";
-  public static boolean ssd_commit_all = false;
-  public static boolean ssd_commit_su = true;
-  private static String sys_cmd = "";
-  private static boolean motorola_stock_set  = false;
-  private static boolean motorola_stock      = false;
+    // Basic:
+  public  static final String   api_result_id   = "fm.a2d.sf.result.get";
+  public  static final String   api_action_id   = "fm.a2d.sf.action.set";
+  public  static final int      android_version = android.os.Build.VERSION.SDK_INT;
+  private static final int      DEF_BUF         = 512;
+
+    // s2d daemon communications:
+  private static int            bytear_daemon_cmd_sem  = 0;                // Only 1 client at a time
+  private static InetAddress    loop                = null;             // Make global to avoid constant re-initialization; reuse
+  private static boolean        loop_set            = false;
+
+    // Tuner utilities:
+  private static int band_freq_lo = 87500, band_freq_hi = 108000, band_freq_inc = 100, band_freq_odd = 0;
+
+    // Notification ID should be unique on system
+  public static final int s2_notif_id = 1963;                           // No relevance except to uniquely identify notification. Spirit1 uses 2112
+
+    // Device support:
+  private static boolean motorola_stock_set = false;
+  private static boolean motorola_stock     = false;
+
   private static boolean samsung_stock_set  = false;
   private static boolean samsung_stock      = false;
-  private static boolean lg2_stock_set  = false;
-  private static boolean lg2_stock      = false;
-  private static boolean htc_have      = false;
-  private static boolean htc_have_set  = false;
-  private static boolean htc_stock_set  = false;
-  private static boolean htc_stock      = false;
-  public static boolean htc_gpe_set    = false;
-  public static boolean htc_gpe        = false;
 
-  public static final int android_version = android.os.Build.VERSION.SDK_INT;
+  private static boolean lg2_stock_set      = false;
+  private static boolean lg2_stock          = false;
 
+  private static boolean htc_have           = false;
+  private static boolean htc_have_set       = false;
+
+  private static boolean htc_stock_set      = false;
+  private static boolean htc_stock          = false;
+
+  private static boolean htc_gpe_set        = false;
+  private static boolean htc_gpe            = false;
 
     //                                      Tuner   Audio
   public static final int DEV_UNK = -1;
@@ -79,32 +88,13 @@ public final class com_uti  {
   public static final int DEV_GS2 = 2;  // ssl      gs2
   public static final int DEV_GS3 = 3;  // ssl      gs3
   public static final int DEV_QCV = 4;  // qcv      qcv
-  public static final int DEV_ONE = 5;  // bch      one
+  public static final int DEV_OM7 = 5;  // bch      one
   public static final int DEV_LG2 = 6;  // bch      lg2
   public static final int DEV_XZ2 = 7;  // bch      xz2
 
-  public static String m_device = "";
-  public static String m_board = "";
-  public static String m_manufacturer = "";
-
-  public static int device = device_get ();//DEV_UNK;
-
-  private static int dg_daemon_cmd_sem = 0;
-  private static boolean dg_daemon_log = true;//false;
-  private static InetAddress loop;
-  private static boolean loop_set = false;
-  //private static boolean enable_non_audio = true;
-
-
-  private static final int DEF_BUF = 512;
-  private static boolean daemon_cmd_log = false;
-  private static int daemon_cmd_num = 0;
-  private static boolean daemon_audio_data_get_log = false;
-  private static int daemon_audio_data_get_num = 0;
-
-  private static int band_freq_lo = 87500, band_freq_hi = 108000, band_freq_inc = 100, band_freq_odd = 0;
-
-  public static final int s2_notif_id = 2112;                           // No relevance except to uniquely identify notification !! Spirit1 uses same !!
+  public static String m_device         = "";
+  public static String m_board          = "";
+  public static String m_manufacturer   = "";
 
   public com_uti () {                                                    // Default constructor
     //com_uti.logd ("m_obinits: " + m_obinits++);   // !! Can't log from internal code, class is not set up yet !!
@@ -124,9 +114,15 @@ public final class com_uti  {
   }
 
 
-  public  static final boolean ena_log_pcm_stat = true;
-  public  static final boolean ena_log_audio_routing_get = true;
+    // Logging External:
+  public  static final boolean ena_log_pcm_stat         = true;
+  public  static final boolean ena_log_audio_routing_get= true;
 
+    // Logging Internal to Utilities:
+  private static       boolean ena_log_daemon_cmd        = false;
+  private static       boolean ena_log_daemon_cmd_sem    = false;
+
+    // Android Logging Levels:
   private static final boolean ena_log_verbo = false;
   private static final boolean ena_log_debug = true;
   private static final boolean ena_log_warni = false;
@@ -223,13 +219,12 @@ public final class com_uti  {
 
 
 
-  public static boolean main_thread_get () {
+  public static boolean main_thread_get (String source) {
     boolean ret = (Looper.myLooper () == Looper.getMainLooper ());
     if (ret)
-      //com_uti.loge ("YES MAIN THREAD");
-      com_uti.logd ("YES MAIN THREAD");
-    else
-      com_uti.logd ("NO  MAIN THREAD");
+      com_uti.loge ("YES MAIN THREAD source: " + source);
+    //else
+    //  com_uti.logd ("Not main thread source: " + source);
     return (ret);
   }
 
@@ -336,9 +331,22 @@ public final class com_uti  {
 
     // Time:
 
+  public static long quiet_ms_sleep (long ms) {
+    //main_thread_get ("quiet_ms_sleep ms: " + ms);
+    try {
+      Thread.sleep (ms);                                                // Wait ms milliseconds
+      return (ms);
+    }
+    catch (InterruptedException e) {
+      return (0);
+    }
+  }
   public static long ms_sleep (long ms) {
-    if (ms > 10 && (ms % 101 != 0) && (ms % 11 != 0))
+    main_thread_get ("ms_sleep ms: " + ms);
+
+//    if (ms > 10 && (ms % 101 != 0) && (ms % 11 != 0))
       com_uti.loge ("ms: " + ms);                                       // Error as a warning
+
     try {
       Thread.sleep (ms);                                                // Wait ms milliseconds
       return (ms);
@@ -351,9 +359,16 @@ public final class com_uti  {
     }
   }
 
-  public static long ms_get () {
-    long ms = System.currentTimeMillis ();
-    //com_uti.logd ("ms: " + ms);
+  public static long tmr_ms_get () {        // Current timestamp of the most precise timer available on the local system, in nanoseconds. Equivalent to Linux's CLOCK_MONOTONIC. 
+    long ms = System.nanoTime () / 1000000; // Should only be used to measure a duration by comparing it against another timestamp on the same device.
+                                            // Values returned by this method do not have a defined correspondence to wall clock times; the zero value is typically whenever the device last booted
+    //com_uti.logd ("ms: " + ms);           // Changing system time will not affect results.
+    return (ms);
+  }
+
+  public static long utc_ms_get () {        // Current time in milliseconds since January 1, 1970 00:00:00.0 UTC.
+    long ms = System.currentTimeMillis ();  // Always returns UTC times, regardless of the system's time zone. This is often called "Unix time" or "epoch time".
+    //com_uti.logd ("ms: " + ms);           // This method shouldn't be used for measuring timeouts or other elapsed time measurements, as changing the system time can affect the results.
     return (ms);
   }
 
@@ -429,7 +444,8 @@ public final class com_uti  {
   }
 */
 
-  public static boolean file_delete (String filename) {
+  public static boolean file_delete (final String filename) {
+    main_thread_get ("file_delete filename: " + filename);
     java.io.File f = null;
     boolean ret = false;
     try {
@@ -445,14 +461,14 @@ public final class com_uti  {
     return (ret);
   }
 
-  public static boolean file_create (String filename) {
+  public static boolean file_create (final String filename) {
+    main_thread_get ("file_create filename: " + filename);
     java.io.File f = null;
     boolean ret = false;
     try {
       f = new File (filename);
       ret = f.createNewFile ();
       com_uti.logd ("ret: " + ret);
-      //f.delete ();
     }
     catch (Throwable e) {
       com_uti.logd ("Throwable e: " + e);
@@ -461,7 +477,26 @@ public final class com_uti  {
     return (ret);
   }
 
+  public static void perms_all (final String filename) {
+    main_thread_get ("perms_all filename: " + filename);
+    try {
+      final File file = new File (filename);
+      boolean readable = file.setReadable    (true, false);  // r--r--r--
+      boolean writable = file.setWritable    (true, false);  // -r--w--w-
+      boolean execable = file.setExecutable  (true, false);  // --x--x--x
+      if (readable && writable && execable)
+        logd ("filename readable && writable && execable");
+      else
+        loge ("filename readable: " + readable + "  writable: " + writable + "  execable: " + execable);
+    }
+    catch (Throwable e) {
+      //e.printStackTrace ();
+      loge ("Throwable e: " + e);
+    }
+  }
+
   public static String file_create (Context context, int id, String filename, boolean exe) {     // When daemon running !!!! java.io.FileNotFoundException: /data/data/com.WHATEVER.fm/files/sprtd (Text file busy)
+    main_thread_get ("file_create filename: " + filename);
 
     if (context == null)
       return ("");
@@ -489,7 +524,9 @@ public final class com_uti  {
       fos.write (buffer);                                               // Copy input to output file
       fos.close ();                                                     // Close output file
 
-      com_uti.sys_run ("chmod 755 " + full_filename + " 1>/dev/null 2>/dev/null" , false);              // Set execute permission; otherwise rw-rw----
+      //com_uti.sys_run ("chmod 755 " + full_filename + " 1>/dev/null 2>/dev/null" , false);              // Set execute permission; otherwise rw-rw----
+      perms_all (full_filename);
+
     }
     catch (Exception e) {
       //e.printStackTrace ();
@@ -500,6 +537,7 @@ public final class com_uti  {
     return (full_filename);
   }
 
+/*
   public static int cached_sys_run (String cmd) {                              // Additive single string w/ commit version
 
     if (sys_cmd.equals (""))
@@ -516,30 +554,15 @@ public final class com_uti  {
     sys_cmd = "";
     return (0);
   }
+*/
 
 /*
-  public static void sys_run (String [] cmds, boolean su) {             // Array of commands version
-    com_uti.logd ("su: " + su + "  cmds: " + cmds);
-    main_thread_get ();                                                 // Should not run on main thread, but currently does. Does it matter for service in different process ?
-
-    for (String cmd : cmds) {
-      com_uti.logd ("su: " + su + "  cmd: " + cmd);
-
-      String su_cmd = cmd;
-      if (su) {
-        //su_cmd = "echo \"" + cmd + "\" | su -c sh";
-        //su_cmd = "su -c \"" + cmd + ""\";
-        su_cmd = "su -c '" + cmd + "'";
-      }
-      sh_run (su_cmd);
-    }
-  }
   private static void sh_run (String cmd) {//, String params) {
     logd ("cmd: " + cmd);
     Process process = null;
     try {
       process = new ProcessBuilder ()
-        .command ("/system/xbin/su", "chmod 667 /dev/fmradio")//cmd)
+        .command ("/system/xbin/su", "WAS_chmod 667 /dev/fmradio")//cmd)
         .redirectErrorStream (true)
         .start ();
       logd ("process: " + process);
@@ -589,13 +612,25 @@ public final class com_uti  {
 
 */
 
-  public static int sys_run (String cmd, boolean su) {
-    String [] cmds = {("")};
-    cmds [0] = cmd;
-    return (sys_run (cmds, su));
+  public static boolean su_installed_get () {
+    boolean ret = false;
+    if (com_uti.file_get ("/system/bin/su"))
+      ret = true;
+    else if (com_uti.file_get ("/system/xbin/su"))
+      ret = true;
+    com_uti.logd ("ret: " + ret);
+    return (ret);
   }
 
-  public static int sys_run (String [] cmds, boolean su) {              // !! Crash in logs if any output to stderr !!
+  public static int sys_run (String cmd, boolean su) {
+    main_thread_get ("sys_run cmd: " + cmd);
+
+    String [] cmds = {("")};
+    cmds [0] = cmd;
+    return (arr_sys_run (cmds, su));
+  }
+
+  private static int arr_sys_run (String [] cmds, boolean su) {         // !! Crash if any output to stderr !!
     //logd ("sys_run: " + cmds);
 
     try {
@@ -612,7 +647,7 @@ public final class com_uti  {
       os.writeBytes ("exit\n");  
       os.flush ();
 
-      int exit_val = p.waitFor ();
+      int exit_val = p.waitFor ();                                      // This could hang forever ?
       if (exit_val != 0)
         com_uti.loge ("exit_val: " + exit_val);
       else
@@ -631,7 +666,7 @@ public final class com_uti  {
 /*
   public static void rec_sys_run (String [] cmds, boolean su) {             // Array of commands version
     com_uti.logd ("su: " + su + "  cmds: " + cmds);
-    main_thread_get ();                                                 // Should not run on main thread, but currently does. Does it matter for service in different process ?
+    main_thread_get ("rec_sys_run");                                                 // Should not run on main thread, but currently does. Does it matter for service in different process ?
     try {
       Process p;
       if (su)
@@ -717,6 +752,7 @@ failure to promptly write the input stream or read the output stream of the subp
 
 
   public static long file_size_get (String filename) {
+    main_thread_get ("file_size_get filename: " + filename);
     File ppFile = null;
     long ret = -1;
     try {
@@ -732,6 +768,7 @@ failure to promptly write the input stream or read the output stream of the subp
   }
 
   public static boolean file_get (String filename, boolean log) {
+    //main_thread_get ("file_get filename: " + filename);
     File ppFile = null;
     boolean exists = false;    
     try {
@@ -741,7 +778,8 @@ failure to promptly write the input stream or read the output stream of the subp
     }
     catch (Exception e) {
       //e.printStackTrace ();
-      exists = false;                                                   // Exception means no file
+      loge ("Exception: " + e );
+      exists = false;                                                   // Exception means no file or no permission for file
     } 
     if (log)
       logd ("exists: " + exists + "  \'" + filename + "\'");
@@ -755,6 +793,7 @@ failure to promptly write the input stream or read the output stream of the subp
   }
 
   public static boolean access_get (String filename, boolean read, boolean write, boolean execute) {
+    main_thread_get ("access_get filename: " + filename);
     File ppFile = null;
     boolean exists = false, access = false;
     try {
@@ -894,7 +933,7 @@ GT-I9000    GT-I9000        Mackay. Unofficial ?
 Evo 4G LTE  jewel
 */
 
-  private static String string_device_get () {
+  private static String service_device_get (int device) {
     switch (device) {
       case DEV_UNK: return ("UNK");
       case DEV_GEN: return ("GEN");
@@ -902,32 +941,71 @@ Evo 4G LTE  jewel
       case DEV_GS2: return ("GS2");
       case DEV_GS3: return ("GS3");
       case DEV_QCV: return ("QCV");
-      case DEV_ONE: return ("ONE");
+      case DEV_OM7: return ("ONE");
       case DEV_LG2: return ("LG2");
       case DEV_XZ2: return ("XZ2");
     }
     return ("UNK");
   }
 
-  private static int device_get () {
-    String arch = System.getProperty ("os.arch");                       // armv7l
-    if (arch != null)
-      com_uti.logd (arch);
-    String name = System.getProperty ("os.name");                       // Linux
-    if (name != null)
-      com_uti.logd (name);
-    String vers = System.getProperty ("os.version");                    // 3.0.60-g8a65ee9
-    if (vers != null)
-      com_uti.logd (vers);
+/*
+  private String getProperty (String propertyName) {
+    String ret = System.getProperty (propertyName);         // Need to be system user for some properties ?
+    if (ret != null)
+      return (ret);
 
-    com_uti.logd (android.os.Build.BOARD);                                // aries
-    com_uti.logd (android.os.Build.BRAND);                                // samsung          SEMC
-    com_uti.logd (android.os.Build.DEVICE);                               // GT-I9000
-    com_uti.logd (android.os.Build.HARDWARE);                             // aries            st-ericsson
-    com_uti.logd (android.os.Build.ID);                                   // JOP40D
-    com_uti.logd (android.os.Build.MANUFACTURER);                         // samsung          Sony
-    com_uti.logd (android.os.Build.MODEL);                                // GT-I9000
-    com_uti.logd (android.os.Build.PRODUCT);                              // GT-I9000
+    String cmd = "getprop " + propertyName + " | grep 1";      // !! Only works with binary 0/1 results !!!
+    int iret = com_uti.WAS_sys_run (cmd, true);
+    if (iret == 0)
+      ret = "1";
+    else
+      ret = "0";
+    return (ret);
+  }
+*/
+
+
+  private static boolean strict_set = false;
+
+  public static int devnum = DEV_UNK;                                   // !!!! Need to match m_com_api.service_device_int !!!!
+  public static final String DEV_UNK_STR = "" + DEV_UNK;
+
+  public static int devnum_set (Context context) {
+    com_uti.devnum = devnum_get (context);
+    return (com_uti.devnum);
+  }
+
+  private static int devnum_get (Context context) {
+
+    if (! strict_set) {
+      strict_set = true;
+      //strict_mode_set (true);
+    }
+                                                                        // Can't get these from getprop !!
+    String arch = System.getProperty ("os.arch");                       // armv7l           armv7l
+    if (arch != null)
+      com_uti.logd ("os.arch: " + arch);
+    else
+      com_uti.loge ("!!!! os.arch");
+    String name = System.getProperty ("os.name");                       // Linux            Linux
+    if (name != null)
+      com_uti.logd ("os.name: " + name);
+    else
+      com_uti.loge ("!!!! os.name");
+    String vers = System.getProperty ("os.version");                    // 3.0.31-CM-ge296ffc   3.0.60-g8a65ee9
+    if (vers != null)
+      com_uti.logd ("os.vers: " + vers);
+    else
+      com_uti.loge ("!!!! os.version");
+
+    com_uti.logd ("ro.product.board:        " + android.os.Build.BOARD);                                // smdk4x12       aries
+    com_uti.logd ("ro.product.brand:        " + android.os.Build.BRAND);                                // samsung        samsung          SEMC
+    com_uti.logd ("ro.product.device:       " + android.os.Build.DEVICE);                               // m0             GT-I9000
+    com_uti.logd ("ro.hardware:             " + android.os.Build.HARDWARE);                             // smdk4x12       aries            st-ericsson
+    com_uti.logd ("ro.build.id:             " + android.os.Build.ID);                                   // LRX22G         JOP40D
+    com_uti.logd ("ro.product.manufacturer: " + android.os.Build.MANUFACTURER);                         // samsung        samsung          Sony
+    com_uti.logd ("ro.product.model:        " + android.os.Build.MODEL);                                // GT-I9300       GT-I9000
+    com_uti.logd ("ro.product.name:         " + android.os.Build.PRODUCT);                              // m0xx           GT-I9000
 
     //if (android.os.Build.DEVICE.toUpperCase (Locale.getDefault ()).equals "GT-I900")
 
@@ -943,24 +1021,8 @@ Evo 4G LTE  jewel
 
     int dev = DEV_UNK;
 
-    if (file_get ("/sdcard/spirit/dev_gen"))
-      dev = (DEV_GEN);
-    else if (file_get ("/sdcard/spirit/dev_gs1"))
-      dev = (DEV_GS1);
-    else if (file_get ("/sdcard/spirit/dev_gs2"))
-      dev = (DEV_GS2);
-    else if (file_get ("/sdcard/spirit/dev_gs3"))
-      dev = (DEV_GS3);
-    else if (file_get ("/sdcard/spirit/dev_one"))
-      dev = (DEV_ONE);
-    else if (file_get ("/sdcard/spirit/dev_lg2"))
-      dev = (DEV_LG2);
-    else if (file_get ("/sdcard/spirit/dev_xz2"))
-      dev = (DEV_XZ2);
-    else if (file_get ("/sdcard/spirit/dev_qcv"))
-      dev = (DEV_QCV);
-    else if (file_get ("/sdcard/spirit/dev_unk"))
-      dev = (DEV_UNK);
+    if (false)
+      com_uti.loge ("Impossible !");
 
     else if (is_gs3_note2 ())
       dev = (DEV_GS3);
@@ -993,7 +1055,7 @@ Evo 4G LTE  jewel
       dev = (DEV_QCV);
 
     else if (htc_one_onemini_get ())
-      dev = (DEV_ONE);
+      dev = (DEV_OM7);
 
     else if (motog_get ())
       dev = (DEV_QCV);
@@ -1007,11 +1069,10 @@ Evo 4G LTE  jewel
 
     if (dev == DEV_UNK) {
       // From android_fmradio.cpp
-      if (com_uti.file_get ("/dev/radio0") && com_uti.file_get ("/sys/devices/platform/APPS_FM.6")) { // Qualcomm is always V4L and has this FM /sys directory
-        dev = DEV_QCV;  // Redundant, see 
+      if (com_uti.file_get ("/dev/radio0") && com_uti.file_get ("/sys/devices/platform/APPS_FM.6")) {   // Qualcomm is always V4L and has this FM /sys directory
+        dev = DEV_QCV;                                                                                  // Redundant, see 
       }
-      else if (com_uti.file_get ("/dev/radio0") || com_uti.file_get ("/dev/fmradio")) {               // Samsung always have one of these driver names for Samsung Silicon Labs driver
-        //if (com_uti.file_get (plg_gs1.codec_reg))
+      else if (com_uti.file_get ("/dev/radio0") || com_uti.file_get ("/dev/fmradio")) {                 // Samsung GalaxyS class devices always have one of these driver names for Samsung Silicon Labs driver
         if (com_uti.file_get ("/sys/kernel/debug/asoc/smdkc110/wm8994-samsung-codec.4-001a/codec_reg"))
           dev = DEV_GS1;
         else if (com_uti.file_get ("/sys/kernel/debug/asoc/U1-YMU823") || com_uti.file_get ("/sys/devices/platform/soc-audio/MC1N2 AIF1") || com_uti.file_get ("/sys/kernel/debug/asoc/U1-YMU823/mc1n2.6-003a"))
@@ -1023,14 +1084,59 @@ Evo 4G LTE  jewel
         if (com_uti.file_get ("/dev/ttyHS99") && com_uti.file_get ("/sys/class/g2_rgb_led"))
           dev = DEV_LG2;
         else if (com_uti.file_get ("/dev/ttyHS0") && (com_uti.file_get ("/sys/devices/platform/m7_rfkill") || com_uti.file_get ("/sys/devices/platform/mipi_m7.0") || com_uti.file_get ("/sys/module/board_m7_audio")))
-          dev = DEV_ONE;
+          dev = DEV_OM7;
       }
       com_uti.loge ("DEV_UNK fix -> dev: " + dev);
     }
 
-    com_uti.logd ("dev: " + dev);
+    com_uti.logd ("Auto-Detected dev: " + dev + "  service_device_get: " + service_device_get (dev));
+
+    String plg_dev = com_uti.prefs_get (context, "service_plugin_device", "").toUpperCase (Locale.getDefault ());
+    com_uti.logd ("Prefs service_plugin_device plg_dev: " + plg_dev);
+
+    if (plg_dev.equals (""))
+      com_uti.logd ("default device");
+    else if (plg_dev.startsWith ("GEN"))
+      dev = DEV_GEN;
+    else if (plg_dev.startsWith ("GT-I9300"))
+      dev = DEV_GS2;
+    else if (plg_dev.startsWith ("GT-I9100"))
+      dev = DEV_GS2;
+    else if (plg_dev.startsWith ("GT-I9000"))
+      dev = DEV_GS1;
+    else if (plg_dev.startsWith ("GT-N7100"))
+      dev = DEV_GS3;
+    else if (plg_dev.startsWith ("GT-N7000"))
+      dev = DEV_GS2;
+    else if (plg_dev.startsWith ("One-M8"))
+      dev = DEV_QCV;
+    else if (plg_dev.startsWith ("One-X"))//Lte"))
+      dev = DEV_QCV;
+    else if (plg_dev.startsWith ("Moto-"))//G"))
+      dev = DEV_QCV;
+    else if (plg_dev.startsWith ("One-M7"))
+      dev = DEV_OM7;
+    else if (plg_dev.startsWith ("LG-G2"))
+      dev = DEV_LG2;
+    else if (plg_dev.startsWith ("Sony-Z1"))//-"))
+      dev = DEV_QCV;
+    else if (plg_dev.startsWith ("Sony-Z2"))//+"))
+      dev = DEV_XZ2;
+    else if (plg_dev.startsWith ("QCom"))//-All"))
+      dev = DEV_QCV;
+
+    com_uti.logd ("Final dev: " + dev + "  service_device_get: " + service_device_get (dev));
+
+
+    String plg_tnr = com_uti.prefs_get (context, "service_plugin_tuner", "").toUpperCase (Locale.getDefault ());
+    com_uti.logd ("Prefs service_plugin_device plg_tnr: " + plg_tnr);
+
+    String plg_aud = com_uti.prefs_get (context, "service_plugin_audio", "").toUpperCase (Locale.getDefault ());
+    com_uti.logd ("Prefs service_plugin_device plg_aud: " + plg_aud);
+
     return (dev);
   }
+
 
 
   public static String app_version_get (Context act) {                                             // Get versionName (from AndroidManifest.xml)
@@ -1050,92 +1156,55 @@ Evo 4G LTE  jewel
 
     // Preferences:
 
-  static double double_parse (String str) {
-    try {
-      return (Double.parseDouble (str));
-    }
-    catch (Exception e) {
-    }
-    return (-1);
-  }
-  static int int_parse (String str) {
-    try {
-      return (Integer.parseInt (str));
-    }
-    catch (Exception e) {
-    }
-    return (0);
-  }
-  long long_parse (String str) {
-    try {
-      return (Long.parseLong (str));
-    }
-    catch (Exception e) {
-    }
-    return (0);//(-1);
-  }
-  boolean boolean_parse (String str) {
-    try {
-      return (Boolean.parseBoolean (str));
-    }
-    catch (Exception e) {
-    }
-    return (false);
+  public  static final String   prefs_file = "s2_prefs";
+                                                                        // prefs_mode: Match previous releases to avoid loss of settings
+  private static final int      prefs_mode = Context.MODE_PRIVATE | Context.MODE_MULTI_PROCESS;
+
+  public static SharedPreferences sp_get (Context context) {
+    SharedPreferences m_sp = context.getSharedPreferences (prefs_file, prefs_mode);
+    return (m_sp);
   }
 
-
-    // Prefs:
-  private static final String prefs_file = "s2_prefs";
-  //private static final int prefs_mode = Context.MODE_WORLD_WRITEABLE | Context.MODE_WORLD_READABLE;//MotoG settings don't work sometimes    Context.MODE_PRIVATE | Context.MODE_MULTI_PROCESS;
-  private static final int prefs_mode = Context.MODE_WORLD_WRITEABLE | Context.MODE_WORLD_READABLE | Context.MODE_MULTI_PROCESS;
-  //private static final int MODE_MULTI_PROCESS = 4;
+  public static String def_set (Context context, String key) {
+    String res = com_uti.prefs_get (context, key, "");
+    if (res.equals (""))
+      com_uti.prefs_set (context, key, "");
+    //com_uti.logd ("context: " + context + "  key: " + key + "  res: " + res);
+    return (res);
+  }
 
     // Prefs Get:
-  public static int prefs_get (Context context, String key, int int_def) {
-    String def = "" + int_def;
-    String int_str = prefs_get (context, key, def);
-    int int_parsed = int_parse (int_str);
-    com_uti.logd ("key: " + key + "  def: " + def + "  int_str: " + int_str + "  int_parsed: " + int_parsed);
-    return (int_parsed);
+  public static int prefs_get (Context context, String key, int def_int) {
+    String def = "" + def_int;
+    String str = prefs_get (context, key, def);
+    int getd = int_get (str);
+    com_uti.logd ("key: " + key + "  def: " + def + "  str: " + str + "  getd: " + getd);
+    return (getd);
   }
+
   public static String prefs_get (Context context, String key, String def) {
     String res = def;
     try {
-      SharedPreferences sp = context.getSharedPreferences (prefs_file, prefs_mode);
-      res = sp.getString (key, def);   // java.lang.ClassCastException if wrong type !!
+      SharedPreferences m_sp = sp_get (context);
+      if (m_sp != null) {
+        res = m_sp.getString (key, def);                                // java.lang.ClassCastException if wrong type
+        if (res.equalsIgnoreCase (""))
+          res = def;
+      }
     }
     catch (Exception e) {
     }
     com_uti.logd ("key: " + key + "  def: " + def + "  res: " + res);
     return (res);
   }
-/*
-  public static long prefs_get (Context context, String key, long def) {
-    long res = def;
-    SharedPreferences sp = context.getSharedPreferences (prefs_file, prefs_mode);
-    try {
-      res = sp.getLong (key, def);
-    }
-    catch (Exception e) {
-    }
-    return (res);
-  }
-  public static boolean prefs_get (Context context, String key, boolean def) {
-    boolean res = def;
-    try {
-      SharedPreferences sp = context.getSharedPreferences (prefs_file, prefs_mode);
-      res = sp.getBoolean (key, def);
-    }
-    catch (Exception e) {
-    }
-    return (res);
-  }
+
   public static double prefs_get (Context context, String key, double def) {
     double resd = def;
     String res = "" + def;
     try {
-      SharedPreferences sp = context.getSharedPreferences (prefs_file, prefs_mode);
-      res = sp.getString (key, Double.toString (def));
+      SharedPreferences m_sp = sp_get (context);
+      if (m_sp != null)
+        res = m_sp.getString (key, Double.toString (def));
     }
     catch (Exception e) {
     }
@@ -1147,23 +1216,51 @@ Evo 4G LTE  jewel
     }
     return (resd);
   } 
+
+/*
+  public static long prefs_get (Context context, String key, long def) {
+    long res = def;
+    try {
+      SharedPreferences m_sp = sp_get (context);
+      if (m_sp != null)
+        res = m_sp.getLong (key, def);
+    }
+    catch (Exception e) {
+    }
+    return (res);
+  }
+  public static boolean prefs_get (Context context, String key, boolean def) {
+    boolean res = def;
+    try {
+      SharedPreferences m_sp = sp_get (context);
+      if (m_sp != null)
+        res = m_sp.getBoolean (key, def);
+    }
+    catch (Exception e) {
+    }
+    return (res);
+  }
 */
     // Prefs Set:
   public static void prefs_set (Context context, String key, String val) {
     prefs_set (context, prefs_file, key, val);
   }
-  public static void prefs_set (Context context, String key, int int_val) {
-    String val = "" + int_val;
+  public static void prefs_set (Context context, String key, int val_int) {
+    String val = "" + val_int;
     prefs_set (context, key, val);
     return;
   }
   public static void prefs_set (Context context, String prefs_file, String key, String val) {
     com_uti.logd ("String: " + key + " = " + val);
     try {
-      SharedPreferences sp = context.getSharedPreferences (prefs_file, prefs_mode);
-      SharedPreferences.Editor ed = sp.edit ();
-      ed.putString (key, val);
-      ed.commit ();
+      SharedPreferences.Editor ed = null;
+      SharedPreferences m_sp = sp_get (context);
+      if (m_sp != null)
+        ed = m_sp.edit ();
+      if (ed != null) {
+        ed.putString (key, val);
+        ed.commit ();
+      }
     }
     catch (Exception e) {
     }
@@ -1175,10 +1272,14 @@ Evo 4G LTE  jewel
   public static void prefs_set (Context context, String prefs_file, String key, long val) {
     com_uti.logd ("long: " + key + " = " + val);
     try {
-      SharedPreferences sp = context.getSharedPreferences (prefs_file, prefs_mode);
-      SharedPreferences.Editor ed = sp.edit ();
-      ed.putLong (key, val);
-      ed.commit ();
+      SharedPreferences.Editor ed = null;
+      SharedPreferences m_sp = sp_get (context);
+      if (m_sp != null)
+        ed = m_sp.edit ();
+      if (ed != null) {
+        ed.putLong (key, val);
+        ed.commit ();
+     }
     }
     catch (Exception e) {
     }
@@ -1189,10 +1290,14 @@ Evo 4G LTE  jewel
   public static void prefs_set (Context context, String prefs_file, String key, boolean val) {
     com_uti.logd ("boolean: " + key + " = " + val);
     try {
-      SharedPreferences sp = context.getSharedPreferences (prefs_file, prefs_mode);
-      SharedPreferences.Editor ed = sp.edit ();
-      ed.putBoolean (key, val);
-      ed.commit ();
+      SharedPreferences.Editor ed = null;
+      SharedPreferences m_sp = sp_get (context);
+      if (m_sp != null)
+        SharedPreferences.Editor ed = m_sp.edit ();
+      if (ed != null) {
+        ed.putBoolean (key, val);
+        ed.commit ();
+      }
     }
     catch (Exception e) {
     }
@@ -1200,28 +1305,81 @@ Evo 4G LTE  jewel
 */
   
     // Hidden Audiosystem stuff:
-///*
-  public static int setParameters (final String keyValuePairs) {
-    int ret = -7;
-    com_uti.logd ("keyValuePairs: " + keyValuePairs);
-    try {
-      Class<?> audioSystem = Class.forName ("android.media.AudioSystem");        // Use reflection
-      Method setParameters = audioSystem.getMethod ("setParameters", String.class);
-      ret = (Integer) setParameters.invoke (audioSystem, keyValuePairs);
-      com_uti.logd ("ret: " + ret); 
-    }
-    catch (Exception e) {
-      com_uti.loge ("Could not set audio system parameters: " + e);
-    }
-    return (ret);
-  }
 /*
-  public static final int FOR_MEDIA = 1;
+    public enum audio_mode {
+        MODE_INVALID            (-2),
+        MODE_CURRENT            (-1),
+        MODE_NORMAL             (0),
+        MODE_RINGTONE           (1),
+        MODE_IN_CALL            (2),
+        MODE_IN_COMMUNICATION   (3),
+        NUM_MODES  // not a valid entry, denotes end-of-list
+    };
+
+    public enum audio_in_acoustics {
+        AGC_ENABLE    (0x0001),
+        AGC_DISABLE   (0),
+        NS_ENABLE     (0x0002),
+        NS_DISABLE    (0),
+        TX_IIR_ENABLE (0x0004),
+        TX_DISABLE    (0)
+    };
+
+    // device connection states used for setDeviceConnectionState()
+    public enum device_connection_state {
+        DEVICE_STATE_UNAVAILABLE    (0),
+        DEVICE_STATE_AVAILABLE      (1),
+        NUM_DEVICE_STATES
+    };
+*/
+  public static final int FOR_COMMUNICATION = 0;
+  public static final int FOR_MEDIA         = 1;
+  public static final int FOR_RECORD        = 2;
+  public static final int FOR_DOCK          = 3;
+
+
+  public static final int DEVICE_STATE_UNAVAILABLE  = 0;
+  public static final int DEVICE_STATE_AVAILABLE    = 1;
+
+/*
+    // usages used for setForceUse()
+  public enum force_use {
+    FOR_COMMUNICATION   (0),
+    FOR_MEDIA           (1),
+    FOR_RECORD          (2),
+    FOR_DOCK            (3),
+    NUM_FORCE_USE
+  };
+*/
+
   public static final int FORCE_NONE = 0;
   public static final int FORCE_SPEAKER = 1;
+/*
+    // device categories used for setForceUse()
+  public enum forced_config {
+    FORCE_NONE              (0),
+    FORCE_SPEAKER           (1),
+    FORCE_HEADPHONES        (2),
+    FORCE_BT_SCO            (3),
+    FORCE_BT_A2DP           (4),
+    FORCE_WIRED_ACCESSORY   (5),
+    FORCE_BT_CAR_DOCK       (6),
+    FORCE_BT_DESK_DOCK      (7),
+
+// These below are not in ~/android/system/hardware/cm/audio/AudioSystem.h
+    FORCE_ANALOG_DOCK       (8),
+    FORCE_DIGITAL_DOCK      (9),
+    FORCE_NO_BT_A2DP        (10),
+    NUM_FORCE_CONFIG        (11),
+//    FORCE_DEFAULT = FORCE_NONE;
+  };
+*/
   public static int setForceUse (final int usage, final int config) {
     int ret = -9;
-    com_uti.logd ("usage: " + usage + "  config: " + config); 
+    com_uti.logd ("usage: " + usage + "  config: " + config);
+
+com_uti.logd ("getForceUse 1: " + getForceUse (usage));
+
     try {
       //Method setForceUse = AudioManager.class.getMethod ("setForceUse", int.class, int.class);
       Class<?> audioSystem = Class.forName ("android.media.AudioSystem");        // Use reflection
@@ -1232,12 +1390,297 @@ Evo 4G LTE  jewel
     catch (Exception e) {
       com_uti.loge ("exception: " + e);
     }
+
+com_uti.logd ("getForceUse 2: " + getForceUse (usage));
+
     return (ret);
   }
-*/
 
+  public static int getForceUse (final int usage) {
+    int ret = -9;
+    com_uti.logd ("usage: " + usage);
+    try {
+      //Method getForceUse = AudioManager.class.getMethod ("getForceUse", int.class, int.class);
+      Class<?> audioSystem = Class.forName ("android.media.AudioSystem");        // Use reflection
+      Method getForceUse = audioSystem.getMethod ("getForceUse", int.class);
+      ret = (Integer) getForceUse.invoke (audioSystem, usage);
+      com_uti.logd ("ret: " + ret);
+    }
+    catch (Exception e) {
+      com_uti.loge ("exception: " + e);
+    }
+    return (ret);
+  }
+
+/*
+    public enum audio_devices {
+        // output devices
+        DEVICE_OUT_EARPIECE             0x1,
+        DEVICE_OUT_SPEAKER = 0x2,
+        DEVICE_OUT_WIRED_HEADSET = 0x4,
+        DEVICE_OUT_WIRED_HEADPHONE = 0x8,
+        DEVICE_OUT_BLUETOOTH_SCO = 0x10,
+        DEVICE_OUT_BLUETOOTH_SCO_HEADSET = 0x20,
+        DEVICE_OUT_BLUETOOTH_SCO_CARKIT = 0x40,
+        DEVICE_OUT_BLUETOOTH_A2DP               0x80,
+        DEVICE_OUT_BLUETOOTH_A2DP_HEADPHONES    0x100,
+        DEVICE_OUT_BLUETOOTH_A2DP_SPEAKER = 0x200,
+        DEVICE_OUT_AUX_DIGITAL = 0x400,
+//#ifdef HAVE_FM_RADIO
+        DEVICE_OUT_FM = 0x800,
+        DEVICE_OUT_FM_SPEAKER = 0x1000,
+        DEVICE_OUT_FM_ALL = (DEVICE_OUT_FM | DEVICE_OUT_FM_SPEAKER),
+/*#elif defined(OMAP_ENHANCEMENT)
+        DEVICE_OUT_FM_TRANSMIT = 0x800,
+        DEVICE_OUT_LOW_POWER = 0x1000,
+#endif*/
+
+/*!!!!
+        DEVICE_OUT_HDMI = 0x2000,
+        DEVICE_OUT_DEFAULT = 0x8000,
+        DEVICE_OUT_ALL = (DEVICE_OUT_EARPIECE | DEVICE_OUT_SPEAKER | DEVICE_OUT_WIRED_HEADSET |
+//#ifdef HAVE_FM_RADIO
+                DEVICE_OUT_WIRED_HEADPHONE | DEVICE_OUT_FM | DEVICE_OUT_FM_SPEAKER | DEVICE_OUT_BLUETOOTH_SCO | DEVICE_OUT_BLUETOOTH_SCO_HEADSET |
+/*#else
+                DEVICE_OUT_WIRED_HEADPHONE | DEVICE_OUT_BLUETOOTH_SCO | DEVICE_OUT_BLUETOOTH_SCO_HEADSET |
+#endif*/
+
+/*!!!!
+                DEVICE_OUT_BLUETOOTH_SCO_CARKIT | DEVICE_OUT_BLUETOOTH_A2DP | DEVICE_OUT_BLUETOOTH_A2DP_HEADPHONES |
+/*#if defined(OMAP_ENHANCEMENT) && !defined(HAVE_FM_RADIO)
+                DEVICE_OUT_BLUETOOTH_A2DP_SPEAKER | DEVICE_OUT_AUX_DIGITAL | DEVICE_OUT_LOW_POWER |
+                DEVICE_OUT_FM_TRANSMIT | DEVICE_OUT_DEFAULT),
+#else*/
+
+/*!!!!
+
+                DEVICE_OUT_BLUETOOTH_A2DP_SPEAKER | DEVICE_OUT_AUX_DIGITAL | DEVICE_OUT_HDMI | DEVICE_OUT_DEFAULT),
+//#endif
+        DEVICE_OUT_ALL_A2DP = (DEVICE_OUT_BLUETOOTH_A2DP | DEVICE_OUT_BLUETOOTH_A2DP_HEADPHONES |
+                DEVICE_OUT_BLUETOOTH_A2DP_SPEAKER),
+
+        // input devices
+        DEVICE_IN_COMMUNICATION             0x10000,
+        DEVICE_IN_AMBIENT                   0x20000,
+        DEVICE_IN_BUILTIN_MIC               0x40000,
+        DEVICE_IN_BLUETOOTH_SCO_HEADSET     0x80000,
+        DEVICE_IN_WIRED_HEADSET             0x100000,
+        DEVICE_IN_AUX_DIGITAL               0x200000,
+        DEVICE_IN_VOICE_CALL                0x400000,
+        DEVICE_IN_BACK_MIC                  0x800000,
+//#ifdef HAVE_FM_RADIO
+        DEVICE_IN_FM_RX                     0x1000000,
+        DEVICE_IN_FM_RX_A2DP                0x2000000,
+/*#endif
+#ifdef OMAP_ENHANCEMENT
+        DEVICE_IN_FM_ANALOG = 0x1000000,
+#endif*/
+
+/*!!!!
+
+        DEVICE_IN_DEFAULT = 0x80000000,
+
+        DEVICE_IN_ALL = (DEVICE_IN_COMMUNICATION | DEVICE_IN_AMBIENT | DEVICE_IN_BUILTIN_MIC |
+                DEVICE_IN_BLUETOOTH_SCO_HEADSET | DEVICE_IN_WIRED_HEADSET | DEVICE_IN_AUX_DIGITAL |
+//#ifdef HAVE_FM_RADIO
+                DEVICE_IN_VOICE_CALL | DEVICE_IN_BACK_MIC | DEVICE_IN_FM_RX | DEVICE_IN_FM_RX_A2DP | DEVICE_IN_DEFAULT)
+/*#elif OMAP_ENHANCEMENT
+                DEVICE_IN_VOICE_CALL | DEVICE_IN_BACK_MIC  | DEVICE_IN_FM_ANALOG | DEVICE_IN_DEFAULT)
+#else
+                DEVICE_IN_VOICE_CALL | DEVICE_IN_BACK_MIC | DEVICE_IN_DEFAULT)
+#endif*/
+
+//!!!!    };
+
+
+// AudioSystem.java
+
+    //
+    // audio device definitions: must be kept in sync with values in system/core/audio.h
+    //
+
+    public static final int DEVICE_NONE = 0x0;
+    // reserved bits
+    public static final int DEVICE_BIT_IN = 0x80000000;
+    public static final int DEVICE_BIT_DEFAULT = 0x40000000;
+    // output devices, be sure to update AudioManager.java also
+    public static final int DEVICE_OUT_EARPIECE = 0x1;
+    public static final int DEVICE_OUT_SPEAKER = 0x2;
+    public static final int DEVICE_OUT_WIRED_HEADSET = 0x4;
+    public static final int DEVICE_OUT_WIRED_HEADPHONE = 0x8;
+    public static final int DEVICE_OUT_BLUETOOTH_SCO = 0x10;
+    public static final int DEVICE_OUT_BLUETOOTH_SCO_HEADSET = 0x20;
+    public static final int DEVICE_OUT_BLUETOOTH_SCO_CARKIT = 0x40;
+    public static final int DEVICE_OUT_BLUETOOTH_A2DP = 0x80;
+    public static final int DEVICE_OUT_BLUETOOTH_A2DP_HEADPHONES = 0x100;
+    public static final int DEVICE_OUT_BLUETOOTH_A2DP_SPEAKER = 0x200;
+    public static final int DEVICE_OUT_AUX_DIGITAL = 0x400;
+    public static final int DEVICE_OUT_HDMI = DEVICE_OUT_AUX_DIGITAL;
+    public static final int DEVICE_OUT_ANLG_DOCK_HEADSET = 0x800;
+    public static final int DEVICE_OUT_DGTL_DOCK_HEADSET = 0x1000;
+    public static final int DEVICE_OUT_USB_ACCESSORY = 0x2000;
+    public static final int DEVICE_OUT_USB_DEVICE = 0x4000;
+    public static final int DEVICE_OUT_REMOTE_SUBMIX = 0x8000;
+    public static final int DEVICE_OUT_TELEPHONY_TX = 0x10000;
+    public static final int DEVICE_OUT_LINE = 0x20000;
+    public static final int DEVICE_OUT_HDMI_ARC = 0x40000;
+    public static final int DEVICE_OUT_SPDIF = 0x80000;
+    public static final int DEVICE_OUT_FM = 0x100000;
+    public static final int DEVICE_OUT_AUX_LINE = 0x200000;
+    public static final int DEVICE_OUT_FM_TX = 0x1000000;
+    public static final int DEVICE_OUT_PROXY = 0x2000000;
+
+    public static final int DEVICE_OUT_DEFAULT = DEVICE_BIT_DEFAULT;
+
+    public static final int DEVICE_OUT_ALL = (DEVICE_OUT_EARPIECE |
+                                              DEVICE_OUT_SPEAKER |
+                                              DEVICE_OUT_WIRED_HEADSET |
+                                              DEVICE_OUT_WIRED_HEADPHONE |
+                                              DEVICE_OUT_BLUETOOTH_SCO |
+                                              DEVICE_OUT_BLUETOOTH_SCO_HEADSET |
+                                              DEVICE_OUT_BLUETOOTH_SCO_CARKIT |
+                                              DEVICE_OUT_BLUETOOTH_A2DP |
+                                              DEVICE_OUT_BLUETOOTH_A2DP_HEADPHONES |
+                                              DEVICE_OUT_BLUETOOTH_A2DP_SPEAKER |
+                                              DEVICE_OUT_HDMI |
+                                              DEVICE_OUT_ANLG_DOCK_HEADSET |
+                                              DEVICE_OUT_DGTL_DOCK_HEADSET |
+                                              DEVICE_OUT_USB_ACCESSORY |
+                                              DEVICE_OUT_USB_DEVICE |
+                                              DEVICE_OUT_REMOTE_SUBMIX |
+                                              DEVICE_OUT_TELEPHONY_TX |
+                                              DEVICE_OUT_LINE |
+                                              DEVICE_OUT_HDMI_ARC |
+                                              DEVICE_OUT_SPDIF |
+                                              DEVICE_OUT_FM |
+                                              DEVICE_OUT_AUX_LINE |
+                                              DEVICE_OUT_FM_TX |
+                                              DEVICE_OUT_PROXY |
+                                              DEVICE_OUT_DEFAULT);
+    public static final int DEVICE_OUT_ALL_A2DP = (DEVICE_OUT_BLUETOOTH_A2DP |
+                                                   DEVICE_OUT_BLUETOOTH_A2DP_HEADPHONES |
+                                                   DEVICE_OUT_BLUETOOTH_A2DP_SPEAKER);
+    public static final int DEVICE_OUT_ALL_SCO = (DEVICE_OUT_BLUETOOTH_SCO |
+                                                  DEVICE_OUT_BLUETOOTH_SCO_HEADSET |
+                                                  DEVICE_OUT_BLUETOOTH_SCO_CARKIT);
+    public static final int DEVICE_OUT_ALL_USB = (DEVICE_OUT_USB_ACCESSORY |
+                                                  DEVICE_OUT_USB_DEVICE);
+    public static final int DEVICE_OUT_ALL_HDMI_SYSTEM_AUDIO = (DEVICE_OUT_AUX_LINE |
+                                                                DEVICE_OUT_HDMI_ARC |
+                                                                DEVICE_OUT_SPDIF);
+    public static final int DEVICE_ALL_HDMI_SYSTEM_AUDIO_AND_SPEAKER =
+            (DEVICE_OUT_ALL_HDMI_SYSTEM_AUDIO |
+             DEVICE_OUT_SPEAKER);
+
+    // input devices
+    public static final int DEVICE_IN_COMMUNICATION = DEVICE_BIT_IN | 0x1;
+    public static final int DEVICE_IN_AMBIENT = DEVICE_BIT_IN | 0x2;
+    public static final int DEVICE_IN_BUILTIN_MIC = DEVICE_BIT_IN | 0x4;
+    public static final int DEVICE_IN_BLUETOOTH_SCO_HEADSET = DEVICE_BIT_IN | 0x8;
+    public static final int DEVICE_IN_WIRED_HEADSET = DEVICE_BIT_IN | 0x10;
+    public static final int DEVICE_IN_AUX_DIGITAL = DEVICE_BIT_IN | 0x20;
+    public static final int DEVICE_IN_HDMI = DEVICE_IN_AUX_DIGITAL;
+    public static final int DEVICE_IN_VOICE_CALL = DEVICE_BIT_IN | 0x40;
+    public static final int DEVICE_IN_TELEPHONY_RX = DEVICE_IN_VOICE_CALL;
+    public static final int DEVICE_IN_BACK_MIC = DEVICE_BIT_IN | 0x80;
+    public static final int DEVICE_IN_REMOTE_SUBMIX = DEVICE_BIT_IN | 0x100;
+    public static final int DEVICE_IN_ANLG_DOCK_HEADSET = DEVICE_BIT_IN | 0x200;
+    public static final int DEVICE_IN_DGTL_DOCK_HEADSET = DEVICE_BIT_IN | 0x400;
+    public static final int DEVICE_IN_USB_ACCESSORY = DEVICE_BIT_IN | 0x800;
+    public static final int DEVICE_IN_USB_DEVICE = DEVICE_BIT_IN | 0x1000;
+    public static final int DEVICE_IN_FM_TUNER = DEVICE_BIT_IN | 0x2000;
+    public static final int DEVICE_IN_TV_TUNER = DEVICE_BIT_IN | 0x4000;
+    public static final int DEVICE_IN_LINE = DEVICE_BIT_IN | 0x8000;
+    public static final int DEVICE_IN_SPDIF = DEVICE_BIT_IN | 0x10000;
+    public static final int DEVICE_IN_BLUETOOTH_A2DP = DEVICE_BIT_IN | 0x20000;
+    public static final int DEVICE_IN_LOOPBACK = DEVICE_BIT_IN | 0x40000;
+    public static final int DEVICE_IN_PROXY = DEVICE_BIT_IN | 0x100000;
+    public static final int DEVICE_IN_FM_RX = DEVICE_BIT_IN | 0x200000;
+    public static final int DEVICE_IN_FM_RX_A2DP = DEVICE_BIT_IN | 0x400000;
+    public static final int DEVICE_IN_DEFAULT = DEVICE_BIT_IN | DEVICE_BIT_DEFAULT;
+
+    public static final int DEVICE_IN_ALL = (DEVICE_IN_COMMUNICATION |
+                                             DEVICE_IN_AMBIENT |
+                                             DEVICE_IN_BUILTIN_MIC |
+                                             DEVICE_IN_BLUETOOTH_SCO_HEADSET |
+                                             DEVICE_IN_WIRED_HEADSET |
+                                             DEVICE_IN_HDMI |
+                                             DEVICE_IN_TELEPHONY_RX |
+                                             DEVICE_IN_BACK_MIC |
+                                             DEVICE_IN_REMOTE_SUBMIX |
+                                             DEVICE_IN_ANLG_DOCK_HEADSET |
+                                             DEVICE_IN_DGTL_DOCK_HEADSET |
+                                             DEVICE_IN_USB_ACCESSORY |
+                                             DEVICE_IN_USB_DEVICE |
+                                             DEVICE_IN_FM_TUNER |
+                                             DEVICE_IN_TV_TUNER |
+                                             DEVICE_IN_LINE |
+                                             DEVICE_IN_SPDIF |
+                                             DEVICE_IN_BLUETOOTH_A2DP |
+                                             DEVICE_IN_LOOPBACK |
+                                             DEVICE_IN_PROXY |
+                                             DEVICE_IN_FM_RX |
+                                             DEVICE_IN_FM_RX_A2DP |
+                                             DEVICE_IN_DEFAULT);
+    public static final int DEVICE_IN_ALL_SCO = DEVICE_IN_BLUETOOTH_SCO_HEADSET;
+    public static final int DEVICE_IN_ALL_USB = (DEVICE_IN_USB_ACCESSORY |
+                                                 DEVICE_IN_USB_DEVICE);
+
+
+  public static int setDeviceConnectionState (final int device, final int state, final String address) {   // Called by audio_output_off () & audio_output_set ()
+    int ret = -3;
+    com_uti.logd ("device: " + device + "  state: " + state + "  address: '" + address + "'");
+    audio_routing_get ();
+    try {
+      Class<?> audioSystem = Class.forName ("android.media.AudioSystem");        // Use reflection
+      Method setDeviceConnectionState = audioSystem.getMethod ("setDeviceConnectionState", int.class, int.class, String.class);
+      ret = (Integer) setDeviceConnectionState.invoke (audioSystem, device, state, address);
+      com_uti.logd ("ret: " + ret);
+    }
+    catch (Exception e) {
+      com_uti.loge ("exception: " + e);
+    }
+    audio_routing_get ();
+    return (ret);
+  }
+
+  public static int getDeviceConnectionState (final int device, final String address) {   // Reflector
+    int ret = -5;
+    try {
+      Class<?> audioSystem = Class.forName ("android.media.AudioSystem");
+      Method getDeviceConnectionState = audioSystem.getMethod ("getDeviceConnectionState", int.class, String.class);
+      ret = (Integer) getDeviceConnectionState.invoke (audioSystem, device, address);
+//      com_uti.logd ("getDeviceConnectionState ret: " + ret); 
+    }
+    catch (Throwable e) {
+      com_uti.loge ("throwable: " + e);
+      //e.printStackTrace ();
+    }
+    return (ret);
+  }
+
+  public static int audio_routing_get () {
+    if (! com_uti.ena_log_audio_routing_get)
+      return (0);    
+
+    int ctr = 0, bits = 0, ret = 0, ret_bits = 0;
+    String bin_out = "";
+    for (ctr = 31; ctr >= 0; ctr --) {
+      bits = 1 << ctr;
+      ret = com_uti.getDeviceConnectionState (bits, "");
+      //com_uti.logd ("getDeviceConnectionState for " + bits + "  is: " + ret);
+      bin_out += ret;
+      if (ctr % 4 == 0)                                                 // Every 4 bits...
+        bin_out += " ";                                                 // Add seperator space
+      if (ret == 1)
+        ret_bits |= bits;
+    }
+    com_uti.logd ("getDeviceConnectionState: " + bin_out + "  ret_bits: " + ret_bits);
+    return (ret_bits);
+  }
 
   public static byte [] file_read_16k (String filename) {
+    main_thread_get ("file_read_16k filename: " + filename);
     byte [] content = new byte [0];
     int bufSize = 16384;
     byte [] content1 = new byte [bufSize];
@@ -1280,13 +1723,15 @@ Evo 4G LTE  jewel
   }
 */
 
+  //short val=(short)( ((hi&0xFF)<<8) | (lo&0xFF) );
+
   public static short [] ba_to_sa (byte [] ba) {                        // Byte array to short array
     short [] sa = new short [ba.length / 2];
     ByteBuffer.wrap (ba).order (ByteOrder.LITTLE_ENDIAN).asShortBuffer ().get (sa); // to turn bytes to shorts as either big endian or little endian. 
     return (sa);
   }
 
-  public static byte [] ba_to_sa (short [] sa) {                        // Short array to byte array
+  public static byte [] sa_to_ba (short [] sa) {                        // Short array to byte array
     byte [] ba = new byte [sa.length * 2];
     ByteBuffer.wrap (ba).order (ByteOrder.LITTLE_ENDIAN).asShortBuffer ().put (sa);
     return (ba);
@@ -1476,35 +1921,40 @@ Evo 4G LTE  jewel
 
     // Datagram command API:
 
+    // Native API:
+
+  static {
+    System.loadLibrary ("jut");
+  }
+
+    // PCM other:
+  private native int native_priority_set    (int priority);
+  private native int native_prop_get        (int prop);
+  private static native int native_daemon_cmd      (int cmd_len, byte [] cmd_buf, int res_len, byte [] res_buf, int net_port, int rx_tmo);
+
+
+  public static String extras_daemon_set (String key, Bundle extras) {
+    String res = "";
+    String val = extras.getString (key, "");
+    if (! val.equals ("")) {
+      res = com_uti.daemon_set (key, val);
+      com_uti.logd ("Set key: " + key + "  to val: " + val + "  with res: " + res);
+    }
+    return (res);
+  }
+
   private static DatagramSocket ds = null;
   private static DatagramPacket dps = null;
   private static int last_tmo = -1;
 
-  private static int dg_daemon_cmd (int cmd_len, byte [] cmd_buf, int res_len, byte [] res_buf, int rx_tmo) {
+  private static int java_daemon_cmd (int cmd_len, byte [] cmd_buf, int res_len, byte [] res_buf, int net_port, int rx_tmo) {
     int len = 0;
     String cmd = (com_uti.ba_to_str (cmd_buf)).substring (0, cmd_len);
-/*
-    if (com_uti.file_get ("/sdcard/spirit/daemon_log", false))
-      dg_daemon_log = true;
-    else*/
-      dg_daemon_log = false;
-
-    if (dg_daemon_log)
-      com_uti.logd ("Before sem++ cmd: " + cmd + "  res_len: " + res_len + "  rx_tmo: " + rx_tmo);
-
-    dg_daemon_cmd_sem ++;
-    while (dg_daemon_cmd_sem != 1) {
-      dg_daemon_cmd_sem --;
-      com_uti.ms_sleep (1);
-      dg_daemon_cmd_sem ++;
-
-    }
-
     try {
       DatagramPacket dps = null;
 
       if (ds == null /*|| rx_tmo < 100 */|| rx_tmo > 5000) {
-        ds = new DatagramSocket (0);//s2d_port);
+        ds = new DatagramSocket (0);//net_port);
         last_tmo = -2;  // Force new timeout setting
       }
       if (last_tmo != rx_tmo) {
@@ -1518,7 +1968,7 @@ Evo 4G LTE  jewel
         loop = InetAddress.getByName ("127.0.0.1");
       }
 
-      dps = new DatagramPacket (cmd_buf, cmd_len, loop, s2d_port);     // Send
+      dps = new DatagramPacket (cmd_buf, cmd_len, loop, net_port);     // Send
       //com_uti.logd ("Before send() cmd: " + cmd + "  res_len: " + res_len);
       ds.send (dps);
       //com_uti.logd ("After  send() cmd: " + cmd);
@@ -1532,7 +1982,7 @@ Evo 4G LTE  jewel
 
       len = dps.getLength ();
 
-      if (dg_daemon_log) {
+      if (ena_log_daemon_cmd) {
         com_uti.logd ("After  getLength() cmd: " + cmd + "  len: " + len);
         //com_uti.logd ("hexstr res: " + (com_uti.ba_to_hexstr (rcv_buf)).substring (0, len * 2));
         com_uti.logd ("   str res: " + (com_uti.ba_to_str (rcv_buf)).substring (0, len));
@@ -1546,95 +1996,192 @@ Evo 4G LTE  jewel
         for (ctr = 0; ctr < len; ctr ++)
           res_buf [ctr] = rcv_buf [ctr];
       }
+
     }
     catch (SocketTimeoutException e) {
-      if (cmd.equalsIgnoreCase ("s radio_nop Start"))
-        com_uti.logd ("radio_nop java.net.SocketTimeoutException rx_tmo: " + rx_tmo + "  cmd: " + cmd);
-      else
-        com_uti.loge ("java.net.SocketTimeoutException rx_tmo: " + rx_tmo + "  cmd: " + cmd);
+      com_uti.loge ("java.net.SocketTimeoutException rx_tmo: " + rx_tmo + "  cmd: " + cmd);
     }
     catch (Throwable e) {
       com_uti.loge ("Exception: " + e + "  rx_tmo: " + rx_tmo + "  cmd: " + cmd);
       e.printStackTrace ();
     };
-
-    dg_daemon_cmd_sem --;
     return (len);
   }
+
+  private static       String  last_cmd             = "";
+  private static final boolean use_java_daemon_cmd  = false;            // false = Use the better JNI implementation
+
+
+    // Send byte array to dameon and wait for byte array response:
+
+  private static int bytear_daemon_cmd (int cmd_len, byte [] cmd_buf, int res_len, byte [] res_buf, int rx_tmo) {
+    //main_thread_get ("bytear_daemon_cmd cmd: " + cmd);
+
+    String cmd = (com_uti.ba_to_str (cmd_buf)).substring (0, cmd_len);  // Get command as string for logging purposes
+
+    long start_sem_ms = com_uti.tmr_ms_get ();                          // Start semaphore timer
+
+    if (ena_log_daemon_cmd_sem)
+      com_uti.logd ("Before sem++ bytear_daemon_cmd_sem: " + bytear_daemon_cmd_sem + "  res_len: " + res_len + "  rx_tmo: " + rx_tmo + "  cmd: \"" + cmd + "\"");
+
+    bytear_daemon_cmd_sem ++;
+    while (bytear_daemon_cmd_sem != 1) {                                // Get semaphore
+      bytear_daemon_cmd_sem --;
+      if (cmd.equalsIgnoreCase ("tuner_bulk")) {
+        com_uti.loge ("Aborting tuner_bulk for bytear_daemon_cmd_sem: " + bytear_daemon_cmd_sem + "  res_len: " + res_len + "  rx_tmo: " + rx_tmo + "  cmd: \"" + cmd + "\"  last_cmd: \"" + last_cmd + "\"");
+        return (-1);
+      }
+      com_uti.loge ("Waiting for bytear_daemon_cmd_sem: " + bytear_daemon_cmd_sem + "  res_len: " + res_len + "  rx_tmo: " + rx_tmo + "  cmd: \"" + cmd + "\"  last_cmd: \"" + last_cmd + "\"");
+      com_uti.ms_sleep (101);
+      bytear_daemon_cmd_sem ++;
+    }
+
+    last_cmd = cmd;                                                     // Update last command to our current command, now that semaphore is obtained
+
+    long sem_ms = com_uti.tmr_ms_get () - start_sem_ms;                 // Log semaphore wait time
+    if (sem_ms > 10)
+      com_uti.loge ("Semaphore wait time sem_ms: " + sem_ms);
+    else if (ena_log_daemon_cmd_sem)
+      com_uti.logd ("Semaphore wait time sem_ms: " + sem_ms);           // 6-7 ms is common
+
+    int len = 0;
+    long start_net_ms = com_uti.tmr_ms_get ();                          // Start command timer
+
+    if (use_java_daemon_cmd)                                            // Send command to daemon and wait for response, up to rx_tmo milliseconds
+      len = java_daemon_cmd (cmd_len, cmd_buf, res_len, res_buf, s2d_port, rx_tmo);
+    else
+      len = native_daemon_cmd (cmd_len, cmd_buf, res_len, res_buf, s2d_port, rx_tmo);
+
+    long net_ms = com_uti.tmr_ms_get () - start_net_ms;                 // Log command wait time
+    if (net_ms > (rx_tmo *3) / 4)    //300)
+      com_uti.loge ("Network transaction time net_ms: " + net_ms);
+    else if (false)
+      com_uti.logd ("Network transaction time net_ms: " + net_ms);      // 4-8 ms is common ; Broadcom is often 40+
+
+    bytear_daemon_cmd_sem --;                                           // Release semaphore
+    return (len);
+  }
+
+
+    // Send string to dameon and wait for string response:
+
+  private static String string_daemon_cmd (String cmd, int rx_tmo) {
+    int cmd_len = cmd.length ();
+    if (ena_log_daemon_cmd)
+      com_uti.logd ("cmd_len: " + cmd_len + "  cmd: \"" + cmd + "\"");
+
+    byte [] cmd_buf = com_uti.str_to_ba (cmd);                          // Create byte array command from cmd string
+    /*cmd_len = cmd_buf.length;
+    if (ena_log_daemon_cmd)
+      com_uti.logd ("2 cmd_len: " + cmd_len + "  cmd: \"" + cmd + "\"");*/      // Same result
+
+    int res_len = DEF_BUF;  // 512
+    byte [] res_buf = new byte [res_len];                               // Allocate byte array for response
+
+                                                                        // Send command to daemon and wait for response, up to rx_tmo milliseconds
+    res_len = bytear_daemon_cmd (cmd_len, cmd_buf, res_len, res_buf, rx_tmo);
+
+    String res = "";                                                    // Avoid showing 999 for RT when result is zero length string "" (actually 1 byte long for zero)      "999";
+
+    if (res_len > 0 && res_len <= DEF_BUF) {                            // If valid response size...
+      //if (ena_log_daemon_cmd)
+      //  com_uti.logd ("res_len: " + res_len + "  res_buf: \"" + res_buf + "\"");
+      res = com_uti.ba_to_str (res_buf);                                // Create string from byte array response
+      /*if (ena_log_daemon_cmd)
+        com_uti.logd ("1 res: \"" + res + "\"");*/
+      res = res.substring (0, res_len);                                 // Remove extra data
+      if (ena_log_daemon_cmd)
+        com_uti.logd ("res_len: " + res_len + "  res: \"" + res + "\"");
+    }
+    else if (res_len == 0) {
+      com_uti.loge ("res_len: " + res_len + "  cmd: " + cmd);
+      res = "";             // Empty string
+    }
+    else
+      com_uti.loge ("res_len: " + res_len + "  cmd: " + cmd);
+
+    return (res);                                                       // Return response
+  }
+
+
+    // Get and set:
 
   public static int num_daemon_get = 0;
   public static int num_daemon_set = 0;
   public static String daemon_get (String key) {
     num_daemon_get ++;
-    String res = daemon_cmd ("g " + key);
-    //com_uti.logd ("key: " + key + "  res: " + res);
+
+    int rx_tmo = 400;//800;//500;//300;
+    if (key.equalsIgnoreCase ("tuner_bulk"))
+      rx_tmo = 100;                                                     // Keep "disposable" commands like get tuner_bulk at a low timeout
+
+    if (ena_log_daemon_cmd)
+      com_uti.logd ("before string_daemon_cmd key: " + key + "  rx_tmo: " + rx_tmo + "  num_daemon_get: " + num_daemon_get);
+
+    long start_ms = com_uti.tmr_ms_get ();
+    String res = string_daemon_cmd (key, rx_tmo);                       // Get for "tuner_state" simply passes the key string "tuner_state" with the "get" implied by no space characters.
+    long cmd_time_ms = com_uti.tmr_ms_get () - start_ms;                // Since all key strings have no spaces this works well.
+
+    if (ena_log_daemon_cmd)
+      com_uti.logd ("after  string_daemon_cmd key: " + key + "  res: " + res + "  cmd_time_ms: " + cmd_time_ms);
+
     return (res);
   }
+
   public static String daemon_set (String key, String val) {
     num_daemon_set ++;
-    String res = daemon_cmd ("s " + key + " " + val);
-    com_uti.logd ("key: " + key + "  val: " + val + "  res: " + res);
-    return (res);
-  }
 
-
-  private static String daemon_cmd (String cmd) {
-    int cmd_len = cmd.length ();
-/*
-    if (daemon_cmd_num % 100 == 0)
-      daemon_cmd_log = true;
-    else
-      daemon_cmd_log = false;
-    daemon_cmd_num ++;
-*/
-    if (daemon_cmd_log)
-      com_uti.logd ("cmd_len: " + cmd_len + "  cmd: \"" + cmd + "\"");
-
-    byte [] cmd_buf = com_uti.str_to_ba (cmd);
-    cmd_len = cmd_buf.length;
-    //String cmd2 = com_uti.ba_to_str (cmd_buf);
-    //if (daemon_cmd_log)
-    //  com_uti.logd ("cmd_len: " + cmd_len + "  cmd2: \"" + cmd2 + "\"  cmd_buf: \"" + cmd_buf + "\"");
-
-    int res_len = DEF_BUF;
-    byte [] res_buf = new byte [res_len];
-
-    int rx_tmo = 800;//500;//300;
-    if (cmd.equalsIgnoreCase ("s tuner_state Start"))
+    long cmd_time_ms = 0;
+    long start_ms = 0;
+    String res = "";
+    int timeouts = 0;
+    int rx_tmo = 800;                                                   // 500; // 300;
+    if (key.startsWith ("test"))
+      rx_tmo = 99000;
+    else if (key.equalsIgnoreCase ("tuner_seek_state"))
       rx_tmo = 20000;
-    else if (cmd.equalsIgnoreCase ("s radio_nop Start"))
-      rx_tmo = 200;//10; // Always fails so make it short
-    else if (cmd.equalsIgnoreCase ("s radio_dai_state Start"))           // Still show: rx_tmo: 500  cmd: s radio_dai_state Start
-      rx_tmo = 2000;
-    res_len = dg_daemon_cmd (cmd_len, cmd_buf, res_len, res_buf, rx_tmo);
+    else if (key.equalsIgnoreCase ("tuner_api_state"))
+      rx_tmo = 10000;
+    else if (key.equalsIgnoreCase ("tuner_state"))
+      rx_tmo =  6000;
+    else if (key.equalsIgnoreCase ("audio_mode"))
+      rx_tmo = 10000;
+    else if (key.equalsIgnoreCase ("audio_state"))
+      rx_tmo =  6000;
 
-    String res = "";//Avoid showing 999 for RT when result is zero length string "" (actually 1 byte long for zero)      "999";
-    if (res_len > 0 && res_len <= DEF_BUF) {
-      if (daemon_cmd_log)
-        com_uti.logd ("res_len: " + res_len + "  res_buf: \"" + res_buf + "\"");
-      res = com_uti.ba_to_str (res_buf);
-      res = res.substring (0, res_len);     // Remove extra data
-      if (daemon_cmd_log)
-        com_uti.logd ("res: \"" + res + "\"");
+    if (ena_log_daemon_cmd)
+      com_uti.logd ("before string_daemon_cmd key: " + key + "  val: " + val + "  rx_tmo: " + rx_tmo + "  num_daemon_set: " + num_daemon_set);
+
+    int max_timeouts = 3;
+//    if (rx_tmo > 2000)
+      max_timeouts = 1;
+    while (timeouts ++ < max_timeouts) {
+      start_ms = com_uti.tmr_ms_get ();
+      res = string_daemon_cmd (key + " " + val, rx_tmo);           // Set "tuner_rds_ps" to "AB D FG " passes the key and value as "tuner_rds_ps AB D FG ".
+      cmd_time_ms = com_uti.tmr_ms_get () - start_ms;                // Value is one string, with embedded spaces. Second parameters not explicitly supported, but can be emulated with parsing.
+      if (cmd_time_ms > (rx_tmo * 3) / 4)
+        com_uti.loge ("timeouts: " + timeouts + "  cmd_time_ms: " + cmd_time_ms);
+      else
+        break;
     }
-    else if (res_len == 0)
-      res = "";             // Empty string
-    else
-      com_uti.loge ("res_len: " + res_len + "  cmd: " + cmd);
+
+    com_uti.logd ("after  string_daemon_cmd key: " + key + "  val: " + val + "  res: " + res + "  cmd_time_ms: " + cmd_time_ms + "  timeouts: " + timeouts);
+
     return (res);
   }
 
 
 /*
-  public static int daemon_audio_data_get (int device, int samplerate, int channels, int buf_len, byte [] buffer) {
+  private static       boolean ena_log_daemon_audio     = false;
+  public static int daemon_audio_data_get (int adevice, int samplerate, int channels, int buf_len, byte [] buffer) {
     int len = 0;
     //if (daemon_audio_data_get_num % 10 == 0)
-    //  daemon_audio_data_get_log = true;
+    //  ena_log_daemon_audio = true;
     //else
-    //  daemon_audio_data_get_log = false;
+    //  ena_log_daemon_audio = false;
     //daemon_audio_data_get_num ++;
-    if (daemon_cmd_log)
-      com_uti.logd ("device: " + device + "  samplerate: " + samplerate + "  channels: " + channels + "  buf_len: " + buf_len);
+    if (ena_log_daemon_cmd)
+      com_uti.logd ("adevice: " + adevice + "  samplerate: " + samplerate + "  channels: " + channels + "  buf_len: " + buf_len);
 
     int rx_tmo = 1002;
     String cmd = "g audio_data                                                    ";    // 64 bytes
@@ -1645,9 +2192,9 @@ Evo 4G LTE  jewel
     byte [] cmd_buf = com_uti.str_to_ba (cmd);
     cmd_len = cmd_buf.length;
 
-    len = dg_daemon_cmd (cmd_len, cmd_buf, buf_len, buffer, rx_tmo);
+    len = bytear_daemon_cmd (cmd_len, cmd_buf, buf_len, buffer, rx_tmo);
 
-    if (daemon_cmd_log) {
+    if (ena_log_daemon_cmd) {
       if (len > 0)
         com_uti.logd ("len: " + len + "  buffer[16]: " + buffer [16]);
       else
@@ -1789,17 +2336,21 @@ http://www.netmite.com/android/mydroid/frameworks/base/include/utils/threads.h
 
     // Tuner FM utility functions:
 
-  private static int s2d_port = 2122;
+        // Match #defines in utils.c
+  private static final int  NET_PORT_S2D =  2102;
+  private static final int  NET_PORT_HCI =  2112;
+
+  private static int s2d_port = NET_PORT_S2D;
 
   public static boolean s2_tx_apk () {
     String tx_name = "fm.a2d.s";
     tx_name += "t";                                                     // Protect name against build sed change
     if (tx_name.equals ("fm.a2d.sf")) {                                 // If equals string which gets modified to "fm.a2d.st" for transmit APK
-      s2d_port = 2132;                                                  // Transmit APK s2d port
+      s2d_port = NET_PORT_S2D;// + 30;                                  // Transmit APK s2d port
       return (true);
     }
     else {
-      s2d_port = 2122;                                                  // Receive APK s2d port (Should SpiritF Free/Open use a different port ?)
+      s2d_port = NET_PORT_S2D;                                          // Receive APK s2d port (Should SpiritF Free/Open use a different port ?)
       return (false);
     }
   }
@@ -1817,6 +2368,7 @@ http://www.netmite.com/android/mydroid/frameworks/base/include/utils/threads.h
   public static boolean s2_tx_set (boolean s2_tx) {
     if (s2_tx) {
       if (s2_tx_apk ())
+
         com_uti.sys_run ("rm /data/data/fm.a2d.sf/files/s2_rx", false);
       else
         com_uti.sys_run ("touch /data/data/fm.a2d.sf/files/s2_tx", false);
@@ -1860,12 +2412,12 @@ http://www.netmite.com/android/mydroid/frameworks/base/include/utils/threads.h
   }
 
 
-  private static int band_freq_updn_get (int int_tuner_freq, boolean up) {
+  private static int band_freq_updn_get (int tuner_freq_int, boolean up) {
     int new_freq;
     if (up)
-      new_freq = com_uti.tnru_freq_enforce (int_tuner_freq + com_uti.band_freq_inc);
+      new_freq = com_uti.tnru_freq_enforce (tuner_freq_int + com_uti.band_freq_inc);
     else
-      new_freq = com_uti.tnru_freq_enforce (int_tuner_freq - com_uti.band_freq_inc);
+      new_freq = com_uti.tnru_freq_enforce (tuner_freq_int - com_uti.band_freq_inc);
     return (new_freq);
   }
 
@@ -1892,12 +2444,12 @@ http://www.netmite.com/android/mydroid/frameworks/base/include/utils/threads.h
     return ((int) dfreq);
   }
 
-  public static int tnru_band_new_freq_get (String freq, int int_tuner_freq) {
+  public static int tnru_band_new_freq_get (String freq, int tuner_freq_int) {
     int ifreq = 106900;
     if (freq.equalsIgnoreCase ("down"))
-      ifreq = com_uti.band_freq_updn_get (int_tuner_freq, false);
+      ifreq = com_uti.band_freq_updn_get (tuner_freq_int, false);
     else if (freq.equalsIgnoreCase ("up"))
-      ifreq = com_uti.band_freq_updn_get (int_tuner_freq, true);
+      ifreq = com_uti.band_freq_updn_get (tuner_freq_int, true);
     else
       ifreq = com_uti.tnru_khz_get (freq);
     return (ifreq);
@@ -2334,21 +2886,6 @@ It should be noted that operation in this region is the same as it is for all RD
     return ("");
    }
 
-  private String getProperty (String propertyName) {
-    String ret = System.getProperty (propertyName); // Doesn't work ? Need to be system user ??
-    if (ret != null)
-      return (ret);
-
-    String cmd1 = "getprop " + propertyName + " | grep 1";      // !! Only works with binary 0/1 results !!!
-    String [] cmds = {(cmd1)};
-    int iret = com_uti.sys_run (cmds, true);
-    if (iret == 0)
-      ret = "1";
-    else
-      ret = "0";
-    return (ret);
-  }
-
 
     // Shim:
 
@@ -2362,7 +2899,7 @@ It should be noted that operation in this region is the same as it is for all RD
   public static boolean shim_files_possible_get () {
     if (com_uti.file_get ("/system/lib/libbt-hci.so"))
       return (true);
-    if (com_uti.file_get ("/system/vendor/lib/libbt-vendor.so") && device != DEV_LG2)   // Disable libbt-vendor for LG2 due to Audio enable issue !!!!
+    if (com_uti.file_get ("/system/vendor/lib/libbt-vendor.so") && com_uti.devnum != DEV_LG2)   // Disable libbt-vendor for LG2 due to Audio enable issue !!!!
       return (true);
     return (false);
   }
@@ -2372,6 +2909,7 @@ It should be noted that operation in this region is the same as it is for all RD
     BT On &  Shim     Installed & NOT Active                  BT Off, Use UART      Need reboot & BT to be active
     BT On &  Shim     Installed &     Active                          Use SHIM  */
   public static int shim_install () {
+    main_thread_get ("shim_install");
     int ret = 0;
     boolean restart_bt = false;
 
@@ -2416,6 +2954,7 @@ It should be noted that operation in this region is the same as it is for all RD
   }
 
   public static int shim_remove () {
+    main_thread_get ("shim_remove");
     int ret = 0;
 
     if (! shim_files_operational_get ()) {
@@ -2469,6 +3008,116 @@ private final int getAndIncrement(int modulo) {
     }
 }
 */
+
+  private static BluetoothAdapter      m_bt_adapter    = null;
+
+  private static boolean bta_get () {
+    m_bt_adapter = BluetoothAdapter.getDefaultAdapter ();                // Just do this once, shouldn't change
+    if (m_bt_adapter == null) {
+      com_uti.loge ("BluetoothAdapter.getDefaultAdapter () returned null");
+      return (false);
+    }
+    return (true);
+  }
+
+  public static boolean bt_get () {                                     // Old note: Should check with pid_get ("bluetoothd"), "brcm_patchram_plus", "btld", "hciattach" etc. for consistency w/ fm_hrdw
+    boolean ret = false;                                                //      BUT: if isEnabled () doesn't work, m_bt_adapter.enable () and m_bt_adapter.disable () may not work either.
+    if (m_bt_adapter == null)
+      if (! bta_get ())
+        return (false);
+    ret = m_bt_adapter.isEnabled ();
+    com_uti.logd ("bt_get isEnabled (): " + ret);
+    return (ret);
+  }
+
+// bttest is_enabled
+// bttest enable
+// bttest disable
+// Alternate/libbluedroid uses rfkill and ctl.stop/ctl.start bluetoothd
+
+  public static int bt_set ( boolean bt_pwr, boolean wait ) {
+    main_thread_get ("bt_set");
+    if (m_bt_adapter == null)
+      if (! bta_get ())
+        return (-1);
+
+    boolean bt = bt_get ();
+    if (bt_pwr && bt) {
+      com_uti.logd ("bt_set BT already on");
+      return (0);
+    }
+    if (! bt_pwr && ! bt) {
+      com_uti.logd ("bt_set BT already off");
+      return (0);
+    }
+    if (bt_pwr) {                                                       // If request for BT on
+      com_uti.logd ("bt_set BT turning on");
+
+      try {
+        m_bt_adapter.enable ();                                       // Start enable BT
+      }
+      catch (Throwable e) {
+        com_uti.loge ("bt_set m_bt_adapter.disable () Exception");
+      }
+
+      if (! wait)                                                       // If no wait
+        return (0);                                                     // Done w/ no error
+
+      bt_wait (true);                                                   // Wait until BT is on or times out
+      bt = bt_get ();
+      if (bt) {
+        com_uti.logd ("bt_set BT on success");
+        return (0);
+      }
+      com_uti.loge ("bt_set BT on error");
+      return (-1);
+    }
+    else {
+      com_uti.logd ("bt_set BT turning off");
+      try {
+        m_bt_adapter.disable ();                                        // Start disable BT
+      }
+      catch (Throwable e) {
+        com_uti.loge ("bt_set m_bt_adapter.disable () Exception");
+      }
+
+      if (! wait)                                                       // If no wait
+        return (0);                                                     // Done w/ no error
+
+      bt_wait (false);                                                  // Wait until BT is off or times out
+      bt = bt_get ();
+      if (! bt) {
+        com_uti.logd ("bt_set BT off success");
+        return (0);
+      }
+      com_uti.loge ("bt_set BT off error");
+      return (-1);
+    }
+  }
+
+  private static void bt_wait (boolean wait_on) {
+    int ctr = 0;
+    boolean done = false;
+
+    while (! done && ctr ++ < 100 ) {                                   // While not done and 10 seconds has not elapsed...
+      com_uti.ms_sleep (100);                                           // Wait 0.1 second
+      if (wait_on)                                                      // If waiting for BT on...
+        done = bt_get ();                                               // Done if BT on
+      else                                                              // Else if waiting for BT off...
+        done = ! bt_get ();                                             // Done if BT off
+    }
+    return;
+  }
+
+    // Install app:
+/*private void app_install (String filename) {
+    m_com_api.key_set ("tuner_state", "Stop");                      // Full power down/up
+    Intent intent = new Intent (Intent.ACTION_VIEW);
+    intent.setDataAndType (Uri.fromFile (new java.io.File (com_uti.getExternalStorageDirectory() + "/download/" + filename)), "application/vnd.android.package-archive");
+    intent.setFlags (Intent.FLAG_ACTIVITY_NEW_TASK);
+    m_gui_act.startActivity (intent);
+    m_gui_act.finish ();
+  }*/
 
 }
 

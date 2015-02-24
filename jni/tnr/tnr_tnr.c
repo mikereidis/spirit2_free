@@ -5,220 +5,95 @@
 
   #include "utils.c"
 
-/*
-    // API start/stop
-  int chip_imp_api_on   (int freq_lo, int freq_hi, int freq_inc);
-  int chip_imp_api_off  ();
+  #include "tnr_tnr.h"
 
-    // Power on/off
-  int chip_imp_pwr_on   (int pwr_rds);
-  int chip_imp_pwr_off  (int pwr_rds);
+    // Plugin support data:
 
-    // Set:
-  int chip_imp_freq_set (int freq);
-  int chip_imp_mute_set (int mute);
-  int chip_imp_stro_set (int stereo);
-  int chip_imp_vol_set  (int vol);
-  int chip_imp_extra_cmd    (const char * command, char ** parameters);
-
-    // Get:
-  int chip_imp_freq_get ();
-  int chip_imp_rssi_get ();
-  int chip_imp_stro_get ();
-  int chip_imp_events_process  (unsigned char * rds_grpd);
-
-    // Seek:
-  int chip_imp_seek_start   (int dir);
-  int chip_imp_seek_stop    ();
-
-*/
-
-    // API start/stop
-  int chip_api_api_on   (int freq_lo, int freq_hi, int freq_inc) {
-    if (chip_lock_get ("chip_api_api_on"))
-      return (-1);
-    int ret = chip_imp_api_on (freq_lo, freq_hi, freq_inc);
-    chip_lock_ret ();
-    return (ret);
-  }
-  int chip_api_api_off  () {
-    if (chip_lock_get ("chip_api_api_off"))
-      return (-1);
-    int ret = chip_imp_api_off ();
-    chip_lock_ret ();
-    return (ret);
-  }
-
-    // Power on/off
-  int chip_api_pwr_on   (int pwr_rds) {
-    if (chip_lock_get ("chip_api_pwr_on"))
-      return (-1);
-    int ret = chip_imp_pwr_on (pwr_rds);
-    chip_lock_ret ();
-    return (ret);
-  }
-  int chip_api_pwr_off  (int pwr_rds) {
-    if (chip_lock_get ("chip_api_pwr_off"))
-      return (-1);
-    int ret = chip_imp_pwr_off (pwr_rds);
-    chip_lock_ret ();
-    return (ret);
-  }
-
-    // Set:
-  int chip_api_freq_set (int freq) {
-    if (chip_lock_get ("chip_api_freq_set"))
-      return (-1);
-    int ret = chip_imp_freq_set (freq);
-    chip_lock_ret ();
-    return (ret);
-  }
-  int chip_api_mute_set (int mute) {
-    if (chip_lock_get ("chip_api_mute_set"))
-      return (-1);
-    int ret = chip_imp_mute_set (mute);
-    chip_lock_ret ();
-    return (ret);
-  }
-  int chip_api_stro_set (int stereo) {
-    if (chip_lock_get ("chip_api_stro_set"))
-      return (-1);
-    int ret = chip_imp_stro_set (stereo);
-    chip_lock_ret ();
-    return (ret);
-  }
-  int chip_api_vol_set  (int vol) {
-    if (chip_lock_get ("chip_api_vol_set"))
-      return (-1);
-    int ret = chip_imp_vol_set (vol);
-    chip_lock_ret ();
-    return (ret);
-  }
-  int chip_api_extra_cmd (const char * command, char ** parameters) {
-    if (chip_lock_get ("chip_api_extra_cmd"))
-      return (-1);
-    int ret = chip_imp_extra_cmd (command, parameters);
-    chip_lock_ret ();
-    return (ret);
-  }
-
-    // Get:
-  int chip_api_freq_get () {
-    if (chip_lock_get ("chip_api_freq_get"))
-      return (-1);
-    int ret = chip_imp_freq_get ();
-    chip_lock_ret ();
-    return (ret);
-  }
-  int chip_api_rssi_get () {
-    if (chip_lock_get ("chip_api_rssi_get"))
-      return (-1);
-    int ret = chip_imp_rssi_get ();
-    chip_lock_ret ();
-    return (ret);
-  }
-  int chip_api_stro_get () {
-    if (chip_lock_get ("chip_api_stro_get"))
-      return (-1);
-    int ret = chip_imp_stro_get ();
-    chip_lock_ret ();
-    return (ret);
-  }
-
-  int chip_api_events_process  (unsigned char * rds_grpd) {
-
-    if (chip_lock_get ("chip_api_events_process"))
-      return (-1);
-    int ret = chip_imp_events_process (rds_grpd);
-
-    chip_lock_ret ();
-
-    return (ret);
-  }
-
-    // Seek:
-  int chip_api_seek_start   (int dir) {
-    if (chip_lock_get ("chip_api_seek_start"))
-      return (-1);
-    int ret = chip_imp_seek_start (dir);
-    chip_lock_ret ();
-    return (ret);
-  }
-  int chip_api_seek_stop    () {
-    if (chip_lock_get ("chip_api_seek_stop"))
-      return (-1);
-    int ret = chip_imp_seek_stop ();
-    chip_lock_ret ();
-    return (ret);
-  }
-
-
-
-    // Generic utilities:
-
-  int noblock_set (int fd) {
-    //#define IOCTL_METH
-    #ifdef  IOCTL_METH
-    int nbio = 1;
-    int ret = ioctl (fd, FIONBIO, & nbio);
-    if (ret == -1)
-      loge ("noblock_set ioctl errno: %d", errno);
-    else
-      logd ("noblock_set ioctl ret: %d", ret);
-    #else
-    int flags = fcntl (fd, F_GETFL);
-    if (flags == -1) {
-      loge ("noblock_set fcntl get errno: %d", errno);
-      flags = 0;
-    }
-    else
-      logd ("noblock_set fcntl get flags: %d  nonblock flags: %d", flags, flags & O_NONBLOCK);
-    int ret = fcntl (fd, F_SETFL, flags | O_NONBLOCK);
-    if (ret == -1)
-      loge ("noblock_set fcntl set errno: %d", errno);
-    else
-      logd ("noblock_set fcntl set ret: %d", ret);
-    flags = fcntl (fd, F_GETFL);
-    if (flags == -1)
-      loge ("noblock_set fcntl result get errno: %d", errno);
-    else
-      logd ("noblock_set fcntl result get flags: %d  nonblock flags: %d", flags, flags & O_NONBLOCK);
-    #endif
-    return (0);
-  }
-
-
-
-
-    // FM support:
-
-  int curr_rssi = -7;
-
+    // Prototypes
   int af_count_get ();
   int af_confidence_get (int idx);
-  int evt_get (int just_poll);
+  int current_event_get (int just_poll);
 
-    // Callbacks we call from rx_thread:
+    // Callbacks that plugin calls:
 
-  void (* on_playing_in_stereo_changed)  (int is_stereo);
-  void (* on_rds_data_found)             (struct fmradio_rds_bundle_t * rds_bundle, int frequency);
-  void (* on_signal_strength_changed)    (int new_level);
-  void (* on_automatic_switch)           (int new_freq, enum fmradio_switch_reason_t reason);
-  void (* on_forced_reset)               (enum fmradio_reset_reason_t reason);
+  void (* cb_tuner_state)   (int reason);
+  void (* cb_tuner_rssi)    (int new_level);
+  void (* cb_tuner_pilot)    (int is_stereo);
+  void (* cb_tuner_rds)     (rds_struct_t * rds_struct);
+  void (* cb_tuner_rds_af)  (int new_freq);
 
 
+    // Current value variables:
 
-    //
+  int curr_api_mode     = 0;                                            // 0 = UART/default, 1 = SHIM
+  int curr_api_state    = 0;                                            // 0 = Stop, 1 = Start
+  int curr_mode         = 0;                                            // 0 = Receive, 1 = Transmit
+  int curr_state        = 0;
 
-  int pwr_rds = 1;
+  int curr_band         = 0;                                            // 0 = EU
 
-  int next_rssi_get_per = 5000;         // Next RSSI get period: Get new RSSI every 5 seconds
-  int next_rssi_get_ms = 0;             // Time for next rssi_get in ms_get () milliseconds
-  int next_display_test_per = 10000;    // Next RDS test periond: New rds test every 1 seconds   1 hour
-  int next_display_em_ms = 0;           // For emulator mode
+  int curr_freq_int     =  88500;
+    int curr_freq_lo      =  87500;
+    int curr_freq_hi      = 108000;
+    int curr_freq_inc     =    100;
 
-    // Seek
-  int seek_in_progress    = 0;
+  int curr_vol          = 7;
+  int curr_thresh       = 0;
+  int curr_mute         = 0;
+
+  int curr_stereo       = 0;
+
+  int curr_seek_state   = 0;
+  int curr_rds_state    = 1;                                            // Default 1 = RDS on
+  int curr_rds_af_state = 0;                                            // 0 = Disabled, 1 = Manual, 2 = RDS, 3 = Allow Regional  !! > 1 means need RDS so leave on even if screen off
+
+  int curr_rssi         = -7;
+  int curr_pilot          = 0;                                            // 0 = Mono, 1 = Stereo: read only indication of pilot 19 KHz / stereo
+
+  int curr_antenna = 0;                                                 // 0 = Default External/Wired headset antenna, 1 = Rare Sony Internal for Qualcomm chips
+
+    // RDS Values: Current (under construction), Candidate (complete, but must be repeated before confirmed), Confirmed (Displayable, with few if any visual/logical defects.)
+
+  int cand_rds_pi_ctr = 0;                                              // RDS PI
+  int curr_rds_pi = 0;
+  int cand_rds_pi = 0;
+  int conf_rds_pi = 0;
+
+  int cand_rds_pt_ctr = 0;                                              // RDS PT
+  int curr_rds_pt = -1;
+  int cand_rds_pt = -1;
+  int conf_rds_pt = -1;
+
+  char curr_rds_ps [9] = "        ";                                    // Current   RDS PS: Assembled here to start.
+  char cand_rds_ps [9] = "        ";                                    // Candidate RDS PS: When all bytes are set, curr_rds_ps is copied to cand_rds_ps.
+  char conf_rds_ps [9] = "        ";                                    // Confirmed RDS PS: When a new Current PS matches Candidate PS, the candidate is considered confirmed and copied here where the App can retrieve it.
+
+  char curr_rds_rt [65] = "                                                                ";     // Current   RDS RT.
+  char cand_rds_rt [65] = "                                                                ";     // Candidate RDS RT.
+  char conf_rds_rt [65] = "                                                                ";     // Confirmed RDS RT.
+  char conf_rds_rf [65] = {0};                                          // Confirmed RDS RT with no trailing spaces.
+
+
+    // AF:
+  int curr_af_num       = 0;                                            // Current number of AF table entries
+  char curr_extension[64]= "";                                          // Current Extension data
+
+  int last_af_count_get_s = 0;
+  int af_regional_count = 0;
+
+    // RDS:
+  //unsigned char rds_grpd [8] = {0};
+  unsigned char evt_rbuf [8] = {0};                                     // For RDS, but can be extended for other uses
+
+
+    // Previous value variables:
+  int prev_freq = 0;
+  int prev_pilot  = 0;
+  int pre2_pilot  = 0;
+
+    // General flags:
+  int stro_evt_enable = 1;//0;
+  int rssi_evt_enable = 1;//0;
 
     // Event flags requiring callback:
   int need_freq_chngd     = 0;
@@ -228,684 +103,370 @@
   int need_ps_chngd       = 0;
   int need_rt_chngd       = 0;
 
-
-  int curr_freq_val     =  88500;
-  int curr_freq_lo      =  87500;
-  int curr_freq_hi      = 108000;
-  int curr_freq_inc     =    100;
-
-    // Current values
-  int curr_stro_sig = 0; //1=stereo, 0=mono
-  int prev_stro_sig = 0;
-
-
-
-    // Debug:
-
+    // Stats:
+  int tuner_event_sg_ctr     = 0;
   int af_common_error_num     = 0;
   int af_general_error_num    = 0;
+  int next_rssi_sg_per = 5000;         // Next RSSI get period: Get new RSSI every 5 seconds
+  int next_rssi_sg_ms = 0;             // Time for next rssi_sg in ms_get () milliseconds
+  int next_display_test_per = 10000;    // Next RDS test periond: New rds test every 1 seconds   1 hour
+  int next_display_em_ms = 0;           // For emulator mode
 
 
+    // Frequency Utilities:
 
-    // Utilities only used by tnr_bch:
+  int freq_fix (int freq) {               // Ensures the frequency returned is fixed in regards to curr_freq_inc and curr_freq_odd
+    logd ("freq_fix: %d", freq);
+                                          // Only called by freq_enforce()
+    // Tests/Use cases:
+    // w/ Odd:  108099-107900 -> 107900     = Add 100, Divide by 200, then multiply by 200, then subtract 100
+    // w/ Even: 108199-108000 -> 108000     = Divide by 200, then multiply by 200  (curr_freq_inc)
+    // w/ Odd:  87500-87699 -> 87500     = Add 100, Divide by 200, then multiply by 200, then subtract 100
+    // w/ Even: 87600-87799 -> 87600     = Divide by 200, then multiply by 200  (curr_freq_inc)
 
-int freq_fix (int freq) {               // Ensures the frequency returned is fixed in regards to curr_freq_inc and curr_freq_odd
-  logd ("freq_fix: %d", freq);
-                                        // Only called by freq_enforce()
-// Tests/Use cases:
-// w/ Odd:  108099-107900 -> 107900     = Add 100, Divide by 200, then multiply by 200, then subtract 100
-// w/ Even: 108199-108000 -> 108000     = Divide by 200, then multiply by 200  (curr_freq_inc)
-// w/ Odd:  87500-87699 -> 87500     = Add 100, Divide by 200, then multiply by 200, then subtract 100
-// w/ Even: 87600-87799 -> 87600     = Divide by 200, then multiply by 200  (curr_freq_inc)
-
-  if (curr_freq_inc >= 200) {//curr_freq_odd) {                       // curr_freq_odd: Should only be true if 200 KHz curr_freq_inc (North America/US/Korea)
-    freq += curr_freq_inc / 2;               // Add half of curr_freq_inc (100) so that odd becomes even and usable for round down
-    freq /= curr_freq_inc;
-    freq *= curr_freq_inc;                   // Round down freq to closest frequency
-    freq -= curr_freq_inc / 2;               // Subtract half of curr_freq_inc (100) so that even becomes original odd again
+    if (curr_freq_inc >= 200) {//curr_freq_odd) {                       // curr_freq_odd: Should only be true if 200 KHz curr_freq_inc (North America/US/Korea)
+      freq += curr_freq_inc / 2;               // Add half of curr_freq_inc (100) so that odd becomes even and usable for round down
+      freq /= curr_freq_inc;
+      freq *= curr_freq_inc;                   // Round down freq to closest frequency
+      freq -= curr_freq_inc / 2;               // Subtract half of curr_freq_inc (100) so that even becomes original odd again
+    }
+    else {
+      freq /= curr_freq_inc;
+      freq *= curr_freq_inc;                   // Round down freq to closest frequency
+    }
+    if (freq < curr_freq_lo)                   // If rounding down caused freq to go below freq_lo...
+      freq += curr_freq_inc;                   // Next channel up should be good.
+    return (freq);
   }
-  else {
-    freq /= curr_freq_inc;
-    freq *= curr_freq_inc;                   // Round down freq to closest frequency
+
+  int freq_enforce (int freq, int fix) {  // Enforces limits curr_freq_lo and curr_freq_hi. If fixed due to limits, or argument fix != 0 then also enforces curr_freq_inc/curr_freq_odd
+    logd ("freq_enforce: %d %d", freq, fix);
+                                          // Only called by chip_imp_freq_sg () w/ fix = 0
+                                          // Only called by freq_up_get ()/freq_dn_get () w/ fix = 1
+                                          // Parameter fix set if caller requests or limit fixed so we can apply curr_freq_inc/curr_freq_odd rules. Unset to set frequency as close as possible.
+    if (freq < curr_freq_lo) {
+      freq = curr_freq_hi;
+      fix = 1;                            // Force a curr_freq_inc/curr_freq_odd fix due to limit fix
+    }
+    if (freq > curr_freq_hi) {
+      freq = curr_freq_lo;
+      fix = 1;                            // Force a curr_freq_inc/curr_freq_odd fix due to limit fix
+    }
+    if (fix) {
+      freq = freq_fix (freq);
+    }
+    return (freq);
   }
-  if (freq < curr_freq_lo)                   // If rounding down caused freq to go below freq_lo...
-    freq += curr_freq_inc;                   // Next channel up should be good.
-  return (freq);
-}
-int freq_enforce (int freq, int fix) {  // Enforces limits curr_freq_lo and curr_freq_hi. If fixed due to limits, or argument fix != 0 then also enforces curr_freq_inc/curr_freq_odd
-  logd ("freq_enforce: %d %d", freq, fix);
-                                        // Only called by chip_api_freq_set () w/ fix = 0
-                                        // Only called by freq_up_get ()/freq_dn_get () w/ fix = 1
-                                        // Parameter fix set if caller requests or limit fixed so we can apply curr_freq_inc/curr_freq_odd rules. Unset to set frequency as close as possible.
-  if (freq < curr_freq_lo) {
-    freq = curr_freq_hi;
-    fix = 1;                            // Force a curr_freq_inc/curr_freq_odd fix due to limit fix
+
+  int freq_up_get (int freq) {                                            // Called only by chip_imp_seek_state_sg ()
+    logd ("freq_up_get: %d", freq);
+    int save_freq_inc = curr_freq_inc;
+    if (curr_freq_inc < 100)                                              // !!!! Hack for seek problems w/ 50 KHz offsets on TI and BC Low level APIs.
+      curr_freq_inc = 100;
+
+    //if (curr_freq_inc < 100)
+    //  freq += 100;
+    //else
+      freq += curr_freq_inc;
+    freq = freq_enforce (freq, 1);
+
+    curr_freq_inc = save_freq_inc;
+    return (freq);
   }
-  if (freq > curr_freq_hi) {
-    freq = curr_freq_lo;
-    fix = 1;                            // Force a curr_freq_inc/curr_freq_odd fix due to limit fix
+
+  int freq_dn_get (int freq) {                                            // Called only by chip_imp_seek_state_sg ()
+    int save_freq_inc = curr_freq_inc;
+    if (curr_freq_inc < 100)                                              // !!!! Hack for seek problems w/ 50 KHz offsets on TI and BC Low level APIs.
+      curr_freq_inc = 100;
+
+    //if (curr_freq_inc < 100)
+    //  freq -= 100;
+    //else
+      freq -= curr_freq_inc;
+    freq = freq_enforce (freq, 1);
+
+    curr_freq_inc = save_freq_inc;
+    return (freq);
   }
-  if (fix) {
-    freq = freq_fix (freq);
-  }
-  return (freq);
-}
-int freq_up_get (int freq) {                                            // Called only by chip_api_seek_start ()
-  logd ("freq_up_get: %d", freq);
-  int save_freq_inc = curr_freq_inc;
-  if (curr_freq_inc < 100)                                              // !!!! Hack for seek problems w/ 50 KHz offsets on TI and BC Low level APIs.
-    curr_freq_inc = 100;
-
-  //if (curr_freq_inc < 100)
-  //  freq += 100;
-  //else
-    freq += curr_freq_inc;
-  freq = freq_enforce (freq, 1);
-
-  curr_freq_inc = save_freq_inc;
-  return (freq);
-}
-int freq_dn_get (int freq) {                                            // Called only by chip_api_seek_start ()
-  int save_freq_inc = curr_freq_inc;
-  if (curr_freq_inc < 100)                                              // !!!! Hack for seek problems w/ 50 KHz offsets on TI and BC Low level APIs.
-    curr_freq_inc = 100;
-
-  //if (curr_freq_inc < 100)
-  //  freq -= 100;
-  //else
-    freq -= curr_freq_inc;
-  freq = freq_enforce (freq, 1);
-
-  curr_freq_inc = save_freq_inc;
-  return (freq);
-}
 
 
-  int RSSI_FACTOR = 16;//20; // 62.5/50 -> 1000  (See 60)     Highest seen locally = 57, 1000 / 62.5 = 16
+    // RDS:
 
-  int cfg_af_mode = 0;                                                    // 0 = Disabled, 1 = Manual, 2 = RDS, 3 = Allow Regional  !! > 1 means need RDS so leave on even if screen off
-
-  int last_af_count_get_s = 0;
-  int af_regional_count = 0;
-
-  //char g1 [256] = "";
-  unsigned char rds_grpd [8] = {0};
-  //char g2 [256] = "";
-
-  int curr_af_num = 0;                                                    // Current number of AF table entries
-
-    // Values: Current (under construction), Candidate (complete, but must be repeated before confirmed), Confirmed (Displayable, with few if any visual/logical defects.)
-
-  int cand_pi_ctr = 0;
-  int curr_pi = 0;         // Program ID. Canada non-national = 0xCxxx.   // 88.5: 0x163e, 106.1: 0xc448, 105.3: 0xc87d, 106.9: 0xdc09, 91.5: 0xb102, 89.1: 0, 89.9: 0x15d6, 93.9: 0xccb6
-  int cand_pi = 0;
-  int conf_pi = 0;
-
-  int cand_pt_ctr = 0;
-  int curr_pt = -1;         // 88.5: 5 = Rock   106.1: 6 = Classic Rock
-  int cand_pt = -1;
-  int conf_pt = -1;
-
-  //char g3 [256] = "";
-  char curr_ps [9] = "        ";  // Current PS: Assembled here to start.
-
-  //char g14a [256] = "";
-  char cand_ps [9] = "        ";  // Candidate PS: When all bytes are set, curr_ps is copied to cand_ps.
-
-  //char g2a [256] = "";
-  char conf_ps [9] = "        ";  // Confirmed PS: When a new Current PS matches Candidate PS, the candidate is considered confirmed and copied here where the App can retrieve it.
-
-
-  //char g5 [256] = "";
-  char curr_rt [65] = "                                                                ";     // Current RT.
-
-  //char g15 [256] = "";
-  char cand_rt [65] = "                                                                ";     // Candidate RT.
-
-  //char g4 [256] = "";
-  char conf_rt [65] = "                                                                ";     // Confirmed RT.
-
-  //char g6 [256] = "";
-  char conf_rf [65] = {0};                                              // Confirmed RT with no trailing spaces.
-  //char g7 [256] = "";
-
-  //char g16 [256] = "";
-
-
-
-#ifdef  SUPPORT_RDS
-  #include "tnr_rds.c"
-#else
-  int rds_reset () {
+  #ifdef  SUPPORT_RDS
+    #include "rds_tnr.c"
+  #else
+  int rds_init () {
     return (-1);
   }
   int af_count_get () {
     return (0);
   }
-  int rds_group_process (unsigned char * grp) { // For tnr_bch only
+  int rds_group_process (unsigned char * grp) {                         // For tnr_bch only
     return (-1);
   }
   void af_switch_if_needed () {
   }
   void rds_callback () {
   }
-#endif
-
-    //
-
-  int prev_freq = 0;
-  int stro_evt_enable = 0;//1;
-  int rssi_evt_enable = 0;//1;
-  int curr_pwr = 1;
-  int low_pwr_mode = 0;
-  int pre2_stro_sig = 0;
+  #endif
 
 
-    // Event getter:
-  int evt_get (int just_poll) { // Called only from af_switch() w/ just_poll=1 or rx_thread() w/ just_poll=0
-    int evt = -1, stro_sig = 0;//, evt_freq = 0;
+    // Event getter / poll:
 
-    if (! curr_pwr)                                                     // If no power...
-      return (0);                                                       // Return w/ no event
+  #define   EVT_GET_NONE    0
+  //#define   EVT_GET_RSSI    1
+  //#define   EVT_GET_pilot     2
+  #define   EVT_GET_RDS_PI  3
+  #define   EVT_GET_RDS_PT  4
+  #define   EVT_GET_RDS_PS  5
+  #define   EVT_GET_RDS_RT  6
+  #define   EVT_GET_RDS_RAW 7
 
-    if (seek_in_progress)                                               // If seeking with Broadcom HCI API...
-      return (0);                                                       // Return w/ no event
+  #define   EVT_GET_FREQ_OFFSET               0
+  #define   EVT_GET_FREQ_LO               65000
+  #define   EVT_GET_FREQ_HI              108000
+
+  #define   EVT_GET_SEEK_FREQ_OFFSET    1000000
+  #define   EVT_GET_SEEK_FREQ_LO        1065000
+  #define   EVT_GET_SEEK_FREQ_HI        1108000
+
+  int rds_total_polls = 0;
+  int rds_data_polls = 0;
+
+  int current_event_get (int just_poll) {                               // Called only from: tuner_event_sg()   w/ just_poll=0 (to get events)
+                                                                            // And     from: af_switch()        w/ just_poll=1 (to avoid getting events, which we don't want while AF switching)
+                                                                            // Need to keep polling during Alternate Frequency switching in order to get RDS info like PI
+    if (ena_log_tnr_evt)
+      logd ("current_event_get start just_poll: %d", just_poll);
+
+    int current_event = -1;
+    int pilot = 0; 
+
+    if (! curr_state | curr_seek_state)                                 // If no power or seeking...
+      return (EVT_GET_NONE);                                            // Return w/ no event
+
+    if (ena_log_tnr_evt)
+      logd ("current_event_get before af_count_get");
 
     int curr_s = ms_get () / 1000;
     if (last_af_count_get_s + 60 < curr_s)
       af_count_get ();                                                  // Ensure at least one AF aging every 60 seconds
 
-    if (! low_pwr_mode) {                                               // If normal / not low power mode w/ no RDS...
-// stro_get() before events_process() to avoid si4709 problem ?
-      if (stro_evt_enable) {                                            // If stereo events enabled...
-        int st = chip_api_stro_get ();
-        if (st)                                                         // If stereo mode...
-          stro_sig = 1;
-        else
-          stro_sig = 0;
-        //logd ("evt_get stro_sig: %3.3d  curr_stro_sig: %3.3d  prev_stro_sig: %3.3d  pre2_stro_sig: %3.3d", stro_sig, curr_stro_sig, prev_stro_sig, pre2_stro_sig);
+    if (ena_log_tnr_evt)
+      logd ("current_event_get after  af_count_get");
+                                                                        // !!!! stro_get() before event_sg() to avoid si4709 problem ?
+    if (stro_evt_enable) {                                              // If stereo events enabled...
+      pilot = chip_imp_pilot_sg (GET);                                    // Get Mono/Stereo indication...
+      //logd ("current_event_get pilot: %d  curr_pilot : %d  prev_pilot : %d  pre2_pilot : %d", pilot, curr_pilot, prev_pilot, pre2_pilot);
 
                                                                         // Only change stereo indication if two consecutive of old value followed by two consecutive of new (different)
-        if (! stro_sig && ! curr_stro_sig && prev_stro_sig && pre2_stro_sig)
-          on_playing_in_stereo_changed (0);
-        else if (stro_sig && curr_stro_sig && ! prev_stro_sig && ! pre2_stro_sig)
-          on_playing_in_stereo_changed (1);
+      if (! pilot && ! curr_pilot  && prev_pilot  && pre2_pilot)
+        cb_tuner_pilot  (0);                                              // Mono callback
+      else if (pilot && curr_pilot  && ! prev_pilot  && ! pre2_pilot)
+        cb_tuner_pilot  (1);                                              // Stereo callback
 
-        pre2_stro_sig = prev_stro_sig;                                  // Age
-        prev_stro_sig = curr_stro_sig;                                  // Age
-        curr_stro_sig = stro_sig;                                       // Previous = current
-      }
-
-      if (pwr_rds) {                                                    // If RDS power is on..
-        int ret = 0;
-
-        while (ret == 0) {                                              // While we have 8 byte RDS groups available...
-                                                                        // (Only one is processed per call to events_process(), except QCV which blocks and handles it's own low level processing)
-          //loge ("evt_get pre  chip_api_events_process");
-          ret = chip_api_events_process (rds_grpd);                     // RDS Process/get (except during low power mode or no rds mode)
-          //loge ("evt_get post chip_api_events_process ret: %d", ret);
-          if (ret == 0)                                                 // If have new raw RDS data...
-            rds_group_process (rds_grpd);                               // Pass ptr to 8 bytes of group data, most significant byte first (big endian)
-        }
-      }
-
+      pre2_pilot  = prev_pilot ;                                            // Age Previous + 1
+      prev_pilot  = curr_pilot ;                                            // Age Previous
+      curr_pilot  = pilot;                                                 // Previous = current
     }
 
-  if (rssi_evt_enable && ! seek_in_progress) {                          // If not seeking with Broadcom HCI API...
-    if (ms_get () >= next_rssi_get_ms) {                                // If time for another RSSI check...
-      next_rssi_get_ms = ms_get () + next_rssi_get_per;                 // Set next RSSI check time
-      int old_rssi = curr_rssi;
-      curr_rssi = chip_api_rssi_get ();
-      if (curr_rssi != old_rssi) {                                      // If RSSI changed
+    if (ena_log_tnr_evt)
+      logd ("current_event_get after  if (stro_evt_enable)");
+
+    if (curr_rds_state) {                                               // If RDS is on..
+      int rds_grp_allowance_left = 2;//3;//4;//8;                                   // Only process maximum of 8 rds groups (about 0.16 seconds worth ?) per polling period
+
+      int ret = EVT_GET_RDS_RAW;                                        // Ensure while loop starts
+
+      while (ret != EVT_GET_NONE && rds_grp_allowance_left -- > 0) {    // While we have any 8 byte RDS groups available...
+                                                                        // (Only one is processed per call to event_sg(), except QCV which blocks and handles it's own low level processing)
+
+        ret = chip_imp_event_sg (evt_rbuf);                             // RDS Process/get (except during low power mode or no rds mode)
+        rds_total_polls ++;
+
         if (ena_log_tnr_evt)
-          logd ("evt_get  new rssi: %3.3d", curr_rssi);
-        on_signal_strength_changed (RSSI_FACTOR * curr_rssi);                         // Signal RSSI changed event
-      }
-      else {
-        if (ena_log_tnr_evt)
-          logd ("evt_get same rssi: %3.3d", curr_rssi);
+          logd ("current_event_get chip_imp_event_sg ret: %d", ret);
+
+// !! SSL is the only one that returns raw data here !!
+        if (ret == EVT_GET_RDS_RAW) {                                   // If have new raw RDS data...
+          rds_data_polls ++;
+          rds_group_process (evt_rbuf);                                 // Pass ptr to 8 bytes of group data, Most significant byte first (big endian)
+        }
+        if (rds_total_polls % 800 == 0)
+          logd ("rds_total_polls: %d  rds_data_polls: %d", rds_total_polls, rds_data_polls);
       }
     }
-  }
 
+    if (ena_log_tnr_evt)
+      logd ("current_event_get after  if (curr_rds_state)");
 
-  if (! curr_pwr) {
-    if (ena_log_tnr_evt)
-      logd ("evt_get ! curr_pwr");
-    evt = 0;
-  }
-  else if (just_poll) {
-    if (ena_log_tnr_evt)
-      logd ("evt_get just_poll");
-    evt = 0;
-  }
-  else if (seek_in_progress && need_seek_cmplt) {
-    if (ena_log_tnr_evt)
-      logd ("evt_get seek_in_progress && need_seek_cmplt");
-    seek_in_progress = 0;
-    need_seek_cmplt = 0;
-    evt = curr_freq_val + 1000000;                                      // SEEK_COMPLETE_EVENT
-  }
-  else if (need_freq_chngd) {
-    if (ena_log_tnr_evt)
-      logd ("evt_get need_freq_chngd");
-    need_freq_chngd = 0;
-    evt = curr_freq_val;                                                // TUNE_EVENT
-  }
-  else if (need_pi_chngd) {
-    if (ena_log_tnr_evt)
-      logd ("evt_get need_pi_chngd");
-    //logd ("evt need_pi_chngd");
-    need_pi_chngd = 0;
-    evt = 3;
-  }
-  else if (need_pt_chngd) {
-    if (ena_log_tnr_evt)
-      logd ("evt_get need_pt_chngd");
-    need_pt_chngd = 0;
-    evt = 4;
-  }
-  else if (need_ps_chngd) {
-    if (ena_log_tnr_evt)
-      logd ("evt_get need_ps_chngd");
-    need_ps_chngd = 0;
-    evt = 5;
-  }
-  else if (need_rt_chngd) {
-    if (ena_log_tnr_evt)
-      logd ("evt_get need_rt_chngd");
-    need_rt_chngd = 0;
-    evt = 6;
-  }
-  else {
-    if (ena_log_tnr_evt)
-      logd ("evt_get no event");
-  }
+    if (rssi_evt_enable && ! curr_seek_state) {                         // If RSSI events enabled and not seeking...
 
-  return (evt);
+      if (ms_get () >= next_rssi_sg_ms) {                               // If time for another RSSI check...
+        next_rssi_sg_ms = ms_get () + next_rssi_sg_per;                 // Set next RSSI check time
+        int old_rssi = curr_rssi;                                       // Save old RSSI to compare
 
-}
-
-
-    // Rx thread:
-
-  int spirit2_light     = 0;
-  int rx_thread_running = 0;
-  int rx_thread_ctr     = 0;
-
-  static int rx_thread_work (int sleep_ms) {
-      int ctr = 0;
-      int evt = 1;
-
-      while (! seek_in_progress && evt > 0 && ctr ++ < 8) {             // While NOT seeking with Broadcom HCI API AND starting or had an event AND less than 8 events processed...
-        if (! rx_thread_running) {
-          logd ("rx_thread done 1 rx_thread_ctr: %d", rx_thread_ctr);
-          return (0);
+        curr_rssi = chip_imp_rssi_sg (GET);                             // Get current RSSI
+        if (curr_rssi != old_rssi) {                                    // If RSSI changed
+          if (ena_log_tnr_evt)
+            logd ("current_event_get  new rssi: %d", curr_rssi);
+          cb_tuner_rssi (curr_rssi);                                    // Signal RSSI changed event
         }
-        evt = evt_get (0);
-        if (! rx_thread_running) {
-          logd ("rx_thread done 2 rx_thread_ctr: %d", rx_thread_ctr);
-          return (0);
-        }
-
-        int seconds_disp = 60;
-        int mod_factor = seconds_disp * (1010 / sleep_ms);
-        if (rx_thread_ctr % mod_factor == 0)                            // Every seconds_disp seconds...
-          logd ("rx_thread: %3.3d  evt: %3.3d", rx_thread_ctr, evt);
-
-        if (evt >= 3 && evt <= 6) {                                     // If RDS
-          rds_callback ();                                              // RDS Callback
+        else {
+          if (ena_log_tnr_evt)
+            logd ("current_event_get same rssi: %d", curr_rssi);
         }
       }
-
-      if (! rx_thread_running) {
-        logd ("rx_thread done 3 rx_thread_ctr: %d", rx_thread_ctr);
-        return (0);
-      }
-
-      if (! seek_in_progress && curr_af_num)                            // If NOT seeking with Broadcom HCI API AND we have AFs...
-        if (rx_thread_ctr % 10 == 0)                                    // Every 1 seconds...
-          af_switch_if_needed ();                                       // Check RSSI and switch to AF if needed
-
-      if (! rx_thread_running) {
-        logd ("rx_thread done 4 rx_thread_ctr: %d", rx_thread_ctr);
-        return (0);
-      }
-      rx_thread_ctr ++;
-    return (1); // 1 = Still running
-  }
-/*
-  static void * rx_thread (void * arg) {
-
-    logd ("rx_thread: %p", arg);
-    int ret = 0;
-    //int stereo = 0;
-    int sleep_ms = 101;
-    while (rx_thread_running) {                                         // Loop while running
-      ret = rx_thread_work (sleep_ms);
-      if (ret == 0)
-        return (NULL);
-      ms_sleep (sleep_ms);                                              // 100 ms = poll 10 times per second, to maintain current fixed timing constants
     }
-    logd ("rx_thread done 5 rx_thread_ctr: %d", rx_thread_ctr);
-    return (NULL);
+
+    if (! curr_state) {
+      if (ena_log_tnr_evt)
+        logd ("current_event_get ! curr_state");
+      current_event = EVT_GET_NONE;
+    }
+    else if (just_poll) {
+      if (ena_log_tnr_evt)
+        logd ("current_event_get just_poll");
+      current_event = EVT_GET_NONE;
+    }
+    else if (curr_seek_state && need_seek_cmplt) {
+      if (ena_log_tnr_evt)
+        logd ("current_event_get seek_in_progress && need_seek_cmplt");
+      curr_seek_state = 0;
+      need_seek_cmplt = 0;
+      current_event = curr_freq_int + EVT_GET_SEEK_FREQ_OFFSET;         // Seek Complete Event
+    }
+    else if (need_freq_chngd) {
+      if (ena_log_tnr_evt)
+        logd ("current_event_get need_freq_chngd");
+      need_freq_chngd = 0;
+      current_event = curr_freq_int + EVT_GET_FREQ_OFFSET;              // Frequency Changed Event
+    }
+    else if (need_pi_chngd) {
+      if (ena_log_tnr_evt)
+        logd ("current_event_get need_pi_chngd");
+      need_pi_chngd = 0;
+      current_event = EVT_GET_RDS_PI;
+    }
+    else if (need_pt_chngd) {
+      if (ena_log_tnr_evt)
+        logd ("current_event_get need_pt_chngd");
+      need_pt_chngd = 0;
+      current_event = EVT_GET_RDS_PT;
+    }
+    else if (need_ps_chngd) {
+      if (ena_log_tnr_evt)
+        logd ("current_event_get need_ps_chngd");
+      need_ps_chngd = 0;
+      current_event = EVT_GET_RDS_PS;
+    }
+    else if (need_rt_chngd) {
+      if (ena_log_tnr_evt)
+        logd ("current_event_get need_rt_chngd");
+      need_rt_chngd = 0;
+      current_event = EVT_GET_RDS_RT;
+    }
+    else {
+      if (ena_log_tnr_evt)
+        logd ("current_event_get no event");
+    }
+
+    if (ena_log_tnr_evt)
+      logd ("current_event_get done current_event: %d", current_event);
+
+    return (current_event);
   }
 
 
-  struct thread_info {                                                  // Argument to rx_thread ()
-    pthread_t  thread_id;                                               // ID returned by pthread_create ()
-    int        thread_num;                                              // Application-defined thread #
-    char     * argv_string;                                             // Test
+    // CHIP API: / Tuner functions:         // 21 Remote sget Set/Get:
+
+  int tuner_event_sg (unsigned char * evt_rbuf) { //int event_sg_ms) {  // Polling function called every event_sg_ms milliseconds. Not used remotely but could be in future.
+    if (ena_log_verbose_tshoot)
+      logd ("tuner_event_sg evt_rbuf: %p", evt_rbuf);
+    int event_allowance_left = 1;//2;//8;                                       // Only process maximum of 8 events per polling period
+    int current_event = 1;                                              // Start current_event = 1 to ensure while() loop starts
+
+                                                                        // While tuner is on and we processed an event and less than 8 events processed and not seeking...
+    while (curr_state && current_event > EVT_GET_NONE && event_allowance_left -- > 0 && ! curr_seek_state) {
+      current_event = current_event_get (0);                            // Get next event
+      if (ena_log_verbose_tshoot)
+        logd ("tuner_event_sg current_event: %d", current_event);
+      if (curr_state && current_event >= EVT_GET_RDS_PI && current_event <= EVT_GET_RDS_RT)
+        rds_callback ();                                                // If tuner on and this is an RDS event Do RDS Callback
+    }
+    if (ena_log_verbose_tshoot)
+      logd ("tuner_event_sg done events event_allowance_left: %d", event_allowance_left);
+    if (curr_state && curr_af_num && ! curr_seek_state)                 // If tuner on and we have AFs and not seeking...
+      if (tuner_event_sg_ctr % 10 == 0)                                 // Every 1 second...
+        af_switch_if_needed ();                                         // Check RSSI and switch to AF if needed
+
+    if (tuner_event_sg_ctr ++ % 600 == 0)                                // Log every 60 seconds to show we are still alive and not blocked...
+      logd ("tuner_event_sg_ctr: %d  current_event: %d", tuner_event_sg_ctr, current_event);
+
+    if (ena_log_verbose_tshoot)
+      logd ("tuner_event_sg done af_switch_if_needed and returning");
+
+    return (current_event);
+  }
+
+  plugin_funcs_t local_funcs = {                                        // !! Must match order with plugin_funcs_t in tnr_tnr.h
+
+        // 21 sget Set/Get:
+
+    // Integer functions:
+                                                        // Not used remotely by app, but could be. App could control polling and get "tuner_bulk" response
+    tuner_event_sg,             //chip_imp_event_sg,                     // Polling function called every 100 ms or so when daemon receive times out regularly.
+
+    chip_imp_api_mode_sg,                                                // 0 / 1 = Default+UART / SHIM
+    chip_imp_api_state_sg,                                               // 0 / 1 = Stop         / Start
+    chip_imp_mode_sg,                                                    // 0 / 1 = Receive      / Transmit
+    chip_imp_state_sg,                                                   // 0 / 1 = Stop         / Start
+
+    chip_imp_band_sg,                                                    // 0 / 1 = EU           / US
+    chip_imp_freq_sg,                                                    // 65/76/87.5 - 108,..., 65000/76000/87500 - 108000
+    chip_imp_vol_sg,                                                     // 0 - 65535
+    chip_imp_thresh_sg,                                                  // 0 - ?
+
+    chip_imp_mute_sg,                                                    // 0 / 1 = Unmute       / Mute
+    chip_imp_stereo_sg,                                                  // 0 / 1 = Mono         / Stereo    (Stereo request)
+    chip_imp_seek_state_sg,                                              // 0 / 1 / 2 = Stop, Up, Down
+    chip_imp_rds_state_sg,                                               // 0 / 1 = Stop         / Start
+    chip_imp_rds_af_state_sg,                                            // 0 / 1 = Stop         / Start
+
+    chip_imp_rssi_sg,                                                    // 0 - ?
+    chip_imp_pilot_sg,                                                    // 0 / 1 = Mono         / Stereo    (Stereo/19 KHz pilot indication)
+
+    chip_imp_rds_pi_sg,                                                  // 0 - 65535
+    chip_imp_rds_pt_sg,                                                  // 0 - 65535
+
+    // Character array functions:   May be ASCIIZ strings, but for Euro language RDS, 0 is the common 'á'   ; Could translate to rare character however...
+
+    chip_imp_rds_ps_sg,                                                  // Characters: 0 - 8 or 0 - 64 / ?  for multiple consecutive preloaded PS strings to cycle through
+    chip_imp_rds_rt_sg,                                                  // Characters: 0 - 64 / ?           for multiple consecutive preloaded RT strings to cycle through ?
+
+    chip_imp_extension_sg,                                               // Characters: 0 - ? For chip specific extensions such as register access or other functions
   };
 
-  struct thread_info * tinfo;
-*/
-/*
-  int rx_thread_start () {
-    int s, tnum, opt, num_threads = 1;
-    void * res;
 
-    logd ("rx_thread_start");
+  int plugin_reg (unsigned int * sig, plugin_funcs_t * funcs, plugin_cbs_t * cbs) {    // Initial C level registration function each plugin must implement
+    logd ("plugin_reg sig: %p  funcs: %p  cbs: %p", sig, funcs, cbs);
 
-    // Initialize thread creation attributes
-    pthread_attr_t attr;
-    s = pthread_attr_init (& attr);
-    if (s != 0) {
-      loge ("pthread_attr_init error: %d", s);
-      return (-1);
+    //logd ("plugin_reg sizeof (rds_struct_t): %d",  sizeof (rds_struct_t));  // plugin_reg sizeof (rds_struct_t): 216
+
+    if (sig)                                                            // If valid sig pointer passed...
+      * sig = PLUGIN_SIG;                                               // Return signature identifying a valid plugin
+
+    if (funcs)                                                          // If valid plugin functions pointer passed...
+      * funcs = local_funcs;                                            // Return our local functions structure pointer
+
+    if (cbs) {                                                          // If valid callbacks pointer passed...
+                                                                        // Save callback function pointers that we (the plugin) call in the main s2d daemon binary
+      cb_tuner_state = cbs->cb_tuner_state;                             // cb_tuner_state not used yet, but could inform app about fatal/unexpected errors that set tuner state to Stop
+      cb_tuner_rssi  = cbs->cb_tuner_rssi;                              // RSSI
+      cb_tuner_pilot   = cbs->cb_tuner_pilot ;                              // MOST: Mono/Stereo reception indication
+      cb_tuner_rds   = cbs->cb_tuner_rds;                               // RDS Data
+      cb_tuner_rds_af= cbs->cb_tuner_rds_af;                            // RDS AF Alternate frequencies
     }
-
-    //s = pthread_attr_setstacksize (&attr, stack_size); Comment to use default stacksize
-    //if (s != 0)
-    //  handle_error_en (s, "pthread_attr_setstacksize");
-
-
-    // Allocate memory for pthread_create () arguments
-    tinfo = (struct thread_info *) calloc (num_threads, sizeof(struct thread_info));
-    if (tinfo == NULL) {
-      loge ("calloc error");
-      return (-1);
-    }
-
-    rx_thread_running = 1;
-
-    // Create thread(s)
-    for (tnum = 0; tnum < num_threads; tnum ++) {
-      tinfo [tnum].thread_num = tnum + 1;
-      tinfo [tnum].argv_string = (char *) "test";
-
-      // The pthread_create() call stores the thread ID into corresponding element of tinfo []
-      s = pthread_create ( & tinfo [tnum].thread_id, & attr, & rx_thread, & tinfo [tnum]);
-        if (s != 0) {
-          loge ("pthread_create error: %d", s);
-          return (-1);
-        }
-    }
-
-    // Destroy the thread attributes object, since it is no longer needed
-    s = pthread_attr_destroy (& attr);
-    if (s != 0) {
-      loge ("pthread_attr_destroy error: %d", s);
-//Thread active so just continue   return (-1);
-    }
-    return (0);
-  }
-  int rx_thread_stop () {
-
-    //pthread_cancel (tinfo [0].thread_id);
-//    pthread_kill (tinfo [0].thread_id, SIGKILL);
-
-    rx_thread_running = 0;
-    logd ("rx_thread_running 1: %d  rx_thread_ctr: %d", rx_thread_running,  rx_thread_ctr);
-
-//    ms_sleep (200);
-//    logd ("rx_thread_running 2: %d  rx_thread_ctr: %d", rx_thread_running,  rx_thread_ctr);
-
-    return (0);
-  }
-*/
-
-    // Minimum: rx_start or tx_start, pause2, resume, reset
-  int rx_start (void ** session_data, const struct fmradio_vendor_callbacks_t * callbacks, int low_freq, int high_freq, int default_freq, int grid) {
-    logd ("rx_start callbacks: %p  lo: %d  hi: %d  def: %d  grid: %d", callbacks, low_freq, high_freq, default_freq, grid);
-    if (callbacks) {
-      on_playing_in_stereo_changed  = callbacks->on_playing_in_stereo_changed;
-      on_rds_data_found             = callbacks->on_rds_data_found;
-      on_signal_strength_changed    = callbacks->on_signal_strength_changed;
-      on_automatic_switch           = callbacks->on_automatic_switch;
-      on_forced_reset               = callbacks->on_forced_reset;               // Not used, but could call if fatal error
-    }
-    if (default_freq == 107300) {                                       // If transmit mode
-      pwr_rds = default_freq;
-    }
-    int ret = chip_api_api_on (low_freq, high_freq, grid);
-    if (ret == 0) {
-      ret = chip_api_pwr_on (pwr_rds);
-      if (ret == 0) {
-        //chip_api_vol_set (16384);
-        chip_api_mute_set (0);                                          // Unmute
-      }
-    }
-    if (ret == 0) {                                                     // If successful chip_api_pwr_on()
-//      ret = rx_thread_start ();
-      rx_thread_running = 1;
-
-/*
-      if (ret) {                                                        // If thread start error
-        chip_api_pwr_off (pwr_rds);
-        chip_api_api_off ();
-      }
-*/
-    }
-    return (ret);
-  }
-  int tx_start (void ** session_data, const struct fmradio_vendor_callbacks_t * callbacks, int low_freq, int high_freq, int default_freq, int grid) {
-    logd ("tx_start lo: %d  hi: %d  def: %d  grid: %d", low_freq, high_freq, default_freq, grid);
-    return (0);
-  }
-  int pause2 (void ** session_data) {                           // Name will conflict with C pause2() otherwise
-    logd ("pause2");
-    chip_api_mute_set (1);                                              // Mute
-    return (0);
-  }
-  int resume (void ** session_data) {
-    logd ("resume");
-    chip_api_mute_set (0);                                              // Unmute
-    return (0);
-  }
-  int reset (void ** session_data) {
-    logd ("reset");
-    int ret = 0;
-//    ret = rx_thread_stop ();
-    rx_thread_running = 0;
-    ret = chip_api_pwr_off (pwr_rds);
-    ret = chip_api_api_off ();
-    return (ret);
-  }
-
-    // Optional Tx & Rx:
-  int set_frequency (void ** session_data, int frequency) {
-    logd ("set_frequency: %d", frequency);
-    int ret = chip_api_freq_set (frequency);
-    rds_reset ();
-    return (ret);
-  }
-  int get_frequency (void ** session_data) {
-    int freq = chip_api_freq_get ();
-    if (ena_log_tnr_extra)
-      logd ("get_frequency: %d", freq);
-    return (freq);
-  }
-  int stop_scan (void ** session_data) {
-    logd ("stop_scan");
-    chip_api_seek_stop ();
-    return (0);
-  }
-  int send_extra_command (void ** session_data, const char * command, char ** parameters, struct fmradio_extra_command_ret_item_t ** out_parameters) {
-    if (command == NULL)
-      logd ("send_extra_command: NULL");
-    else if (! strncmp (command, "799", strlen ("799"))) {
-      if (rx_thread_running)
-        rx_thread_work (101);
-      return (0);
-    }
-    logd ("send_extra_command: %s", command);
-    int ret = chip_api_extra_cmd (command, parameters);
-    logd ("send_extra_command ret: %d", ret);
-    return (0);
-  }
-
-    // Optional Rx only:
-  int scan (void ** session_data, enum fmradio_seek_direction_t direction) {
-    logd ("scan: %d", direction);
-    int ret = chip_api_seek_start (direction);
-    need_seek_cmplt = 1;                                                // Seek is complete
-    if (ret > 0)
-      curr_freq_val = ret;
-    rds_reset ();
-    return (ret);
-  }
-
-  int full_scan (void ** session_data, int ** found_freqs, int ** signal_strengths) {
-    logd ("full_scan");
-    return (-1);
-  }
-  int get_signal_strength (void ** session_data) {
-    //logd ("get_signal_strength");
-    curr_rssi = chip_api_rssi_get ();
-    int rssi = RSSI_FACTOR * curr_rssi;
-    if (ena_log_tnr_extra)
-      logd ("get_signal_strength: %d", rssi);
-    return (rssi);
-  }
-  int is_playing_in_stereo (void ** session_data) {
-    //logd ("is_playing_in_stereo: %d", curr_stro_sig);
-    return (curr_stro_sig);
-  }
-  int rds_data_supported = 1;
-  int is_rds_data_supported (void ** session_data) {
-    logd ("is_rds_data_supported: %d", rds_data_supported);
-    return (rds_data_supported);
-  }
-  int tuned_to_valid_channel = 1;
-  int is_tuned_to_valid_channel (void ** session_data) {
-    logd ("is_tuned_to_valid_channel: %d", tuned_to_valid_channel);
-    return (tuned_to_valid_channel);
-  }
-  int set_automatic_af_switching (void ** session_data, int automatic) {// Alternate Frequency
-    logd ("set_automatic_af_switching: %d", automatic);
-    if (automatic == 0)
-      cfg_af_mode = 0;                                                  // 0 = Disabled, 1 = Manual, 2 = RDS, 3 = Allow Regional  !! > 1 means need RDS so leave on even if screen off
-    else
-      cfg_af_mode = 3;
-    return (0);
-  }
-  int set_automatic_ta_switching (void ** session_data, int automatic) {
-    logd ("set_automatic_ta_switching: %d", automatic);
-    return (0);
-  }
-  int set_force_mono (void ** session_data, int force_mono) {
-    logd ("set_force_mono: %d", force_mono);
-    chip_api_stro_set (! force_mono);
-    return (0);
-  }
-  int thresh = 0;
-  int get_threshold (void ** session_data) {
-    return (thresh);
-  }
-  int set_threshold (void ** session_data, int threshold) {
-    thresh = threshold;
-    logd ("set_threshold: %d", thresh);
-    if (thresh >= 770 && thresh <= 785)
-      chip_api_vol_set ((thresh - 770) * 4096);
-    return (0);
-  }
-  int set_rds_reception (void ** session_data, int use_rds) {
-    logd ("set_rds_reception: %d", use_rds);
-    if (use_rds == 0)
-      pwr_rds = 0;
-    else
-      pwr_rds = 1;
-    return (0);
-  }
-
-    // Optional Tx only:
-  int block_scan (void ** session_data, int low_freq, int high_freq, int ** found_freqs, int ** signal_strengths) {
-    return (0);
-  }
-  int set_rds_data (void ** session_data, char * key, void * value) {
-    return (0);
-  }  
-
-/*  !!!!
-char rds_char_xfrm (char rds_char) {
-  //rds_char &= 0x7f;                                                   // Low 7 bits only
-  if (rds_char == 0x0d)
-    rds_char = 0;                                                       // CR -> ASCIIZ 0 / terminate
-  else if (rds_char == 0x0a)
-    rds_char = ' ';                                                     // LF -> SPACE
-  else if (rds_char < 0x20) // || rds_char >= 0x7f)
-    rds_char = '~';                                                     // Non ASCII -> Tilde
-  else if (rds_char == 0x7f)
-    rds_char = '~';                                                     // Delete
-  return (rds_char);
-}
-
-
-char xfrm (char rds_char) {
-  char r_char = rds_char_xfrm (rds_char);
-  if (r_char == 0)
-    r_char = ' ';                                                       // Same as rds_char_xfrm but CR -> SPACE
-  return (r_char);
-}
-*/
-
-
-
-    // Callbacks:
-/*
-      on_playing_in_stereo_changed
-      on_rds_data_found
-      on_signal_strength_changed
-      on_automatic_switch
-      on_forced_reset                                                   // Not used, but could call if fatal error
-*/
-
-    // Init API:
-
-  //unsigned int magicVal = FMRADIO_SIGNATURE;
-  struct fmradio_vendor_methods_t vendor_funcs = {
-    rx_start,                                                           // Set 5 callbacks, chip_api_api_on(), chip_api_pwr_on(), rx_thread_start().
-    tx_start,                                                           // --
-    pause2,                                                     // chip_api_mute_set(1). Mute audio on chip. Could also set chip to low power. Name conflicts with C library pause2()
-    resume,                                                             // chip_api_mute_set(0). Unmute "                                             "
-    reset,                                                              // AKA "off" or "rx_stop": rx_thread_stop(), chip_api_pwr_off(), chip_api_api_off()
-    set_frequency,                                                      // Set freq: chip_api_freq_set(), rds_reset()
-    get_frequency,                                                      // Get freq: chip_api_freq_get()
-    stop_scan,                                                          // Stop seek: chip_api_seek_stop()
-    send_extra_command,                                                 // chip_api_extra_cmd()
-    scan,                                                               // chip_api_seek_start(), rds_reset()
-    full_scan,                                                          // --
-    get_signal_strength,                                                // chip_api_rssi_get()
-    is_playing_in_stereo,                                               // ? return (curr_stro_sig);
-    is_rds_data_supported,                                              // ? return (rds_data_supported); (1)
-    is_tuned_to_valid_channel,                                          // ? return (tuned_to_valid_channel); (1)
-    set_automatic_af_switching,                                         // cfg_af_mode = 0 or 3    // 0 = Disabled, 1 = Manual, 2 = RDS, 3 = Allow Regional  !! > 1 means need RDS so leave on even if screen off
-    set_automatic_ta_switching,                                         // --
-    set_force_mono,                                                     // chip_api_stro_set()
-    get_threshold,                                                      // return (thresh);
-    set_threshold,                                                      // Test:     if (thresh >= 770 && thresh <= 785)     chip_api_vol_set ((thresh - 770) * 4096)
-    set_rds_reception,                                                  // pwr_rds = 0 or 1
-    block_scan,                                                         // --
-    set_rds_data                                                        // --
-    };
-
-  int register_fmradio_functions (unsigned int * signature_p, struct fmradio_vendor_methods_t * vendor_funcs_p) {
-
-    if (signature_p)
-      *signature_p = FMRADIO_SIGNATURE;//magicVal;
-    if (vendor_funcs_p)
-      *vendor_funcs_p = vendor_funcs;
 
     return (0);
   }

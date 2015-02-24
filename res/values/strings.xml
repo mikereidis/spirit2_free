@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources xmlns:xliff="urn:oasis:names:tc:xliff:document:1.2">
+
+    <!--  -->
+
+  <string name="copyright_msg">
+    Spirit is Copyright (c) 2011-2015 Michael A. Reid. All rights reserved.
+  </string>
+
+</resources>

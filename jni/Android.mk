@@ -54,9 +54,9 @@ include $(BUILD_SHARED_LIBRARY)
 #include $(PREBUILT_SHARED_LIBRARY)
 
     # JNI utilities
-#include $(CLEAR_VARS)
-#LOCAL_MODULE:= jut
-#LOCAL_SRC_FILES:= jut/jut.c
-##LOCAL_LDLIBS += -l OpenSLES
-#include $(BUILD_SHARED_LIBRARY)
+include $(CLEAR_VARS)
+LOCAL_MODULE:= jut
+LOCAL_SRC_FILES:= jut/jut.c
+LOCAL_LDLIBS := -llog
+include $(BUILD_SHARED_LIBRARY)
 

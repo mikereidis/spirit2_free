@@ -4,9 +4,10 @@
   #define CLT_LOGTAG "sfc....."
   #define DMN_LOGTAG "sfd....."
 
-  #define LOGTAG "sfd....."
+  //#define LOGTAG "sfd....."
+  //unsigned char logtag [16] = DEF_LOGTAG;//"s2l.....";   // Default "2s2l...." = JNI library
 
-  unsigned char logtag [16] = DEF_LOGTAG;//"s2l.....";   // Default "2s2l...." = JNI library
+  unsigned char LOGTAG [16] = DEF_LOGTAG;//"s2l.....";   // Default "2s2l...." = JNI library
 
   const char * copyright = "Copyright (c) 2011-2015 Michael A. Reid. All rights reserved.";
 
@@ -19,7 +20,15 @@
 
   #define DEF_BUF 512    // Raised from 256 so we can add headers to 255-256 byte buffers
 
+  #define  GENERIC_CLIENT
+  #define  GENERIC_SERVER
+
   #include "utils.c"
+
+  #define  logv(...)  s2_log(ANDROID_LOG_VERBOSE,LOGTAG,__VA_ARGS__)
+  #define  logd(...)  s2_log(ANDROID_LOG_DEBUG,LOGTAG,__VA_ARGS__)
+  #define  logw(...)  s2_log(ANDROID_LOG_WARN,LOGTAG,__VA_ARGS__)
+  #define  loge(...)  s2_log(ANDROID_LOG_ERROR,LOGTAG,__VA_ARGS__)
 
   //#ifdef  CS_AF_UNIX                                                      // For Address Family UNIX sockets
   //#include <sys/un.h>
@@ -27,12 +36,7 @@
   #include <netinet/in.h>
   #include <netdb.h> 
 
-
-    //
-
-  int s2_tx = 0;
-
-  int   curr_radio_device_int       = -1;
+  int s2d_port = NET_PORT_S2D;
 
   #define DEV_UNK -1
   #define DEV_GEN 0
@@ -40,499 +44,224 @@
   #define DEV_GS2 2
   #define DEV_GS3 3
   #define DEV_QCV 4
-  #define DEV_ONE 5
+  #define DEV_OM7 5
   #define DEV_LG2 6
   #define DEV_XZ2 7
+  int curr_service_device_int;// = DEV_UNK;                                // Should make this available to plugins !! tnr_bch needs and qcv antenna ??
 
 
-    // STE API support:
+    // Spirit2 Daemon API support:
 
   #include "tnr/tnr_tnr.h"
 
-
-  static bool lib_name_get (char * lib_name, size_t max_size) {
-
-    switch (curr_radio_device_int) {
-      case DEV_GEN: strncpy (lib_name, "/data/data/fm.a2d.sf/lib/libs2t_gen.so", max_size);   return (true);
-      case DEV_GS1: strncpy (lib_name, "/data/data/fm.a2d.sf/lib/libs2t_ssl.so", max_size);   return (true);
-      case DEV_GS2: strncpy (lib_name, "/data/data/fm.a2d.sf/lib/libs2t_ssl.so", max_size);   return (true);
-      case DEV_GS3: strncpy (lib_name, "/data/data/fm.a2d.sf/lib/libs2t_ssl.so", max_size);   return (true);
-      case DEV_QCV: strncpy (lib_name, "/data/data/fm.a2d.sf/lib/libs2t_qcv.so", max_size);   return (true);
-      case DEV_ONE: strncpy (lib_name, "/data/data/fm.a2d.sf/lib/libs2t_bch.so", max_size);   return (true);
-      case DEV_LG2: strncpy (lib_name, "/data/data/fm.a2d.sf/lib/libs2t_bch.so", max_size);   return (true);
-      case DEV_XZ2: strncpy (lib_name, "/data/data/fm.a2d.sf/lib/libs2t_bch.so", max_size);   return (true);
+  char * service_device_get (int device) {
+    switch (device) {
+      case DEV_UNK: return ("UNK");
+      case DEV_GEN: return ("GEN");
+      case DEV_GS1: return ("GS1");
+      case DEV_GS2: return ("GS2");
+      case DEV_GS3: return ("GS3");
+      case DEV_QCV: return ("QCV");
+      case DEV_OM7: return ("OM7");
+      case DEV_LG2: return ("LG2");
+      case DEV_XZ2: return ("XZ2");
     }
-    return (false);
+    return ("UNK");
   }
 
-  void * lib_fd;
-  struct fmradio_vendor_methods_t * tnr_funcs;
+  int tuner_plugin_libname_get (int service_device, char * lib_name, size_t max_size) {
 
-  bool lib_load () {
-    char lib_name [DEF_BUF] = "";
-    if (! lib_name_get (lib_name, sizeof (lib_name))) {                 // Read library directory and find matching library
-      loge ("Can't get lib_name for curr_radio_device_int: %d", curr_radio_device_int);
-      return (false);
+    switch (service_device) {
+      case DEV_GEN: strncpy (lib_name, "/data/data/fm.a2d.sf/lib/libs2t_gen.so", max_size);   return (service_device);
+      case DEV_GS1: strncpy (lib_name, "/data/data/fm.a2d.sf/lib/libs2t_ssl.so", max_size);   return (service_device);
+      case DEV_GS2: strncpy (lib_name, "/data/data/fm.a2d.sf/lib/libs2t_ssl.so", max_size);   return (service_device);
+      case DEV_GS3: strncpy (lib_name, "/data/data/fm.a2d.sf/lib/libs2t_ssl.so", max_size);   return (service_device);
+      case DEV_QCV: strncpy (lib_name, "/data/data/fm.a2d.sf/lib/libs2t_qcv.so", max_size);   return (service_device);
+      case DEV_OM7: strncpy (lib_name, "/data/data/fm.a2d.sf/lib/libs2t_bch.so", max_size);   return (service_device);
+      case DEV_LG2: strncpy (lib_name, "/data/data/fm.a2d.sf/lib/libs2t_bch.so", max_size);   return (service_device);
+      case DEV_XZ2: strncpy (lib_name, "/data/data/fm.a2d.sf/lib/libs2t_bch.so", max_size);   return (service_device);
     }
-
-    lib_fd = dlopen (lib_name, RTLD_LAZY); // Load the library
-    if (lib_fd == NULL) {
-      loge ("Could not load library '%s'", lib_name);
-      return (false);
-    }
-    else {
-      logd ("Loaded library %s  lib_fd: %d", lib_name, lib_fd);
-    }
-
-    fmradio_reg_func_t reg_func = (fmradio_reg_func_t) dlsym (lib_fd, FMRADIO_REGISTER_FUNC); // Now we have loaded the library, check for function
-    if (reg_func == NULL) {
-      loge ("Could not find symbol '%s' in loaded library '%s'", FMRADIO_REGISTER_FUNC, lib_name);
-      dlclose (lib_fd);
-      return (false);
-    }
-
-    unsigned int magic_val = 0;
-    if (reg_func (& magic_val, tnr_funcs) != 0) {       // Register
-      loge ("Loaded function '%s' returned unsuccessful", FMRADIO_REGISTER_FUNC);
-      dlclose (lib_fd);
-      return (false);
-    }
-
-    if (magic_val != FMRADIO_SIGNATURE) {    // Ensure correct function was called
-      loge ("Loaded function '%s' returned successful but failed setting magic value", FMRADIO_REGISTER_FUNC);
-      dlclose (lib_fd);
-      return (false);
-    }
-    return (true);  // Success
+    return (DEV_UNK);
   }
 
-  void lib_unload () {
-    if (lib_fd != NULL) {
-      dlclose (lib_fd);
-      free (tnr_funcs);
+
+    // Plugin data:
+  void           * tnr_fd       = NULL;
+  plugin_funcs_t * tnr_funcs    = NULL;
+  plugin_cbs_t   * tnr_cbs      = NULL;
+
+    // Callback prototypes:
+  void imp_cb_tuner_pilot (int new_pilot);
+  void imp_cb_tuner_rds   (rds_struct_t * new_rds);
+  void imp_cb_tuner_rssi  (int new_rssi);
+  void imp_cb_tuner_rds_af(int new_freq);
+  void imp_cb_tuner_state (int new_state);
+
+
+    // First order of business is to determine the device we are running on, and set up appropriate plugins.
+
+  int service_device_set (int service_device) {
+
+    if (service_device <= DEV_UNK) {
+      curr_service_device_int = DEV_UNK;
+      if (tnr_fd != NULL)                                               // Unload plugin and return resources
+        dlclose (tnr_fd);
+      tnr_fd = NULL;
+      if (tnr_cbs != NULL)
+        free (tnr_cbs);
+      tnr_cbs = NULL;
+      if (tnr_funcs != NULL)
+        free (tnr_funcs);
       tnr_funcs = NULL;
     }
-  }
 
+    if (service_device == curr_service_device_int) {                        // If no change...
+      if (tnr_fd && tnr_cbs && tnr_funcs) {
+        loge ("service_device set no change service_device: %d", service_device);
+        return (curr_service_device_int);
+      }
+    }
 
-/*
-  void funcs_display () {
-        // Mandatory:
-    logd ("rx_start:                  %p", tnr_funcs->rx_start);
-    logd ("tx_start:                  %p", tnr_funcs->tx_start);
-    logd ("rx_pause2:                  %p", tnr_funcs->pause2);
-    logd ("rx_resume:                 %p", tnr_funcs->resume);
-    logd ("rx_reset:                  %p", tnr_funcs->reset);
-        // Optional: Both RX & TX:
-    logd ("set_frequency:             %p", tnr_funcs->set_frequency);
-    logd ("get_frequency:             %p", tnr_funcs->get_frequency);
-    logd ("stop_scan:                 %p", tnr_funcs->stop_scan);
-    logd ("send_extra_command:        %p", tnr_funcs->send_extra_command);
-        // RX only:
-    logd ("scan:                      %p", tnr_funcs->scan);
-        // RX only ? (or both?):
-    logd ("full_scan:                 %p", tnr_funcs->full_scan);
-    logd ("get_signal_strength:       %p", tnr_funcs->get_signal_strength);
-    logd ("is_playing_in_stereo:      %p", tnr_funcs->is_playing_in_stereo);
-    logd ("is_rds_data_supported:     %p", tnr_funcs->is_rds_data_supported);
-    logd ("is_tuned_to_valid_channel: %p", tnr_funcs->is_tuned_to_valid_channel);
-    logd ("set_automatic_af_switching:%p", tnr_funcs->set_automatic_af_switching);
-    logd ("set_automatic_ta_switching:%p", tnr_funcs->set_automatic_ta_switching);
-    logd ("set_force_mono:            %p", tnr_funcs->set_force_mono);
-    logd ("get_threshold:             %p", tnr_funcs->get_threshold);
-    logd ("set_threshold:             %p", tnr_funcs->set_threshold);
-    logd ("set_rds_reception:         %p", tnr_funcs->set_rds_reception);
-        // TX only:
-    logd ("block_scan:                %p", tnr_funcs->block_scan);
-    logd ("set_rds_data:              %p", tnr_funcs->set_rds_data);
-  }
-*/
+    curr_service_device_int = DEV_UNK;                                    // Default = error
 
-    // Client/Server:
+    tnr_funcs = calloc (1, sizeof (plugin_funcs_t));   // Setup functions
+    if (tnr_funcs == NULL)
+      return (curr_service_device_int);
 
-    // Unix datagrams requires other write permission for /dev/socket, or somewhere else (ext, not FAT) writable.
+    tnr_cbs = calloc (1, sizeof (plugin_cbs_t));     // Setup callbacks
+    if (tnr_cbs == NULL)
+      return (curr_service_device_int);
 
-  //#define CS_AF_UNIX        // Use network sockets to avoid filesystem permission issues w/ Unix Domain Address Family sockets
-  #define CS_DGRAM            // Use datagrams, not streams/sessions
-
-  #define CS_RX_TMO   1000    // 1 second     //#define CS_RX_TMO   100     // 100 milliseconds
-
-  #ifdef  CS_AF_UNIX                                                      // For Address Family UNIX sockets
-  //#include <sys/un.h>
-  #define DEF_API_SRVSOCK    "/dev/socket/srv_spirit"
-  #define DEF_API_CLISOCK    "/dev/socket/cli_spirit"
-  char api_srvsock [DEF_BUF] = DEF_API_SRVSOCK;
-  char api_clisock [DEF_BUF] = DEF_API_CLISOCK;
-  #define CS_FAM   AF_UNIX
-
-  #else                                                                   // For Address Family NETWORK sockets
-  //#include <netinet/in.h>
-  //#include <netdb.h> 
-  int s2d_port = 2122;
-  #define CS_FAM   AF_INET
-  #endif
-
-  #ifdef  CS_DGRAM
-  #define CS_SOCK_TYPE    SOCK_DGRAM
-  #else
-  #define CS_SOCK_TYPE    SOCK_STREAM
-  #endif
-
-
-
-  int sock_rx_tmo_set (int fd, int tmo) {                                 // tmo = timeout in milliseconds
-    struct timeval tv = {0, 0};
-    tv.tv_sec = tmo / 1000;                                               // Timeout in seconds
-    tv.tv_usec = (tmo % 1000) * 1000;
-    int ret = setsockopt (fd, SOL_SOCKET, SO_RCVTIMEO, (struct timeval *) & tv, sizeof (struct timeval));
-    if (ret != 0) {
-      loge ("sock_rx_tmo_set setsockopt SO_RCVTIMEO errno: %d", errno);
+    char lib_name [DEF_BUF] = "";
+    if (tuner_plugin_libname_get (service_device, lib_name, sizeof (lib_name)) <= DEV_UNK) {                   // Read library directory and find matching library
+      loge ("Can't get lib_name for service_device: %d  curr_service_device_int: %d", service_device, curr_service_device_int);
+      return (curr_service_device_int);
+    }
+    tnr_fd = dlopen (lib_name, RTLD_LAZY);                              // Load library
+    if (tnr_fd == NULL) {
+      loge ("Could not load library '%s'", lib_name);
+      return (curr_service_device_int);
     }
     else {
-      logd ("sock_rx_tmo_set setsockopt SO_RCVTIMEO Success");
-    }
-    //ret = setsockopt (fd, SOL_SOCKET, SO_SNDTIMEO, (struct timeval *) & tv, sizeof (struct timeval));
-    //if (ret != 0) {
-    //  loge ("timeout_set setsockopt SO_SNDTIMEO errno: %d", errno);
-    //}
-    return (0);
-  }
-  
-
-    // IPC API
-  int client_cmd (unsigned char * cmd_buf, int cmd_len, unsigned char * res_buf, int res_max) {
-    logd ("s2d_port: %d  cmd_buf: \"%s\"  cmd_len: %d", s2d_port, cmd_buf, cmd_len);
-    static int sockfd = -1;
-    int res_len,written;
-    static socklen_t srv_len;
-  #ifdef  CS_AF_UNIX
-    static struct sockaddr_un  srv_addr;
-    #ifdef  CS_DGRAM
-    #define   CS_DGRAM_UNIX
-      struct sockaddr_un  cli_addr;                                       // Unix datagram sockets must be bound; no ephemeral sockets.
-      socklen_t cli_len;
-    #endif
-  #else
-    //struct hostent *hp;
-    struct sockaddr_in  srv_addr,cli_addr;
-    socklen_t cli_len;
-  #endif
-  
-    if (sockfd < 0) {
-      if ((sockfd = socket (CS_FAM, CS_SOCK_TYPE, 0)) < 0) {                // Get an ephemeral, unbound socket
-        loge ("client_cmd: socket errno: %d", errno);
-        return (0);//"Error socket");
-      }
-    #ifdef  CS_DGRAM_UNIX                                                 // Unix datagram sockets must be bound; no ephemeral sockets.
-      unlink (api_clisock);                                                // Remove any lingering client socket
-      memset ((char *) & cli_addr, sizeof (cli_addr), 0);
-      cli_addr.sun_family = AF_UNIX;
-      strncpy (cli_addr.sun_path, api_clisock, sizeof (cli_addr.sun_path));
-      cli_len = strlen (cli_addr.sun_path) + sizeof (cli_addr.sun_family);
-  
-      if (bind (sockfd, (struct sockaddr *) & cli_addr,cli_len) < 0) {
-        loge ("client_cmd: bind errno: %d", errno);
-        close (sockfd);
-        sockfd = -1;
-        return (0);//"Error bind");                                        // OK to continue w/ Internet Stream but since this is Unix Datagram and we ran unlink (), let's fail
-      }
-    #endif
-    }
-  //!! Can move inside above
-  // Setup server address
-    memset ((char *) & srv_addr, sizeof (srv_addr), 0);
-  #ifdef  CS_AF_UNIX
-    srv_addr.sun_family = AF_UNIX;
-    strlcpy (srv_addr.sun_path, api_srvsock, sizeof (srv_addr.sun_path));
-    srv_len = strlen (srv_addr.sun_path) + sizeof (srv_addr.sun_family);
-  #else
-    srv_addr.sin_family = AF_INET;
-    srv_addr.sin_addr.s_addr=htonl (INADDR_LOOPBACK);
-    //hp = gethostbyname ("localhost");
-    //if (hp == 0) {
-    //  loge ("client_cmd: Error gethostbyname  errno: %d", errno);
-    //  return (0);//"Error gethostbyname");
-    //}
-    //bcopy ((char *) hp->h_addr, (char *) & srv_addr.sin_addr, hp->h_length);
-    srv_addr.sin_port = htons (s2d_port);
-    srv_len =sizeof (struct sockaddr_in);
-  #endif
-  
-  
-  // Send cmd_buf and get res_buf
-  #ifdef CS_DGRAM
-    written= sendto (sockfd, cmd_buf, cmd_len, 0,(const struct sockaddr *)&srv_addr,srv_len);
-    if (written != cmd_len) {  // Dgram buffers should not be segmented
-      loge ("client_cmd: sendto errno: %d", errno);
-    #ifdef  CS_DGRAM_UNIX
-      unlink (api_clisock);
-    #endif
-      close (sockfd);
-      sockfd = -1;
-      return (0);//"Error sendto");
-    }
-  
-    sock_rx_tmo_set (sockfd, CS_RX_TMO);
-    res_len = recvfrom (sockfd, res_buf, res_max, 0,(struct sockaddr *)&srv_addr, &srv_len);
-    if (res_len <= 0) {
-      loge ("client_cmd: recvfrom errno: %d", errno);
-    #ifdef  CS_DGRAM_UNIX
-      unlink (api_clisock);
-    #endif
-      close (sockfd);
-      sockfd = -1;
-      return (-1);
-  //    return (0);//"Error recvfrom");
-    }
-    #ifndef CS_AF_UNIX
-  // !!   ?? Don't need this ?? If srv_addr still set from sendto, should restrict recvfrom to localhost anyway ?
-    if ( srv_addr.sin_addr.s_addr != htonl(INADDR_LOOPBACK) ) {
-      loge ("client_cmd: Unexpected suspicious packet from host");// %s", inet_ntop(srv_addr.sin_addr.s_addr)); //inet_ntoa(srv_addr.sin_addr.s_addr));
-    }
-    #endif
-  #else
-    if (connect(sockfd, (struct sockaddr *) &srv_addr, srv_len) < 0) {
-      loge ("client_cmd: connect errno: %d", errno);
-      close (sockfd);
-      sockfd = -1;
-      return (0);//"Error connect");
-    }
-    written = write (sockfd, cmd_buf, cmd_len);                           // Write the command packet
-    if (written != cmd_len) {                                             // Small buffers under 256 bytes should not be segmented ?
-      loge ("client_cmd: write errno: %d", errno);
-      close (sockfd);
-      sockfd = -1;
-      return (0);//"Error write");
-    }
-  
-    sock_rx_tmo_set (sockfd, CS_RX_TMO);
-  
-    res_len = read (sockfd, res_buf, res_max)); // Read response
-    if (res_len <= 0) {
-      loge ("client_cmd: read errno: %d", errno);
-      close (sockfd);
-      sockfd = -1;
-      return (0);//"Error read");
-    }
-  #endif
-    //hex_dump ("", 32, res_buf, n);
-  #ifdef  CS_DGRAM_UNIX
-      unlink (api_clisock);
-  #endif
-    //close (sockfd);
-    return (res_len);
-  }
-
-  int exiting = 0;
-
-  #define   RES_DATA_MAX  1280
-
-  int server_work () {                                                  // Run until exiting != 0, passing incoming commands to server_work_func() and responding with the results
-    int sockfd = -1, newsockfd = -1, cmd_len = 0, ctr = 0;
-    socklen_t cli_len = 0, srv_len = 0;
-  #ifdef  CS_AF_UNIX
-    struct sockaddr_un  cli_addr = {0}, srv_addr = {0};
-    srv_len = strlen (srv_addr.sun_path) + sizeof (srv_addr.sun_family);
-  #else
-    struct sockaddr_in  cli_addr = {0}, srv_addr = {0};
-    //struct hostent *hp;
-  #endif
-    unsigned char cmd_buf [DEF_BUF] ={0};
-  
-    //system("chmod 666 /dev");            // !! Need su if in JNI
-    //system("chmod 666 /dev/socket");
-  
-  #ifdef  CS_AF_UNIX
-    unlink (api_srvsock);
-  #endif
-    if ((sockfd = socket (CS_FAM, CS_SOCK_TYPE, 0)) < 0) {
-      loge ("server_work socket  errno: %d", errno);
-      return (-1);
+      logd ("Loaded library %s  tnr_fd: %d", lib_name, tnr_fd);
     }
 
-    sock_rx_tmo_set (sockfd, 100);                                      // For polling every 100 ms
+    tnr_cbs->cb_tuner_pilot   = imp_cb_tuner_pilot;                         // Setup callback functions structure
+    tnr_cbs->cb_tuner_rds     = imp_cb_tuner_rds;
+    tnr_cbs->cb_tuner_rssi    = imp_cb_tuner_rssi;
+    tnr_cbs->cb_tuner_rds_af  = imp_cb_tuner_rds_af;
+    tnr_cbs->cb_tuner_state   = imp_cb_tuner_state;
 
-    memset ((char *) & srv_addr, sizeof (srv_addr), 0);
-  #ifdef  CS_AF_UNIX
-    srv_addr.sun_family = AF_UNIX;
-    strncpy (srv_addr.sun_path, api_srvsock, sizeof (srv_addr.sun_path));
-    srv_len = strlen (srv_addr.sun_path) + sizeof (srv_addr.sun_family);
-  #else
-    srv_addr.sin_family = AF_INET;
-    srv_addr.sin_addr.s_addr = htonl (INADDR_LOOPBACK); //INADDR_ANY;
-    //hp = gethostbyname ("localhost");
-    //if (hp == 0) {
-    //  loge ("Error gethostbyname  errno: %d", errno);
-    //  return (-2);
-    //}
-    //bcopy ((char *) hp->h_addr, (char *) & srv_addr.sin_addr, hp->h_length);
-    srv_addr.sin_port = htons (s2d_port);
-    srv_len = sizeof (struct sockaddr_in);
-  #endif
-  
-  #ifdef  CS_AF_UNIX
-  logd ("srv_len: %d  fam: %d  path: %s", srv_len, srv_addr.sun_family, srv_addr.sun_path);
-  #else
-  logd ("srv_len: %d  fam: %d  addr: 0x%x  port: %d", srv_len, srv_addr.sin_family, ntohl (srv_addr.sin_addr.s_addr), ntohs (srv_addr.sin_port));
-  #endif
-    if (bind (sockfd, (struct sockaddr *) & srv_addr, srv_len) < 0) {
-      loge ("Error bind  errno: %d", errno);
-  #ifdef  CS_AF_UNIX
-      return (-3);
-  #endif
-  #ifdef CS_DGRAM
-      return (-3);
-  #endif
-      loge ("Inet stream continuing despite bind error");      // OK to continue w/ Internet Stream
+    plugin_reg_t plugin_reg = (plugin_reg_t) dlsym (tnr_fd, "plugin_reg"); // Dynamic link plugin_reg() function
+    if (plugin_reg == NULL) {
+      loge ("Could not find plugin_reg() symbol in loaded library '%s'", lib_name);
+      dlclose (tnr_fd);
+      return (curr_service_device_int);
     }
 
-sock_rx_tmo_set (sockfd, 100);
-  
-  // Get command from client
-  #ifndef CS_DGRAM
-    if (listen (sockfd, 5)) {                           // Backlog= 5; likely don't need this
-      loge ("Error listen  errno: %d", errno);
-      return (-4);
+    unsigned int ret_sig = 0;
+    if (plugin_reg (& ret_sig, tnr_funcs, tnr_cbs) != 0) {                  // Register functions and get signature
+      loge ("Loaded function plugin_reg() returned unsuccessful");
+      dlclose (tnr_fd);
+      return (curr_service_device_int);
     }
-  #endif
-  
-    logd ("server_work Ready");
-  
-    while (! exiting) {
-      memset ((char *) & cli_addr, sizeof (cli_addr), 0);                        // ?? Don't need this ?
-      //cli_addr.sun_family = CS_FAM;                                     // ""
-      cli_len = sizeof (cli_addr);
-  
-      //logd ("ms_get: %d",ms_get ());
-  #ifdef  CS_DGRAM
-      cmd_len = recvfrom (sockfd, cmd_buf, sizeof (cmd_buf), 0, (struct sockaddr *) & cli_addr, & cli_len);
-      if (cmd_len <= 0) {
-        if (errno == EAGAIN) {
-          if (tnr_funcs != NULL && tnr_funcs->send_extra_command != NULL)   // ???? Use curr_tuner_state ??
-            tnr_funcs->send_extra_command (NULL, "799", NULL, NULL);        // Poll
-        }
-        else {
-          loge ("Error recvfrom errno: %d", errno);
-          ms_sleep (101);   // Sleep 0.1 second
-        }
-        continue;
-      }
-    #ifndef CS_AF_UNIX
-  // !! 
-      if ( cli_addr.sin_addr.s_addr != htonl (INADDR_LOOPBACK) ) {
-        //loge ("Unexpected suspicious packet from host %s", inet_ntop (cli_addr.sin_addr.s_addr));
-        loge ("Unexpected suspicious packet from host");// %s", inet_ntoa (cli_addr.sin_addr.s_addr));
-      }
-    #endif
-  #else
-      newsockfd = accept (sockfd, (struct sockaddr *) & cli_addr, & cli_len);
-      if (newsockfd < 0) {
-        loge ("Error accept  errno: %d", errno);
-        ms_sleep (101);   // Sleep 0.1 second
-        continue;
-      }
-    #ifndef  CS_AF_UNIX
-  // !! 
-      if ( cli_addr.sin_addr.s_addr != htonl (INADDR_LOOPBACK) ) {
-        //loge ("Unexpected suspicious packet from host %s", inet_ntop (cli_addr.sin_addr.s_addr));
-        loge ("Unexpected suspicious packet from host");// %s", inet_ntoa (cli_addr.sin_addr.s_addr));
-      }
-    #endif
-      cmd_len = read (newsockfd, cmd_buf, sizeof (cmd_buf));
-      if (cmd_len <= 0) {
-        loge ("Error read  errno: %d", errno);
-        ms_sleep (101);   // Sleep 0.1 second
-        close (newsockfd);
-        ms_sleep (101);   // Sleep 0.1 second
-        continue;
-      }
-  #endif
-  
-  #ifdef  CS_AF_UNIX
-      //logd ("cli_len: %d  fam: %d  path: %s",cli_len,cli_addr.sun_family,cli_addr.sun_path);
-  #else
-      //logd ("cli_len: %d  fam: %d  addr: 0x%x  port: %d",cli_len,cli_addr.sin_family, ntohl (cli_addr.sin_addr.s_addr), ntohs (cli_addr.sin_port));
-  #endif
-      //hex_dump ("", 32, cmd_buf, n);
-  
-      unsigned char res_buf [RES_DATA_MAX] = {0};
-      int res_len = 0;
 
-      cmd_buf [cmd_len] = 0;    // Null terminate for string usage
-      res_len = server_work_func ( cmd_buf, cmd_len, res_buf, sizeof (res_buf));    // Do server command function and provide response
-
-//      logd ("server_work server_work_func res_len: %d", res_len);
-      if (res_len < 0) {  // If error
-        res_len = 2;
-        res_buf [0] = '?';
-        res_buf [1] = '\n';
-        res_buf [2] = 0;
-      }
-//      hex_dump ("", 32, res_buf, res_len);
-  
-  
-  // Send response
-  #ifdef  CS_DGRAM
-      if (sendto (sockfd, res_buf, res_len, 0, (struct sockaddr *) & cli_addr, cli_len) != res_len) {
-        loge ("Error sendto  errno: %d  res_len: %d", errno, res_len);
-        ms_sleep (101);   // Sleep 0.1 second
-      }
-  #else
-      if (write (newsockfd, res_buf, res_len) != res_len) {
-        loge ("Error write  errno: %d", errno);
-        ms_sleep (101);   // Sleep 0.1 second
-      }
-      close (newsockfd);
-  #endif
+    if (ret_sig != PLUGIN_SIG) {                                        // If signature mismatch
+      loge ("Loaded function plugin_reg() returned successful but signature %x != ret_sig %x", PLUGIN_SIG, ret_sig);
+      dlclose (tnr_fd);
+      return (curr_service_device_int);
     }
-    close (sockfd);
-  #ifdef  CS_AF_UNIX
-    unlink (api_srvsock);
-  #endif
-  
-    return (0);
+
+    //funcs_display ();                                                 // Show functions
+
+    curr_service_device_int = service_device;                               // Success
+    return (curr_service_device_int);      
   }
 
 
+    // Current info Variables:
 
-    //
+    // Audio: 2 only
+  char  curr_audio_mode         [16]= "Digital";
+  char  curr_audio_state        [16]= "Stop";
+//int curr_audio_mode_int = 0;
+//int curr_audio_state_int = 0;
+                                                                        // Simpler to use integer forms of variables
+    // Service: 1 only
+  #define DEV_UNK_STR           "-1";
+  char  curr_service_device        [16]= DEV_UNK_STR;
+int curr_service_device_int = DEV_UNK;                                // Should make this available to plugins !! tnr_bch needs and qcv antenna ??
 
-  int freq_inc = 100;   // EU
+    // Tuner Integer forms of variables:
+
+int   curr_tuner_api_mode_int = 0;
+int   curr_tuner_api_state_int = 0;
+int   curr_tuner_mode_int = 0;
+int   curr_tuner_state_int = 0;
+
+int   curr_tuner_band_int     =  0;
 
   int   curr_tuner_freq_int         = -7;
-  int   curr_tuner_rssi_int         = -7;
-  int   curr_tuner_most_int         = 0;
-  int   curr_tuner_rds_pi_int       = -7;
-  int   curr_tuner_rds_pt_int       = -7;
 
-  char  curr_radio_dai_state    [16]= "Stop";
+int   curr_tuner_freq_lo_int     =  87500;
+int   curr_tuner_freq_hi_int     = 108000;
+//emph75
+//rbds
+    int   curr_tuner_freq_inc_int     = 100;                              // EU frequency increment = 100 KHz
+
+  int   curr_tuner_vol_int         = -7;
+
+int   curr_tuner_thresh_int        = -7;
+int   curr_tuner_mute_int          = -7;
+int   curr_tuner_stereo_int        = -7;
+int   curr_tuner_seek_state_int    = -7;
+int   curr_tuner_rds_state_int     = -7;
+int   curr_tuner_rds_af_state_int  = -7;
+
+  int   curr_tuner_rssi_int        = -7;
+  int   curr_tuner_pilot_int       = 0;
+
+int   curr_tuner_antenna_int       = 0;
+
+  int   curr_tuner_rds_pi_int      = -7;
+  int   curr_tuner_rds_pt_int      = -7;
+
+    // Tuner String forms of variables:
+  char  curr_tuner_api_mode     [16]= "UART";                           // 0 = UART / 1 = SHIM
+  char  curr_tuner_api_state    [16]= "Stop";
+  char  curr_tuner_mode         [16]= "Receive";
+  char  curr_tuner_state        [16]= "Stop";
+
   char  curr_tuner_band         [16]= "EU";
 
-  char  curr_tuner_state        [16]= "Stop";
-  char  curr_tuner_scan_state   [16]= "Stop";
+  char  curr_tuner_freq         [16]= "0";//"107900";
+  char  curr_tuner_vol          [16]= "65535";
+  char  curr_tuner_thresh       [16]= "0";
+char  curr_tuner_mute       [16]= "Mute";
+  char  curr_tuner_stereo       [16]= "Mono";
+
+  char  curr_tuner_seek_state   [16]= "Stop";                           // 0 = Stop, 1 = Up, 2 = Down
   char  curr_tuner_rds_state    [16]= "Stop";
   char  curr_tuner_rds_af_state [16]= "Stop";
 
-  char  curr_tuner_freq         [16]= "0";//"107900";
-  char  curr_tuner_stereo       [16]= "Mono";
-  char  curr_tuner_thresh       [16]= "0";
   char  curr_tuner_rssi         [16]= "0";
-  char  curr_tuner_most         [16]= "0";
-  char  curr_tuner_extra_cmd    [16]= "0";
+  char  curr_tuner_pilot        [16]= "0";
+  char  curr_tuner_extension    [16]= "0";
+
+char  curr_tuner_antenna        [16]= "External";
+
 
   char  curr_tuner_rds_pi       [16]= "0";//"";
   char  curr_tuner_rds_pt       [16]= "0";//"-";
   char  curr_tuner_rds_ps       [16]= "";//-7";//"-";
   char  curr_tuner_rds_rt       [96]= "";//-7";//"-";
 
-  void cb_tuner_change (char * key, char * val) {
-//    logd ("cb_tuner_change key: %s  val: %s", key, val);
-  }
 
-  char cval [16] = "-3";
-  char * itoa (int val) {
-    snprintf (cval, sizeof (cval) - 1, "%d", val);
-    return (cval);
+    // Callback code:
+
+    // Do nothing on callback; because we poll...
+  void cb_tuner_change (char * key, char * val) {
+    //logd ("cb_tuner_change key: %s  val: %s", key, val);
   }
 
     // Store the trimmed input string into the given output buffer, which must be large enough to store the result.  If it is too small, the output is truncated.
@@ -568,885 +297,611 @@ sock_rx_tmo_set (sockfd, 100);
     return str;
   }
 
-  char * itomost (int most) {
-    if (most)
+  char * itop (int pilot) {
+    if (pilot)
       return ("Stereo");
     else
       return ("Mono");
   }
-  void cb_tnr_most (int most) {
-    //logd ("cb_tnr_most most: %d", most);
-    if (curr_tuner_most_int != most) {
-      curr_tuner_most_int = most;
-      strncpy (curr_tuner_most, itomost (most), sizeof (curr_tuner_most));
-      cb_tuner_change ("tuner_most", curr_tuner_most);
+
+  void imp_cb_tuner_pilot  (int new_pilot) {
+    //logd ("imp_cb_tuner_pilot  new_pilot: %d", new_pilot);
+    if (curr_tuner_pilot_int != new_pilot) {
+      curr_tuner_pilot_int = new_pilot;
+      strncpy (curr_tuner_pilot, itop (new_pilot), sizeof (curr_tuner_pilot));
+      cb_tuner_change ("tuner_pilot ", curr_tuner_pilot);
     }
   }
-  void cb_tnr_rds (struct fmradio_rds_bundle_t * rb, int freq) {
-    //logd ("cb_tnr_rds rds_bundle psn: \"%s\"  rt: \"%s\"  ct: \"%d\"  ptyn: \"%d\"", rb->psn, rb->rt, rb->ct, rb->ptyn);
-    //logd ("cb_tnr_rds rds_bundle: %p  freq: %d  pi: %d  tp: %d  pty: %d  ta: %d  ms: %d  taf: %d  num_afs: %d", rb, freq, rb->pi, rb->tp, rb->pty, rb->ta, rb->ms, rb->taf, rb->num_afs);
-    //for (ctr = 0; ctr < RDS_NUMBER_OF_TMC; ctr ++)
-    //  logd ("cb_tnr_rds rds_bundle tmc %2.2d: %d", rb->tmc [ctr]);
 
-    //logd ("cb_tnr_rds freq: %d  rds_bundle  pi: %d  pty: %d psn: \"%s\"  rt: \"%s\"  num_afs: %d", freq, rb->pi, rb->pty, rb->psn, rb->rt, rb->num_afs);
+  void imp_cb_tuner_rds (rds_struct_t * new_rds) {
+    //logd ("imp_cb_tuner_rds rds_struct srds_ps: \"%s\"  srds_rt: \"%s\"  ct: \"%d\"  ptyn: \"%d\"", new_rds->srds_ps, new_rds->srds_rt, new_rds->ct, new_rds->ptyn);
+    //logd ("imp_cb_tuner_rds rds_struct: %p  freq: %d  pi: %d  tp: %d  srds_pt: %d  ta: %d  ms: %d  taf: %d  srds_af_num: %d", new_rds, freq, new_rds->srds_pi, new_rds->tp, new_rds->srds_pt, new_rds->ta, new_rds->ms, new_rds->taf, new_rds->srds_af_num);
+    //for (ctr = 0; ctr < RDS_MAX_TMC; ctr ++)
+    //  logd ("imp_cb_tuner_rds rds_struct tmc %d: %d", new_rds->tmc [ctr]);
+
+    //logd ("imp_cb_tuner_rds freq: %d  rds_struct  pi: %d  srds_pt: %d srds_ps: \"%s\"  srds_rt: \"%s\"  srds_af_num: %d", freq, new_rds->srds_pi, new_rds->srds_pt, new_rds->srds_ps, new_rds->srds_rt, new_rds->srds_af_num);
     int ctr = 0;
-    for (ctr = 0; ctr < rb->num_afs; ctr ++)
-      logv ("cb_tnr_rds rds_bundle af %2.2d: %d", rb->af [ctr]);
+    for (ctr = 0; ctr < new_rds->srds_af_num; ctr ++)
+      logv ("imp_cb_tuner_rds rds_struct srds_af %d: %d", new_rds->srds_af [ctr]);
 
-    if (curr_tuner_freq_int != freq) {
-      curr_tuner_freq_int = freq;
-      strncpy (curr_tuner_freq, itoa (curr_tuner_freq_int), sizeof (curr_tuner_freq));
-      cb_tuner_change ("tuner_freq", curr_tuner_freq);
-    }
-    if (curr_tuner_rds_pi_int != rb->pi) {
-      curr_tuner_rds_pi_int = rb->pi;
-      strncpy (curr_tuner_rds_pi, itoa (curr_tuner_rds_pi_int), sizeof (curr_tuner_rds_pi));
+    char itoa_ret [MAX_ITOA_SIZE] = {0};
+    if (curr_tuner_rds_pi_int != new_rds->srds_pi) {
+      curr_tuner_rds_pi_int = new_rds->srds_pi;
+      strncpy (curr_tuner_rds_pi, itoa (curr_tuner_rds_pi_int, itoa_ret, 10), sizeof (curr_tuner_rds_pi));
       cb_tuner_change ("tuner_rds_pi", curr_tuner_rds_pi);
     }
-    if (curr_tuner_rds_pt_int != rb->pty) {
-      curr_tuner_rds_pt_int = rb->pty;
-      strncpy (curr_tuner_rds_pt, itoa (curr_tuner_rds_pt_int), sizeof (curr_tuner_rds_pt));
+    if (curr_tuner_rds_pt_int != new_rds->srds_pt) {
+      curr_tuner_rds_pt_int = new_rds->srds_pt;
+      strncpy (curr_tuner_rds_pt, itoa (curr_tuner_rds_pt_int, itoa_ret, 10), sizeof (curr_tuner_rds_pt));
       cb_tuner_change ("tuner_rds_pt", curr_tuner_rds_pt);
     }
-    if (strncmp (curr_tuner_rds_ps, rb->psn, sizeof (curr_tuner_rds_ps))) {
-      strncpy (curr_tuner_rds_ps, rb->psn, sizeof (curr_tuner_rds_ps));
-      cb_tuner_change ("tuner_rds_ps", rb->psn);
+    if (strncmp (curr_tuner_rds_ps, new_rds->srds_ps, sizeof (curr_tuner_rds_ps))) {
+      strncpy (curr_tuner_rds_ps, new_rds->srds_ps, sizeof (curr_tuner_rds_ps));
+      cb_tuner_change ("tuner_rds_ps", new_rds->srds_ps);
     }
 
-    //logd ("Radiotext: \"%s\"", rb->rt);
-    //    space_trim (rb->rt);
-    //logd ("Radiotext: \"%s\"", rb->rt);
-    if (strncmp (curr_tuner_rds_rt, rb->rt, sizeof (curr_tuner_rds_rt))) {
-      strncpy (curr_tuner_rds_rt, rb->rt, sizeof (curr_tuner_rds_rt));
-      cb_tuner_change ("tuner_rds_rt", rb->rt);
+    //logd ("Radiotext: \"%s\"", new_rds->srds_rt);
+    //    space_trim (new_rds->srds_rt);
+    //logd ("Radiotext: \"%s\"", new_rds->srds_rt);
+    if (strncmp (curr_tuner_rds_rt, new_rds->srds_rt, sizeof (curr_tuner_rds_rt))) {
+      strncpy (curr_tuner_rds_rt, new_rds->srds_rt, sizeof (curr_tuner_rds_rt));
+      cb_tuner_change ("tuner_rds_rt", new_rds->srds_rt);
     }
   }
-  void cb_tnr_rssi (int rssi) {
-    //logd ("cb_tnr_rssi rssi: %d", rssi);        // rssi: (760 - 347) / 19 = 21.74. Thus internal range thus is 0 - 46
-    if (curr_tuner_rssi_int != rssi) {
-      curr_tuner_rssi_int = rssi;
-      strncpy (curr_tuner_rssi, itoa (curr_tuner_rssi_int), sizeof (curr_tuner_rssi));
+
+  void imp_cb_tuner_rssi (int new_rssi) {
+    //logd ("imp_cb_tuner_rssi new_rssi: %d", new_rssi);        // rssi: (760 - 347) / 19 = 21.74. Thus internal range thus is 0 - 46
+    char itoa_ret [MAX_ITOA_SIZE] = {0};
+    if (curr_tuner_rssi_int != new_rssi) {
+      curr_tuner_rssi_int = new_rssi;
+      strncpy (curr_tuner_rssi, itoa (curr_tuner_rssi_int, itoa_ret, 10), sizeof (curr_tuner_rssi));
       cb_tuner_change ("tuner_rssi", curr_tuner_rssi);
     }
   }
-  void cb_tnr_rds_af (int freq, enum fmradio_switch_reason_t reason) {
-    logd ("cb_tnr_rds_af freq: %d  reason: %d", freq, reason);
+
+  void imp_cb_tuner_rds_af (int new_freq) {
+    logd ("imp_cb_tuner_rds_af new_freq: %d", new_freq);
   }
-  void cb_tnr_state (enum fmradio_reset_reason_t reason) {
-    logd ("cb_tnr_state reason: %d", reason);
+
+  void imp_cb_tuner_state (int new_state) {
+    logd ("imp_cb_tuner_state new_state: %d", new_state);
     strncpy (curr_tuner_state, "Stop", sizeof (curr_tuner_state));
     cb_tuner_change ("tuner_state", curr_tuner_state);
   }
 
-  struct fmradio_vendor_callbacks_t * g_cbp;
 
-  int tuner_initialized = 0;
-
-  int tuner_init () {
-
-    tuner_initialized = 0;
-
-        // For Qualcomm FM/combo chips:
-    //system ("su -c \"setprop hw.fm.mode normal ; setprop hw.fm.version 0 ; setprop ctl.start fm_dl\"");
-
-        // We run as root now. :)
-    //system ("setprop hw.fm.mode normal ; setprop hw.fm.version 0 ; setprop ctl.start fm_dl");
-
-    int ret = -1;
-
-    tnr_funcs = calloc (1, sizeof (struct fmradio_vendor_methods_t));   // Setup functions
-    if (tnr_funcs == NULL)
-      return (-1);
-    if (! lib_load ()) {
-      loge ("lib_load errno: %d", errno);
-      return (-1);
-    }
-    //funcs_display ();                                                   // Show functions
-
-    g_cbp = calloc (1, sizeof (struct fmradio_vendor_callbacks_t));     // Setup callbacks
-    if (g_cbp == NULL)
-      return (-1);
-    g_cbp->on_playing_in_stereo_changed   = cb_tnr_most;
-    g_cbp->on_rds_data_found              = cb_tnr_rds;
-    g_cbp->on_signal_strength_changed     = cb_tnr_rssi;
-    g_cbp->on_automatic_switch            = cb_tnr_rds_af;
-    g_cbp->on_forced_reset                = cb_tnr_state;
-
-    tuner_initialized = 1;
-    return (0);
-  }
-
-
-  #define boolean bool
-  //#define false 0
-  //#define true  1
-  #define byte unsigned char
+    // Audio:
 
   #include "alsa.c"
 
-  char * audio_dev_name = "/dev/snd/controlC0";
-  int snd_fd = -1;
-  static int native_alsa_cmd (int type, char * key, int value) {
-    if (snd_fd < 0) {
-      snd_fd = open (audio_dev_name, O_NONBLOCK | O_RDWR ); //O_RDWR, 0);//S_IRWXU | S_IRWXG | S_IRWXO);// // O_RDONLY, O_WRONLY, or O_RDWR
-      if (snd_fd < 0) {
-        printf ("Error opening device1 %s errno: %s (%d)\n", audio_dev_name, strerror (errno), errno);
-        return (-2);
+  #include "aud_all.c"                                                  // Audio functions for all supported audio architectures. To be replaced with audio plugins, similar to tuner plugins.
+
+
+    // API: key_get(key)        Get value of key    eg: get(tuner_rssi)
+    //      key_set(key,val)    Set value           eg: set(tuner_state,start)
+
+    // To process get requests:
+  int key_get (char * key, char * res_buf, int res_max, char * val) {
+    char itoa_ret [MAX_ITOA_SIZE] = {0};                                // Temp buffer for itoa()
+
+    strncpy (res_buf, "Key Unknown", res_max);                          // Default = "g key -9999"
+
+    if (0)      loge ("key_get never 0");
+
+            // Values we can just read from memory:
+
+    else if (! strcasecmp (key, "service_device"))
+      strncpy (res_buf, curr_service_device,        res_max);
+
+    else if (! strcasecmp (key, "audio_state"))
+      strncpy (res_buf, curr_audio_state,           res_max);
+    else if (! strcasecmp (key, "audio_mode"))
+      strncpy (res_buf, curr_audio_mode,            res_max);
+
+    else if (! strcasecmp (key, "tuner_api_state"))
+      strncpy (res_buf, curr_tuner_api_state,       res_max);
+    else if (! strcasecmp (key, "tuner_api_mode"))
+      strncpy (res_buf, curr_tuner_api_mode,        res_max);
+    else if (! strcasecmp (key, "tuner_mode"))
+      strncpy (res_buf, curr_tuner_mode,            res_max);
+    else if (! strcasecmp (key, "tuner_state"))
+      strncpy (res_buf, curr_tuner_state,           res_max);
+
+    else if (! strcasecmp (key, "tuner_band"))
+      strncpy (res_buf, curr_tuner_band,            res_max);
+    else if (! strcasecmp (key, "tuner_seek_state"))
+      strncpy (res_buf, curr_tuner_seek_state,      res_max);
+    else if (! strcasecmp (key, "tuner_rds_state"))
+      strncpy (res_buf, curr_tuner_rds_state,       res_max);
+    else if (! strcasecmp (key, "tuner_rds_af_state"))
+      strncpy (res_buf, curr_tuner_rds_af_state,    res_max);
+    else if (! strcasecmp (key, "tuner_extension"))
+      strncpy (res_buf, curr_tuner_extension,       res_max);
+    else if (! strcasecmp (key, "tuner_stereo"))
+      strncpy (res_buf, curr_tuner_stereo,          res_max);
+    else if (! strcasecmp (key, "tuner_rds_pi"))
+      strncpy (res_buf, curr_tuner_rds_pi,          res_max);
+    else if (! strcasecmp (key, "tuner_rds_pt"))
+      strncpy (res_buf, curr_tuner_rds_pt,          res_max);
+    else if (! strcasecmp (key, "tuner_rds_ps"))
+      strncpy (res_buf, curr_tuner_rds_ps,          res_max);
+    else if (! strcasecmp (key, "tuner_rds_rt"))
+      strncpy (res_buf, curr_tuner_rds_rt,          res_max);
+
+
+  #define DEVICE_KNOWN (curr_service_device_int > DEV_UNK)
+
+            // Values we get from the FM chip:
+
+    else if (! strcasecmp (key, "tuner_thresh")) {
+      if (DEVICE_KNOWN)
+        strncpy (curr_tuner_thresh, itoa (curr_tuner_thresh_int = tnr_funcs->tnr_tuner_thresh_sg(GET), itoa_ret, 10),  sizeof (curr_tuner_thresh));
+      strncpy (res_buf, curr_tuner_thresh,          res_max);
+    }
+    else if (! strcasecmp (key, "tuner_freq")) {
+      if (DEVICE_KNOWN)
+        strncpy (curr_tuner_freq,   itoa (curr_tuner_freq_int   = tnr_funcs->tnr_tuner_freq_sg  (GET), itoa_ret, 10),  sizeof (curr_tuner_freq));
+      strncpy (res_buf, curr_tuner_freq,            res_max);
+    }
+    else if (! strcasecmp (key, "tuner_vol")) {
+      //if (DEVICE_KNOWN)
+      //  strncpy (curr_tuner_vol,    itoa (curr_tuner_vol_int    = tnr_funcs->tnr_tuner_vol_sg   (GET), itoa_ret, 10),  sizeof (curr_tuner_vol));
+      strncpy (res_buf, curr_tuner_vol,             res_max);
+    }
+    else if (! strcasecmp (key, "tuner_rssi")) {
+      if (DEVICE_KNOWN)
+        strncpy (curr_tuner_rssi,   itoa (curr_tuner_rssi_int   = tnr_funcs->tnr_tuner_rssi_sg  (GET), itoa_ret, 10),  sizeof (curr_tuner_rssi));
+      strncpy (res_buf, curr_tuner_rssi,            res_max);
+    }
+    else if (! strcasecmp (key, "tuner_pilot ")) {
+      if (DEVICE_KNOWN)
+        strncpy (curr_tuner_pilot,  itop (curr_tuner_pilot_int  = tnr_funcs->tnr_tuner_pilot_sg (GET)),                sizeof (curr_tuner_pilot));
+      strncpy (res_buf, curr_tuner_pilot,            res_max);
+    }
+
+    else if (! strcasecmp (key, "tuner_bulk")) {                        // Tuner Bulk:  Update freq, rssi, pilot from tuner plugin
+
+      if (DEVICE_KNOWN)
+        strncpy (curr_tuner_freq,   itoa (curr_tuner_freq_int   = tnr_funcs->tnr_tuner_freq_sg  (GET), itoa_ret, 10),  sizeof (curr_tuner_freq));
+
+      if (DEVICE_KNOWN)
+        strncpy (curr_tuner_rssi,   itoa (curr_tuner_rssi_int   = tnr_funcs->tnr_tuner_rssi_sg  (GET), itoa_ret, 10),  sizeof (curr_tuner_rssi));
+
+//!!!! May interfere with RDS on SSL, so disable for now !!  (used to interfere with BCH also)
+      //if (DEVICE_KNOWN)
+      //  strncpy (curr_tuner_pilot,  itop (curr_tuner_pilot_int  = tnr_funcs->tnr_tuner_pilot_sg (GET)),                sizeof (curr_tuner_pilot));
+
+      res_buf [0] = 0;
+      strlcat (res_buf, curr_tuner_freq,            res_max);
+
+      strlcat (res_buf, "mArK",                     res_max);
+      strlcat (res_buf, curr_tuner_rssi,            res_max);
+
+      strlcat (res_buf, "mArK",                     res_max);
+      strlcat (res_buf, curr_tuner_pilot,            res_max);
+                                                                        // Update PI, PT, PS, RT from memory
+      strlcat (res_buf, "mArK",                     res_max);
+      strlcat (res_buf, curr_tuner_rds_pi,          res_max);
+
+      strlcat (res_buf, "mArK",                     res_max);
+      strlcat (res_buf, curr_tuner_rds_pt,          res_max);
+
+      strlcat (res_buf, "mArK",                     res_max);
+      strlcat (res_buf, curr_tuner_rds_ps,          res_max);
+
+      strlcat (res_buf, "mArK",                     res_max);
+      strlcat (res_buf, curr_tuner_rds_rt,          res_max);
+    }
+
+    return (strlen (res_buf));                                          // !!!! FIX For International RDS PS and RT
+  }
+
+#ifdef  SEE_AUD_ALL_C
+/* Audio calibration related functions */
+#endif  // #ifdef  SEE_AUD_ALL_C
+
+  char * param2_get (char * params) {
+    int ctr = 0;
+    int len = strlen (params);
+    for (ctr = 0; ctr < len - 1; ctr ++) {
+      if (params [ctr] == ' ') {
+        params [ctr] = 0;                                               // ASCIIZ terminate for parameter 1 !!
+        return (& params [ctr + 1]);
       }
-      printf ("snd_fd: %d\n", snd_fd);
     }
-    int ret = m4_do (snd_fd, type, key, value);                          // Func, ID, value
-    return (ret);
+    return (NULL);
   }
 
-  static int alsa_bool_set (char * key, int value) {
-    int ret = native_alsa_cmd (1, key, value);
-    return (ret);
-  }
-  static int alsa_int_set (char * key, int value) {
-    int ret = native_alsa_cmd (2, key, value);
-    return (ret);
-  }
-  static int alsa_enum_set (char * key, int value) {
-    int ret = native_alsa_cmd (3, key, value);
-    return (ret);
-  }
+    // To process set requests:
+  int key_set (char * key, char * res_buf, int res_max, char * val) {
+    int     ret = 0;
+    char * pret = NULL;
+    int    sval = -99999943;
+    //char itoa_ret [MAX_ITOA_SIZE] = {0};
+    char * p2 = NULL;
 
-  static int sys_run (char * cmd) {
-    int ret = system (cmd);                                             // !! Binaries like ssd that write to stdout cause C system() to crash !
-    logd ("sys_run ret: %d  cmd: \"%s\"", ret, cmd);
-    return (ret);
-  }
+    if (0)      loge ("key_set never 0");
 
-  static char sys_cmd [32768] = {0};
-  static int sys_commit () {
-    int ret = sys_run (sys_cmd);                                        // Run
-    sys_cmd [0] = 0;                                                    // Done, so zero
-    return (ret);
-  }
-  static int cached_sys_run (char * new_cmd) {                          // Additive single string w/ commit version
-    char cmd [512] = {0};
-    if (strlen (sys_cmd) == 0)                                          // If first command since commit
-      snprintf (cmd, sizeof (cmd), "%s", new_cmd);
-    else
-      snprintf (cmd, sizeof (cmd), " ; %s", new_cmd);
-    strncat (sys_cmd, cmd, sizeof (sys_cmd));
-    int ret = sys_commit ();                                            // Commit every command now, due to GS3/Note problems
-    return (ret);
-  }
-
-
-
-    //RADIO_L -> IN2LN / DMICDAT1
-    //RADIO_R -> IN2RN / DMICDAT2
-
-  int gs1_digital_input_on () {
-
-    //cached_sys_run ("echo 0 > /sys//devices/virtual/misc/voodoo_sound/recording_preset 2>/dev/null");
-
-    //cached_sys_run ("echo -n 0039  0000 > /sys/kernel/debug/asoc/smdkc110/wm8994-samsung-codec.4-001a/codec_reg 2>/dev/null");  // Else default = 0068 !!
-    //cached_sys_run ("echo -n  0700 8100 > /sys/kernel/debug/asoc/smdkc110/wm8994-samsung-codec.4-001a/codec_reg 2>/dev/null");  // Else default = a101 !!
-
-    cached_sys_run ("echo -n   300 4010 > /sys/kernel/debug/asoc/smdkc110/wm8994-samsung-codec.4-001a/codec_reg 2>/dev/null");  // Else default = C010 !!
-
-    cached_sys_run ("echo -n   410    0 > /sys/kernel/debug/asoc/smdkc110/wm8994-samsung-codec.4-001a/codec_reg 2>/dev/null");  // Else default = 2800 !!
-    //cached_sys_run ("echo -n   410 1800 > /sys/kernel/debug/asoc/smdkc110/wm8994-samsung-codec.4-001a/codec_reg 2>/dev/null");    // 0410 = 1800 to remove dc offset w/ hifi, cf = 4 hz at 44K, 3.7 @ 44.1
-
-
-    cached_sys_run ("echo -n    2  63a0 > /sys/kernel/debug/asoc/smdkc110/wm8994-samsung-codec.4-001a/codec_reg 2>/dev/null");
-    cached_sys_run ("echo -n    4  0303 > /sys/kernel/debug/asoc/smdkc110/wm8994-samsung-codec.4-001a/codec_reg 2>/dev/null");    // Default 3003
-
-    cached_sys_run ("echo -n   18    80 > /sys/kernel/debug/asoc/smdkc110/wm8994-samsung-codec.4-001a/codec_reg 2>/dev/null");    // default: 8b  Raises volume         80 mutes
-    cached_sys_run ("echo -n   19   14d > /sys/kernel/debug/asoc/smdkc110/wm8994-samsung-codec.4-001a/codec_reg 2>/dev/null");    // default: 4b
-    cached_sys_run ("echo -n   1a    80 > /sys/kernel/debug/asoc/smdkc110/wm8994-samsung-codec.4-001a/codec_reg 2>/dev/null");    // default: 8b                        80 mutes
-    cached_sys_run ("echo -n   1b   14d > /sys/kernel/debug/asoc/smdkc110/wm8994-samsung-codec.4-001a/codec_reg 2>/dev/null");    // default: 4b
-
-    cached_sys_run ("echo -n   28    44 > /sys/kernel/debug/asoc/smdkc110/wm8994-samsung-codec.4-001a/codec_reg 2>/dev/null");
-    cached_sys_run ("echo -n   29   100 > /sys/kernel/debug/asoc/smdkc110/wm8994-samsung-codec.4-001a/codec_reg 2>/dev/null");
-    cached_sys_run ("echo -n   2a   100 > /sys/kernel/debug/asoc/smdkc110/wm8994-samsung-codec.4-001a/codec_reg 2>/dev/null");
-
-    cached_sys_run ("echo -n  606     2 > /sys/kernel/debug/asoc/smdkc110/wm8994-samsung-codec.4-001a/codec_reg 2>/dev/null");    // ADC1L_TO_AIF1ADC1L   Def 0
-    //if (gs1_optional)
-      cached_sys_run ("echo -n  607     2 > /sys/kernel/debug/asoc/smdkc110/wm8994-samsung-codec.4-001a/codec_reg 2>/dev/null");    // ADC1R_TO_AIF1ADC1R   Def 0
-    sys_commit ();
-
-    return (0);
-  }
-  int gs1_digital_input_off () {
-    return (0);
-  }
-
-    // C1YMU823 / MC-1N2
-    // /sys/kernel/debug/asoc/U1-YMU823/mc1n2.6-003a/codec_reg
-  int gs2_digital_input_on () {
-    alsa_bool_set ("ADCL MIXER Mic2 Switch", 1);    // !!  Must first switch ON, then OFF !!
-    alsa_bool_set ("ADCR MIXER Mic2 Switch", 1);
-    alsa_bool_set ("ADCL MIXER Mic2 Switch", 0);
-    alsa_bool_set ("ADCR MIXER Mic2 Switch", 0);
-
-    alsa_bool_set ("ADCL MIXER Mic1 Switch", 1);    // Same for Mic1 when using CAMCORDER
-    alsa_bool_set ("ADCR MIXER Mic1 Switch", 1);
-    alsa_bool_set ("ADCL MIXER Mic1 Switch", 0);
-    alsa_bool_set ("ADCR MIXER Mic1 Switch", 0);
-
-    alsa_bool_set ("ADCL MIXER Line Switch", 0);
-    alsa_bool_set ("ADCR MIXER Line Switch", 0);
-    alsa_bool_set ("ADCL MIXER Line Switch", 1);
-    alsa_bool_set ("ADCR MIXER Line Switch", 1);
-
-    alsa_int_set ("AD Analog Volume", 22);
-    return (0);
-  }
-  int gs2_digital_input_off () {
-    alsa_bool_set ("ADCL MIXER Line Switch", 0);
-    alsa_bool_set ("ADCR MIXER Line Switch", 0);
-    return (0);
-  }
-
-    // GT-N7100 Note2:
-    // FM Left     IN2RP       OK but popping
-    // FM Right    IN2RN       Very Low
-    // GT-I9300 Galaxy S3:
-    //FM Left     IN2RP
-    //FM Right    IN2RN
-
-    //FM Left IN2RP -> MIXINL via RXVOICE:
-    //RXVOICE = IN2RP (FM Left) - IN2LP (EAR_MIC_N)
-    //-> MIXINL / MIXINR:     6 steps:    -12, -9, -6, -3, 0, +3, +6
-
-    //- FM Right IN2RN -> MIXINR via IN2R PGA:
-    //IN2R = -16.5 to +30 * ( 0/IN2RP (FM Left) - 0/IN2RN (FM Right) )
-    //-> MIXINR:  0, +30      = -16.5 to +30 or  13.5 to +60                  */
-
-#define NOTE2_1_CHANNEL_LOW_HACK
-#ifdef NOTE2_1_CHANNEL_LOW_HACK
-  static char * codec_reg          = "/sys/kernel/debug/asoc/T0_WM1811/wm8994-codec/codec_reg";
-  static char * codec_reg_esc      = "/sys/kernel/debug/asoc/T0_WM1811/wm8994-codec/codec_reg";    // Space Escaped
-
-  static char * codec_reg_omni     = "/sys/kernel/debug/asoc/Midas_WM1811/wm8994-codec/codec_reg";  // OmniROM 9300 has codec_reg_sa44, but read-only.
-  static char * codec_reg_cm11     = "/sys/kernel/debug/asoc/T0_WM1811/wm8994-codec/codec_reg";
-
-//Read-only on Nameless Lollipop:
-  static char * codec_reg_sa44     = "/sys/devices/platform/soc-audio/WM8994 AIF1/codec_reg";      // Only access on stock, additional on CM11 unofficial for N7100
-  static char * codec_reg_sa44_esc = "/sys/devices/platform/soc-audio/WM8994\\ AIF1/codec_reg";     // Space Escaped
-
-  int is_note2_set = 0;
-  int is_note2_val = 0;
-  int is_note2 () {
-    if (is_note2_set)
-      return (is_note2_val);
-
-    is_note2_val = 0;
-    prop_buf_get ("ro.product.device",           product_device_prop_buf);
-
-    if (! strncasecmp (product_device_prop_buf, "T03G",     strlen ("T03G")))     // Galaxy Note2 3G
-      is_note2_val = 1;
-    else if (! strncasecmp (product_device_prop_buf, "GT-N71",   strlen ("GT-N71")))
-      is_note2_val = 1;
-    else if (! strncasecmp (product_device_prop_buf, "GALAXYN71",strlen ("GALAXYN71")))
-      is_note2_val = 1;
-
-    loge ("is_note2_val: %d", is_note2_val);
-    is_note2_set = 1;
-    return (is_note2_val);
-  }  
-#endif
-
-  int gs3_digital_input_on () {
-
-    //Right:
-    alsa_int_set ("MIXINR IN2R Volume", 0);                       // +0         Default = 1
-    alsa_int_set ("IN2R Volume", 15); // STUCK low bug  Default = 11                            // 0-31 : +6        15 is actually max, not 31  Total right: 0 + 6 = +6 db
-
-    alsa_bool_set ("MIXINR IN2R Switch", 1);
-
-    alsa_bool_set ("MIXINR IN1R Switch", 0);    // Needed for Camcorder mic
-
-    //alsa_int_set ("MIXINL IN2L Volume", 0);   //!!!!
-
-    alsa_bool_set ("IN2R PGA IN2RP Switch", 0);                    // Off, or would be FM Left - FM Right
-//    alsa_bool_set ("IN2R PGA IN2RN Switch", 1);                    // On for -FM Right
-//    alsa_bool_set ("IN2R Switch", 1);                              // Added because was off on stock XXEMA2, but same as power on default.
-
-
-        //Left:
-    alsa_int_set ("MIXINL Direct Voice Volume", 7);               // Highest (+1) = +6 db on left ?? 7 is louder than "Max" of 6 ?
-    alsa_bool_set ("MIXINL IN1L Switch", 0);
-    alsa_bool_set ("MIXINL IN2L Switch", 0);
-
-    alsa_bool_set ("AIF1ADC1 HPF Switch", 0);   // Or "AIF1ADC1 HPF Mode" = 0 = HiFi
-
-
-    alsa_enum_set ("AIF1ADCL Source", 0);
-    alsa_enum_set ("AIF1ADCR Source", 1);       // !! Set to Left (0) on recent KK/LOL ROMs January 2015
-
-#ifdef NOTE2_1_CHANNEL_LOW_HACK
-    if (file_get (codec_reg_omni)) {
-       codec_reg    = codec_reg_omni;
-       codec_reg_esc= codec_reg_omni;
-    }
-    else if (file_get (codec_reg_cm11)) {
-       codec_reg    = codec_reg_cm11;
-       codec_reg_esc= codec_reg_cm11;
-    }
-    else if (file_get (codec_reg_sa44)) {
-       codec_reg    = codec_reg_sa44;
-       codec_reg_esc= codec_reg_sa44_esc;
+    else if (! strcasecmp (key, "audio_alsa_log")) {
+      loge ("Got audio_alsa_log");
+      itoa (alsa_control_log (atoi (val)), res_buf, 10);
     }
 
-    if (is_note2 () && file_get (codec_reg)) {                    // !! Should verify N7100 better, but should be benign anyway
-      if (file_get (codec_reg_omni))
-        cached_sys_run ("echo -n    2 2320 > /sys/kernel/debug/asoc/Midas_WM1811/wm8994-codec/codec_reg 2>/dev/null ; echo -n   18  116 > /sys/kernel/debug/asoc/Midas_WM1811/wm8994-codec/codec_reg 2>/dev/null");
-      else if (file_get (codec_reg_cm11))
-        cached_sys_run ("echo -n    2 2320 > /sys/kernel/debug/asoc/T0_WM1811/wm8994-codec/codec_reg    2>/dev/null ; echo -n   18  116 > /sys/kernel/debug/asoc/T0_WM1811/wm8994-codec/codec_reg    2>/dev/null");
+    else if (! strcasecmp (key, "audio_alsa_bool")) {
+      p2 = param2_get (val);                                            // val now ASCIIZ terminated for param1
+      if (p2 == NULL)
+        itoa (alsa_bool_get (val,        -1), res_buf, 10);
       else
-        cached_sys_run ("echo -n    2 2320 > /sys/devices/platform/soc-audio/WM8994\\ AIF1/codec_reg    2>/dev/null ; echo -n   18  116 > /sys/devices/platform/soc-audio/WM8994\\ AIF1/codec_reg    2>/dev/null");
-      sys_commit ();
+        itoa (alsa_bool_set (val, atoi (p2)), res_buf, 10);
     }
-#endif
-    return (0);
-  }
-  int gs3_digital_input_off () {                                     // Set back to assumed defaults
-    //alsa_bool_set ("MIXINR IN2R Switch", 0);
-    return (0);
-  }
-
-  int lg2_digital_input_on () {
-    alsa_enum_set ("FM Radio", 0);
-    alsa_bool_set ("MultiMedia1 Mixer TERT_MI2S_TX", 1);
-    alsa_bool_set ("MultiMedia1 Mixer SLIM_0_TX", 0);                 // Turn off microphone path
-    return (-1);
-  }
-  int lg2_digital_input_off () {
-    alsa_bool_set ("MultiMedia1 Mixer TERT_MI2S_TX", 0);
-    alsa_bool_set ("MultiMedia1 Mixer SLIM_0_TX", 1);
-    return (-1);
-  }
-
-
-  int one_digital_input_on () {
-    alsa_bool_set ("MultiMedia1 Mixer PRI_TX", 1);
-    alsa_bool_set ("MultiMedia1 Mixer SLIM_0_TX", 0);                 // Turn off microphone path
-    ms_sleep (101);
-    return (-1);
-  }
-  int one_digital_input_off () {
-    alsa_bool_set ("MultiMedia1 Mixer PRI_TX", 0);
-    ms_sleep (101);
-    return (-1);
-  }
-
-  int qcv_digital_input_on () {
-    if (s2_tx) {
-      alsa_bool_set ("SLIMBUS_0_RX Audio Mixer MultiMedia1", 0);    // Wired headset audio off
-      alsa_bool_set ("INTERNAL_FM_RX Audio Mixer MultiMedia1", 1);
-      alsa_bool_set ("INTERNAL_FM_RX Audio Mixer MultiMedia4", 1);
-      alsa_bool_set ("INTERNAL_FM_RX Audio Mixer MultiMedia5", 1);
-      return (0);
+    else if (! strcasecmp (key, "audio_alsa_enum")) {
+      p2 = param2_get (val);                                            // val now ASCIIZ terminated for param1
+      if (p2 == NULL)
+        itoa (alsa_enum_get (val,        -1), res_buf, 10);
+      else
+        itoa (alsa_enum_set (val, atoi (p2)), res_buf, 10);
     }
-    alsa_bool_set ("MultiMedia1 Mixer INTERNAL_FM_TX", 1);
-    alsa_bool_set ("MultiMedia1 Mixer SLIM_0_TX", 0);                 // Turn off microphone path
-    ms_sleep (101);
-    return (0);
-  }
-  int qcv_digital_input_off () {
-    if (s2_tx) {
-      alsa_bool_set ("SLIMBUS_0_RX Audio Mixer MultiMedia1", 1);    // Wired headset audio on
-      return (0);
+    else if (! strcasecmp (key, "audio_alsa_long")) {
+      p2 = param2_get (val);                                            // val now ASCIIZ terminated for param1
+      if (p2 == NULL)
+        itoa (alsa_long_get (val,        -1), res_buf, 10);
+      else
+        itoa (alsa_long_set (val, atoi (p2)), res_buf, 10);
     }
-    alsa_bool_set ("MultiMedia1 Mixer INTERNAL_FM_TX", 0);
-    ms_sleep (101);
-    return (0);
-  }
 
-
-
-  int xz2_digital_input_on () {
-
-//   <path name="capture-fm">
-      alsa_bool_set ("AIF1_CAP Mixer SLIM TX7", 1);       //          Connect Analog Interface 1  to SLIMBus TX 7
-      alsa_enum_set ("SLIM TX7 MUX", 9);                  // DEC2     Connect SLIMBus TX 7 Mux    to Decimator 2
-      alsa_enum_set ("DEC2 MUX", 2);                      // ADC5     Connect Decimator 2         to ADC 5
-      alsa_int_set ("DEC2 Volume", 80);//83);             // 80       Set     Decimator 1 Volume                  !! default 84 distorts on CM11
-      alsa_int_set ("ADC5 Volume", 4);                    // 4        Set     ADC 5 Volume
-
-      alsa_bool_set ("AIF1_CAP Mixer SLIM TX8", 1);       //          Connect Analog Interface 1  to SLIMBus TX 7
-      alsa_enum_set ("SLIM TX8 MUX", 8);                  // DEC1     Connect SLIMBus TX 8 Mux to Decimator 1
-      alsa_enum_set ("DEC1 MUX", 2);                      // ADC6     Connect Decimator 1         to ADC 6
-      alsa_int_set ("DEC1 Volume", 80);//83);             // 80       Set     Decimator 1 Volume                  !! default 84 distorts on CM11
-      alsa_int_set ("ADC6 Volume", 4);                    // 4        Set     ADC 5 Volume
-
-      alsa_enum_set ("SLIM_0_TX Channels", 1);            // 2/Stereo Set SLIMBus TX channels
-
-     ms_sleep (101);
-
-    alsa_bool_set ("MultiMedia1 Mixer SLIM_0_TX", 1);
-    alsa_bool_set ("MultiMedia1 Mixer SLIM_0_TX", 0);
-    alsa_bool_set ("MultiMedia1 Mixer SLIM_0_TX", 1);
-
-    return (0);
-  }
-
-  int xz2_digital_input_off () {
-
-    alsa_bool_set ("MultiMedia1 Mixer SLIM_0_TX", 0);
-
-    return (0);
-  }
-
-  int dev_digital_input_on () {
-    if (tnr_funcs != NULL)                               // !!!! Should go at end !!!!
-      tnr_funcs->resume         (NULL);                                 // UnMute
-    switch (curr_radio_device_int) {
-      case DEV_UNK: return (-1);
-      case DEV_GEN: return (-1);
-      case DEV_GS1: return (gs1_digital_input_on ());
-      case DEV_GS2: return (gs2_digital_input_on ());
-      case DEV_GS3: return (gs3_digital_input_on ());
-      case DEV_QCV: return (qcv_digital_input_on ());
-      case DEV_ONE: return (one_digital_input_on ());
-      case DEV_LG2: return (lg2_digital_input_on ());
-      case DEV_XZ2: return (xz2_digital_input_on ());
+    else if (! strcasecmp (key, "tuner_acdb")) {                        // If Tuner ACDB...
+      //loge ("GOT tuner_acdb: %d", acdb_disable ());
     }
-    return (-1);
+
+    else if (! strcasecmp (key, "service_device")) {                    // If service_device...
+      logd ("key_set service_device_set: %d", ret = curr_service_device_int = service_device_set (sval = atoi (val)));
+      if (ret == sval)
+        strncpy (curr_service_device, val,  sizeof (curr_service_device));
+    }
+
+    else if (! strcasecmp (key, "tuner_mode")) {                        // If Tuner Mode...
+      if (! strcasecmp (val, "Transmit"))
+        logd ("key_set tuner_mode transmit: %d", ret = curr_tuner_mode_int = tnr_funcs->tnr_tuner_mode_sg (sval = 1));
+      else if (! strcasecmp (val, "Receive"))
+        logd ("key_set tuner_mode receive:  %d", ret = curr_tuner_mode_int = tnr_funcs->tnr_tuner_mode_sg (sval = 0));
+      if (ret == sval)
+        strncpy (curr_tuner_mode, val,  sizeof (curr_tuner_mode));
+    }
+
+    else if (! strcasecmp (key, "tuner_api_mode")) {                    // If Tuner API Mode...
+      if (! strcasecmp (val, "UART"))
+        logd ("key_set tuner_api_mode UART: %d", ret = curr_tuner_api_mode_int = tnr_funcs->tnr_tuner_api_mode_sg (sval = 0));
+      else if (! strcasecmp (val, "SHIM"))
+        logd ("key_set tuner_api_mode SHIM: %d", ret = curr_tuner_api_mode_int = tnr_funcs->tnr_tuner_api_mode_sg (sval = 1));
+      if (ret == sval)
+        strncpy (curr_tuner_api_mode, val,  sizeof (curr_tuner_api_mode));
+    }
+
+    else if (! strcasecmp (key, "tuner_api_state")) {                   // If Tuner API State...
+      if (! strcasecmp (val, "Start"))
+        logd ("key_set tuner_api_state start: %d", ret = curr_tuner_api_state_int = tnr_funcs->tnr_tuner_api_state_sg (sval = 1));
+      else if (! strcasecmp (val, "Stop")) {
+        logd ("key_set tuner_api_state stop:  %d", ret = curr_tuner_api_state_int = tnr_funcs->tnr_tuner_api_state_sg (sval = 0));
+        gen_server_exiting = 1;
+      }
+      if (ret == sval)
+        strncpy (curr_tuner_api_state, val,  sizeof (curr_tuner_api_state));
+    }
+
+
+    // Remaining set commands require valid curr_service_device_int:
+
+    else if (! DEVICE_KNOWN) {
+      loge ("key_set ! DEVICE_KNOWN");
+    }
+
+        // Audio:
+    else if (! strcasecmp (key, "audio_state")) {                       // Audio State
+      logd ("key_set audio_state: %s", audio_state_set (val));
+    }
+    else if (! strcasecmp (key, "audio_mode")) {                        // Audio Mode
+      logd ("key_set audio_mode: %s", audio_mode_set (val));
+    }
+
+        // Tuner:
+
+    else if (! strcasecmp (key, "tuner_state")) {                       // Tuner State
+      if (! strcasecmp (val, "Start")) {                                // If Start...
+        logd ("key_set tuner_state_sg Start: %d", ret = curr_tuner_state_int = tnr_funcs->tnr_tuner_state_sg (sval = 1));
+      }
+      else if (! strcasecmp (val, "Stop")) {                            // If Stop...
+        //gen_server_exiting = 1;
+        logd ("key_set tuner_state_sg Stop: %d",  ret = curr_tuner_state_int = tnr_funcs->tnr_tuner_state_sg (sval = 0));
+      }
+      if (ret == sval)
+        strncpy (curr_tuner_state, val,  sizeof (curr_tuner_state));
+    }
+
+    else if (! strcasecmp (key, "tuner_band")) {                        // If Tuner Band...
+      if (! strcasecmp (val, "EU"))                                     // If EU...
+        logd ("key_set tuner_band_sg Start: %d", ret = curr_tuner_band_int = tnr_funcs->tnr_tuner_band_sg (sval = 0));
+      else if (! strcasecmp (val, "US"))                                // If US...
+        logd ("key_set tuner_band_sg Stop: %d",  ret = curr_tuner_band_int = tnr_funcs->tnr_tuner_band_sg (sval = 1));
+      if (ret == sval) {
+        strncpy (curr_tuner_band, val,  sizeof (curr_tuner_band));
+        curr_tuner_freq_inc_int = 100;
+        if (sval == 1)
+          curr_tuner_freq_inc_int = 200;
+      }
+    }
+
+    else if (! strcasecmp (val, "tuner_mute")) {                        // If Tuner Mute...
+      if (! strcasecmp (val, "Mute"))                                   // If Mute...
+        logd ("key_set tuner_mute_sg Start: %d", ret = curr_tuner_mute_int = tnr_funcs->tnr_tuner_mute_sg (sval = 1));
+      else if (! strcasecmp (val, "Unmute"))                            // If Unmute...
+        logd ("key_set tuner_mute_sg Stop: %d",  ret = curr_tuner_mute_int = tnr_funcs->tnr_tuner_mute_sg (sval = 0));
+      if (ret == sval)
+        strncpy (curr_tuner_mute, val,  sizeof (curr_tuner_mute));
+    }
+
+    else if (! strcasecmp (key, "tuner_seek_state")) {                  // If Tuner Seek State...
+      if (! strcasecmp (val, "Up"))
+        logd ("key_set tuner_seek_state up:   %d", ret = curr_tuner_seek_state_int = tnr_funcs->tnr_tuner_seek_state_sg (sval = 1));
+      else if (! strcasecmp (val, "Down"))
+        logd ("key_set tuner_seek_state down: %d", ret = curr_tuner_seek_state_int = tnr_funcs->tnr_tuner_seek_state_sg (sval = 2));
+      else if (! strcasecmp (val, "Stop"))
+        logd ("key_set tuner_seek_state stop: %d", ret = curr_tuner_seek_state_int = tnr_funcs->tnr_tuner_seek_state_sg (sval = 0));
+      if (ret == sval)
+        strncpy (curr_tuner_seek_state, val,  sizeof (curr_tuner_seek_state));
+    }
+    else if (! strcasecmp (key, "tuner_rds_state")) {                   // If Tuner RDS State...
+      if (! strcasecmp (val, "Start"))                                  // Start
+        logd ("key_set tuner_rds_state_sg: %d", ret = curr_tuner_rds_state_int = tnr_funcs->tnr_tuner_rds_state_sg (sval = 1));
+      else if (! strcasecmp (val, "Stop"))                              // Stop
+        logd ("key_set tuner_rds_state_sg: %d", ret = curr_tuner_rds_state_int = tnr_funcs->tnr_tuner_rds_state_sg (sval = 0));
+      if (ret == sval)
+        strncpy (curr_tuner_rds_state, val,  sizeof (curr_tuner_rds_state));
+    }
+    else if (! strcasecmp (key, "tuner_rds_af_state")) {                // Tuner RDS AF State
+      if (! strcasecmp (val, "Start"))                                  // Start
+        logd ("key_set tuner_rds_af_state_sg: %d", ret = curr_tuner_rds_af_state_int = tnr_funcs->tnr_tuner_rds_af_state_sg (sval = 1));
+      else if (! strcasecmp (val, "Stop"))                              // Stop
+        logd ("key_set tuner_rds_af_state_sg: %d", ret = curr_tuner_rds_af_state_int = tnr_funcs->tnr_tuner_rds_af_state_sg (sval = 0));
+      if (ret == sval)
+        strncpy (curr_tuner_rds_af_state, val,  sizeof (curr_tuner_rds_af_state));
+    }
+    else if (! strcasecmp (key, "tuner_stereo")) {                      // Tuner Stereo
+      if (! strcasecmp (val, "Stereo"))                                 // Stereo
+        logd ("key_set tuner_stereo_sg: %d", ret = curr_tuner_stereo_int = tnr_funcs->tnr_tuner_stereo_sg (sval = 1));
+      else if (! strcasecmp (val, "Mono"))                              // Mono
+        logd ("key_set tuner_stereo_sg: %d", ret = curr_tuner_stereo_int = tnr_funcs->tnr_tuner_stereo_sg (sval = 0));
+      if (ret == sval)
+        strncpy (curr_tuner_stereo, val,  sizeof (curr_tuner_stereo));
+    }
+
+    else if (! strcasecmp (key, "tuner_freq")) {                        // Tuner Freq
+      logd ("key_set tuner_freq_sg: %d", ret = curr_tuner_freq_int = tnr_funcs->tnr_tuner_freq_sg (sval = atoi (val)));
+      if (ret == sval)
+        strncpy (curr_tuner_freq, val,  sizeof (curr_tuner_freq));
+    }
+    else if (! strcasecmp (key, "tuner_vol")) {                         // Tuner Vol
+      /*if (curr_service_device_int == DEV_GS1)                           // GS1 volume controlled by chip
+        logd ("key_set tuner_vol -> audio_ana_vol: %d", ret = curr_tuner_vol_int = tnr_funcs->tnr_tuner_vol_sg (sval = atoi (val)));
+      else*/
+        logd ("key_set tuner_vol -> audio_ana_vol: %d", ret = curr_tuner_vol_int =           audio_ana_vol_set (sval = atoi (val)));
+      if (ret == sval)
+        strncpy (curr_tuner_vol, val,  sizeof (curr_tuner_vol));
+    }
+    else if (! strcasecmp (key, "tuner_thresh")) {                      // Tuner Thresh
+      logd ("key_set tuner_thresh_sg: %d", ret = curr_tuner_thresh_int = tnr_funcs->tnr_tuner_thresh_sg (sval = atoi (val)));
+      if (ret == sval)
+        strncpy (curr_tuner_thresh, val,  sizeof (curr_tuner_thresh));
+    }
+    else if (! strcasecmp (key, "tuner_rds_pi")) {                      // Tuner RDS PI
+      strncpy (curr_tuner_rds_pi, val,  sizeof (curr_tuner_rds_pi));
+      logd ("key_set tuner_rds_pi_sg: %d", ret = curr_tuner_rds_pi_int = tnr_funcs->tnr_tuner_rds_pi_sg (sval = atoi (val)));
+      if (ret == sval)
+        strncpy (curr_tuner_rds_pi, val,  sizeof (curr_tuner_rds_pi));
+    }
+    else if (! strcasecmp (key, "tuner_rds_pt")) {                      // Tuner RDS PT
+      strncpy (curr_tuner_rds_pt, val,  sizeof (curr_tuner_rds_pt));
+      logd ("key_set tuner_rds_pt_sg: %d", ret = curr_tuner_rds_pt_int = tnr_funcs->tnr_tuner_rds_pt_sg (sval = atoi (val)));
+      if (ret == sval)
+        strncpy (curr_tuner_rds_pt, val,  sizeof (curr_tuner_rds_pt));
+    }
+
+    else if (! strcasecmp (key, "tuner_rds_ps")) {                      // Tuner RDS PS
+      logd ("key_set tuner_rds_ps_set: %s", pret = tnr_funcs->tnr_tuner_rds_ps_sg (val));
+      if (pret)
+        strncpy (curr_tuner_rds_ps, pret,  sizeof (curr_tuner_rds_ps));
+    }
+    else if (! strcasecmp (key, "tuner_rds_rt")) {                      // Tuner RDS RT
+      logd ("key_set tuner_rds_rt_set: %s", pret = tnr_funcs->tnr_tuner_rds_rt_sg (val));
+      if (pret)
+        strncpy (curr_tuner_rds_rt, pret,  sizeof (curr_tuner_rds_rt));
+    }
+
+    else if (! strcasecmp (key, "tuner_extension")) {                   // Tuner Extension
+      logd ("key_set tuner_extension_sg: %d", pret = tnr_funcs->tnr_tuner_extension_sg (val));
+      if (pret)
+        strncpy (curr_tuner_extension, pret,  sizeof (curr_tuner_extension));
+    }
+
+    if (pret)                                                           // If pointer return not NULL...
+      return (0);//-321);
+    else    
+      return (ret);
   }
-  int dev_digital_input_off () {
+
+    // Generic server function that deals with commands and returns a response:
+  int gen_server_loop_func (unsigned char * cmd_buf, int cmd_len, unsigned char * res_buf, int res_max) {
+
+    if (res_buf == NULL) {
+      loge ("gen_server_loop_func res_buf == NULL: %p", res_buf);
+      return (-99);
+    }
+
+    strncpy (res_buf, "-543", res_max);                                 // Default for unknown command and other fatal errors
+
+    if (ena_log_s2d_cmd && cmd_buf != NULL)
+      logd ("gen_server_loop_func start res_max: %d  cmd_len: %d  cmd_buf: \"%s\"", res_max, cmd_len, cmd_buf);
+    else if (cmd_buf == NULL) {
+      loge ("gen_server_loop_func start res_max: %d  cmd_len: %d  cmd_buf: %p", res_max, cmd_len, cmd_buf);
+      strncpy (res_buf, "cmd_buf == NULL", res_max);
+      return (strlen (res_buf));
+    }
+
+    if (strlen (cmd_buf) < 1) {                                         // Error for short line
+      strncpy (res_buf, "Short command", res_max);
+      loge ("gen_server_loop_func: %s", res_buf);
+      return (strlen (res_buf));
+    }
+
+    int ret = 0;
+    char * key = & cmd_buf [0];                                         // Pointer to key   passed to us: starts at 2nd word, 3rd character
+    char * val = & cmd_buf [1];                                         // Pointer to value passed to us: add size of key (sky) later when determined
+
+    int len_left = strlen (val);
+    int is_set = 0;
+    int ctr = 0;
+    for (ctr = 0; ctr < len_left - 1; ctr ++) {                         // Only look for space to 2nd last character, to leave room for a 1 character value
+      if (val [ctr] == ' ') {
+        val [ctr] = 0;                                                  // Null terminate for key
+        is_set = 1;                                                     // Have a value, so this is a set
+        val = & val [ctr + 1];                                          // Point after space
+        break;
+      }
+    }
+    if (is_set) {                                                       // If a SET (and get) operation
+      if (ena_log_s2d_cmd)
+        logd ("gen_server_loop_func prior to key_set key: %s  val: %s", key, val);
+
+      ret = key_set (key, res_buf, res_max, val);                       // SET value
+
+      if (ena_log_s2d_cmd)
+        logd ("gen_server_loop_func after    key_set key: %s  val: %s  ret: %d", key, val, ret);
+    }
+    else {                                                              // Else if just a GET operation
+      if (ena_log_s2d_cmd)
+        logd ("gen_server_loop_func prior to get key: %s", key);
+    }
+
+    int res_len = key_get (key, res_buf, res_max, val);                 // GET value: (And do SET Response)
+
+    if (res_len >= 0) {
+      int asciiz_idx = res_len + 1;
+      if (asciiz_idx > res_max - 1) {
+        asciiz_idx = res_max - 1;
+        loge ("asciiz_idx > res_max - 1");
+      }
+      res_buf [asciiz_idx] = 0;
+    }
+
+    if (ena_log_s2d_cmd)
+      logd ("gen_server_loop_func after    key_get key: %s  res_len: %d  res_buf: \"%s\"", key, res_len, res_buf);
+
+    return (res_len);                                                   // Return size of result
+  }
+
+    // Generic Server code calls every 100+ ms or so. Polling is MUCH more reliable than threading in Android Bionic C-look alike...
+    // Equivalent tuner plugin function is called for plugin to do it's pollawable work
+  int gen_server_poll_func (int poll_ms) {
+    int ret = 0;
+
+    if (ena_log_verbose_tshoot)
+      logd ("gen_server_poll_func before tnr_funcs->tnr_tuner_event_sg poll_ms: %d  tnr_funcs: %p", poll_ms, tnr_funcs);
+
     if (tnr_funcs != NULL)
-      tnr_funcs->pause2 (NULL);                                 // Mute
-    switch (curr_radio_device_int) {
-      case DEV_UNK: return (-1);
-      case DEV_GEN: return (-1);
-      case DEV_GS1: return (gs1_digital_input_off ());
-      case DEV_GS2: return (gs2_digital_input_off ());
-      case DEV_GS3: return (gs3_digital_input_off ());
-      case DEV_QCV: return (qcv_digital_input_off ());
-      case DEV_ONE: return (one_digital_input_off ());
-      case DEV_LG2: return (lg2_digital_input_off ());
-      case DEV_XZ2: return (xz2_digital_input_off ());
-    }
-    return (-1);
-  }
+      ret = tnr_funcs->tnr_tuner_event_sg (NULL);//poll_ms);
 
-  int chmod_need = 1;
-  char * set_radio_dai_state (char * dai_state) {
-    if (! strncasecmp (dai_state, "Start", 5))
-      logd ("dai Start: %d", dev_digital_input_on ());
-    else if (! strncasecmp (dai_state, "Stop", 4))
-      logd ("dai Stop: %d", dev_digital_input_off ());
-    else
-      logd ("dai Unknown: %s", dai_state);
+    if (ena_log_verbose_tshoot)
+      logd ("gen_server_poll_func after  tnr_funcs->tnr_tuner_event_sg poll_ms: %d  tnr_funcs: %p", poll_ms, tnr_funcs);
 
-    return (dai_state);
-  }
-
-  int server_work_func (unsigned char * cmd_buf, int cmd_len, unsigned char * res_buf, int res_max) {
-
-    if (ena_log_s2d_cmd)
-      logd ("server_work_func cmd_len: %d  cmd_buf: \"%s\"", cmd_len, cmd_buf);
-    int res_len = tuner_server_work_func (cmd_buf, cmd_len, res_buf, res_max);
-
-    if (ena_log_s2d_cmd)
-      logd ("res_len: %d  res_buf: \"%s\"", res_len, res_buf);
-    return (res_len);
+    return (ret);
   }
 
 
-  int tuner_server_work_func (unsigned char * cmd_buf, int cmd_len, unsigned char * res_buf, int res_max) {
+    // Main client and server code:
 
-    int terminate = 0;
+  char * binary_description = /*"Mike's really cool*/ "Spirit2 FM Receiver/Transmitter daemon version: ";
+  char * s2d_running_file = "/dev/s2d_running";
 
-      int ret = 0;
-      char key [DEF_BUF] = {0};
-      size_t klen = 0;
-      char * ckey = & cmd_buf [2];    // Command/compare key
-
-      if (cmd_buf == NULL) {
-        loge ("!!!!!!!!!!!!");
-      }
-      else if (cmd_buf [0] == 'q') {                                       // Quit
-        terminate = 1;
-      }
-      else if (cmd_buf [0] == 'z') {                                       // Sleep
-        int secs = 1;
-        if (strlen (cmd_buf) > 2)
-          secs = atoi (ckey);
-        sleep (secs);
-      }
-      else if (strlen (cmd_buf) < 3) {                                     // Ignore short lines that aren't 'q' or 'z'
-      }
-
-        // SET:
-      if (cmd_buf != NULL && strlen (cmd_buf) > 2 && cmd_buf [0] == 's') {       // Set
-
-        char * val = & cmd_buf [3];                                     // "s key value"    val = address of "key" ; add klen later when determined
-        char cval [DEF_BUF] = {0};                                      // Compare value filled in when testing each possible value, for defined states
-        size_t clen = 0;
-
-        if (strcpy (key, "tuner_band") && (klen = strlen (key)) && ! strncmp (ckey, key, klen)) {       // Tuner Band USED TO HAVE TO be set before Tuner State Start
-          val += klen;
-          if (strcpy (cval, "EU") && (clen = strlen (cval)) && ! strncasecmp (val, cval, clen))         // EU
-            freq_inc = 100;
-          else if (strcpy (cval, "US") && (clen = strlen (cval)) && ! strncasecmp (val, cval, clen))    // US
-            freq_inc = 200;
-          else
-            cval [0] = 0;
-          if (cval [0]) {
-            strncpy (curr_tuner_band, cval,  sizeof (curr_tuner_band));
-            //logd ("set_band: %d", tnr_funcs->set_band (NULL, atoi (val + klen)));         freq_inc used in tuner start
-
-            if (tuner_initialized && tnr_funcs) {
-              if (freq_inc < 200)                                       // If EU band...
-                tnr_funcs->send_extra_command (NULL, "990", NULL, NULL);
-              else
-                tnr_funcs->send_extra_command (NULL, "991", NULL, NULL);
-            }
-
-          }
-        }
-        else if (strcpy (key, "tuner_state") && (klen = strlen (key)) && ! strncmp (ckey, key, klen)) {   // Tuner State
-          val += klen;
-          if (strcpy (cval, "Start") && (clen = strlen (cval)) && ! strncasecmp (val, cval, clen)) {   // Start
-            ret = 0;
-            if (tuner_initialized == 0) {
-              ret = tuner_init ();
-              if (ret)
-                loge ("tuner_init: %d", ret);
-              else
-                logd ("tuner_init: %d", ret);
-            }
-            int def_freq = 106100;
-            if (s2_tx)
-              def_freq = 107300;
-            if (ret == 0)
-              logd ("rx_start: %d", ret = tnr_funcs->rx_start (NULL, g_cbp, 87500, 108000, def_freq, freq_inc));      // Start receive: Enable API, power on chip, start rx_thread
-            if (ret != 0)
-              strncpy (cval, "Stop", sizeof (cval));
-          }
-          else if (tuner_initialized && strcpy (cval, "Stop") && (clen = strlen (cval)) && ! strncasecmp (val, cval, clen))      // Stop
-            terminate = 1;
-          else if (tuner_initialized && strcpy (cval, "pause2") && (clen = strlen (cval)) && ! strncasecmp (val, cval, clen))     // pause2
-            logd ("pause2: %d", tnr_funcs->pause2 (NULL));
-          else if (tuner_initialized && strcpy (cval, "Resume") && (clen = strlen (cval)) && ! strncasecmp (val, cval, clen))    // Resume
-            logd ("resume: %d", tnr_funcs->resume (NULL));
-          else
-            cval [0] = 0;
-          if (cval [0])
-            strncpy (curr_tuner_state, cval,  sizeof (curr_tuner_state));
-        }
-        else if (tuner_initialized == 0) {  // Remaining set commands require tuner_initialized:
-        }
-        else if (strcpy (key, "tuner_scan_state") && (klen = strlen (key)) && ! strncmp (ckey, key, klen)) {// Tuner Scan State
-          val += klen;
-          if (strcpy (cval, "Up") && (clen = strlen (cval)) && ! strncasecmp (val, cval, clen))
-            logd ("scan: %d", ret = tnr_funcs->scan (NULL, 1));
-          else if (strcpy (cval, "Down") && (clen = strlen (cval)) && ! strncasecmp (val, cval, clen))
-            logd ("scan: %d", ret = tnr_funcs->scan (NULL, 0));
-          else if (strcpy (cval, "Stop") && (clen = strlen (cval)) && ! strncasecmp (val, cval, clen))
-            logd ("stop_scan: %d", ret = tnr_funcs->stop_scan (NULL));
-          else
-            cval [0] = 0;
-          if (cval [0])
-            strncpy (curr_tuner_scan_state, cval,  sizeof (curr_tuner_scan_state));
-        }
-        else if (strcpy (key, "tuner_rds_state") && (klen = strlen (key)) && ! strncmp (ckey, key, klen)) {// Tuner RDS State
-          val += klen;
-          int rds = 0;
-          if (strcpy (cval, "Start") && (clen = strlen (cval)) && ! strncasecmp (val, cval, clen))     // Start
-            rds = 1;
-          else if (strcpy (cval, "Stop") && (clen = strlen (cval)) && ! strncasecmp (val, cval, clen))     // Stop
-            rds = 0;
-          else
-            cval [0] = 0;
-          if (cval [0]) {
-            strncpy (curr_tuner_rds_state, cval,  sizeof (curr_tuner_rds_state));
-            logd ("set_rds_reception: %d", ret = tnr_funcs->set_rds_reception (NULL, rds));
-          }
-        }
-        else if (strcpy (key, "tuner_rds_af_state") && (klen = strlen (key)) && ! strncmp (ckey, key, klen)) {// Tuner RDS AF State
-          val += klen;
-          int af = 0;
-          if (strcpy (cval, "Start") && (clen = strlen (cval)) && ! strncasecmp (val, cval, clen))     // Start
-            af = 1;
-          else
-            cval [0] = 0;
-          if (cval [0]) {
-            strncpy (curr_tuner_rds_af_state, cval,  sizeof (curr_tuner_rds_af_state));
-            logd ("set_automatic_af_switching: %d", ret = tnr_funcs->set_automatic_af_switching (NULL, af));
-          }
-        }
-        else if (strcpy (key, "tuner_stereo") && (klen = strlen (key)) && ! strncmp (ckey, key, klen)) {
-          val += klen;
-          if (strcpy (cval, "Stereo") && (clen = strlen (cval)) && ! strncasecmp (val, cval, clen))     // Stereo
-            logd ("set_force_mono 0: %d", tnr_funcs->set_force_mono (NULL, 0));
-          else if (strcpy (cval, "Mono") && (clen = strlen (cval)) && ! strncasecmp (val, cval, clen))     // Mono
-            logd ("set_force_mono 1: %d", tnr_funcs->set_force_mono (NULL, 1));
-          else
-            cval [0] = 0;
-          if (cval [0])
-            strncpy (curr_tuner_stereo, cval,  sizeof (curr_tuner_stereo));
-        }
-        else if (strcpy (key, "tuner_freq") && (klen = strlen (key)) && ! strncmp (ckey, key, klen)) {
-          val += klen;
-          logd ("set_frequency: %d", tnr_funcs->set_frequency (NULL, atoi (val)));
-          curr_tuner_freq_int = atoi (val);
-          strncpy (curr_tuner_freq, val,  sizeof (curr_tuner_freq));
-        }
-        else if (strcpy (key, "tuner_thresh") && (klen = strlen (key)) && ! strncmp (ckey, key, klen)) {
-          val += klen;
-          logd ("set_threshold: %d", tnr_funcs->set_threshold (NULL, atoi (val)));
-          strncpy (curr_tuner_thresh, val,  sizeof (curr_tuner_thresh));
-        }
-        else if (strcpy (key, "tuner_extra_cmd") && (klen = strlen (key)) && ! strncmp (ckey, key, klen)) {
-          val += klen;
-          logd ("send_extra_command: %d", tnr_funcs->send_extra_command (NULL, val, NULL, NULL));
-          strncpy (curr_tuner_extra_cmd, val,  sizeof (curr_tuner_extra_cmd));
-        }
-        else if (strcpy (key, "radio_dai_state") && (klen = strlen (key)) && ! strncmp (ckey, key, klen)) {
-          val += klen;
-          logd ("radio_dai_state: %s", set_radio_dai_state (val));
-          strncpy (curr_radio_dai_state, val,  sizeof (curr_radio_dai_state));
-        }
-
-            // After set completes:
-        cmd_buf [0] = 'g';                                              // Response is same as get() for specified variable
-        if (terminate) {                                                // If terminating...
-          cmd_buf = "g tuner_state";                                    // Response = get tuner_state   (!! Reassigns char * !!)
-          strncpy (curr_tuner_state, "Stop",  sizeof (curr_tuner_state));
-          exiting = 1;
-        }
-
-      }
-
-        // GET:
-      if (cmd_buf != NULL && strlen (cmd_buf) > 2 && cmd_buf [0] == 'g') {       // Get (or Set response)
-        strncpy (res_buf, "-9999", res_max);                           // Default = "g key -9999"
-        if (0);
-    // Values we can just read from memory:
-// !! Should just use strlcat() instead of snprintf() !!
-        else if (strcpy (key, "radio_dai_state")    && (klen = strlen (key)) && ! strncmp (ckey, key, klen))
-          snprintf (res_buf, res_max -1, "%s",          curr_radio_dai_state);
-        else if (strcpy (key, "tuner_band")         && (klen = strlen (key)) && ! strncmp (ckey, key, klen))
-          snprintf (res_buf, res_max -1, "%s",          curr_tuner_band);
-        else if (strcpy (key, "tuner_state")        && (klen = strlen (key)) && ! strncmp (ckey, key, klen))
-          snprintf (res_buf, res_max -1, "%s",          curr_tuner_state);
-        else if (strcpy (key, "tuner_scan_state")   && (klen = strlen (key)) && ! strncmp (ckey, key, klen))
-          snprintf (res_buf, res_max -1, "%s",          curr_tuner_scan_state);
-        else if (strcpy (key, "tuner_rds_state")    && (klen = strlen (key)) && ! strncmp (ckey, key, klen))
-          snprintf (res_buf, res_max -1, "%s",          curr_tuner_rds_state);
-        else if (strcpy (key, "tuner_rds_af_state") && (klen = strlen (key)) && ! strncmp (ckey, key, klen))
-          snprintf (res_buf, res_max -1, "%s",          curr_tuner_rds_af_state);
-        else if (strcpy (key, "tuner_extra_cmd")    && (klen = strlen (key)) && ! strncmp (ckey, key, klen))
-          snprintf (res_buf, res_max -1, "%s",          curr_tuner_extra_cmd);
-        else if (strcpy (key, "tuner_stereo")       && (klen = strlen (key)) && ! strncmp (ckey, key, klen))
-          snprintf (res_buf, res_max -1, "%s",          curr_tuner_stereo);
-        else if (strcpy (key, "tuner_rds_pi")       && (klen = strlen (key)) && ! strncmp (ckey, key, klen))
-          snprintf (res_buf, res_max -1, "%s",          curr_tuner_rds_pi);
-        else if (strcpy (key, "tuner_rds_pt")       && (klen = strlen (key)) && ! strncmp (ckey, key, klen))
-          snprintf (res_buf, res_max -1, "%s",          curr_tuner_rds_pt);
-        else if (strcpy (key, "tuner_rds_ps")       && (klen = strlen (key)) && ! strncmp (ckey, key, klen))
-          snprintf (res_buf, res_max -1, "%s",          curr_tuner_rds_ps);
-        else if (strcpy (key, "tuner_rds_rt")       && (klen = strlen (key)) && ! strncmp (ckey, key, klen))
-          snprintf (res_buf, res_max -1, "%s",          curr_tuner_rds_rt);
-
-    // Values we get from the FM chip:
-        else if (strcpy (key, "tuner_thresh") && (klen = strlen (key)) && ! strncmp (ckey, key, klen)) {    // Don't really need this one as threshold is just what we set (besides errors/out of range)
-          if (tuner_initialized)
-            strncpy (curr_tuner_thresh, itoa (tnr_funcs->get_threshold (NULL)),  sizeof (curr_tuner_thresh));
-          snprintf (res_buf, res_max -1, "%s",          curr_tuner_thresh);
-        }
-        else if (strcpy (key, "tuner_freq")         && (klen = strlen (key)) && ! strncmp (ckey, key, klen)) {
-          if (tuner_initialized)
-            curr_tuner_freq_int  = tnr_funcs->get_frequency (NULL);
-          strncpy (curr_tuner_freq, itoa (curr_tuner_freq_int),  sizeof (curr_tuner_freq));
-          snprintf (res_buf, res_max -1, "%s",          curr_tuner_freq);
-        }
-        else if (strcpy (key, "tuner_rssi") && (klen = strlen (key)) && ! strncmp (ckey, key, klen)) {
-          if (tuner_initialized)
-            curr_tuner_freq_int = tnr_funcs->get_signal_strength (NULL);
-          strncpy (curr_tuner_rssi, itoa (curr_tuner_freq_int),  sizeof (curr_tuner_rssi));
-          snprintf (res_buf, res_max -1, "%s",          curr_tuner_rssi);
-        }
-        else if (strcpy (key, "tuner_most") && (klen = strlen (key)) && ! strncmp (ckey, key, klen)) {
-          if (tuner_initialized)
-            strncpy (curr_tuner_most, itomost (tnr_funcs->is_playing_in_stereo (NULL)),  sizeof (curr_tuner_most));
-          snprintf (res_buf, res_max -1, "%s",          curr_tuner_most);
-        }
-
-        else if (strcpy (key, "tuner_bulk")         && (klen = strlen (key)) && ! strncmp (ckey, key, klen)) {
-          if (tuner_initialized)
-            curr_tuner_freq_int  = tnr_funcs->get_frequency (NULL);
-          strncpy (curr_tuner_freq, itoa (curr_tuner_freq_int),  sizeof (curr_tuner_freq));
-          //snprintf (res_buf, res_max -1, "%s",          curr_tuner_freq);
-          if (tuner_initialized)
-            curr_tuner_freq_int = tnr_funcs->get_signal_strength (NULL);
-          strncpy (curr_tuner_rssi, itoa (curr_tuner_freq_int),  sizeof (curr_tuner_rssi));
-          //snprintf (res_buf, res_max -1, "%s",          curr_tuner_rssi);
-          if (tuner_initialized)
-            strncpy (curr_tuner_most, itomost (tnr_funcs->is_playing_in_stereo (NULL)),  sizeof (curr_tuner_most));
-          //snprintf (res_buf, res_max -1, "%s",          curr_tuner_most);
-
-          //snprintf (res_buf, res_max -1, "%s",          curr_tuner_rds_pi);
-          //snprintf (res_buf, res_max -1, "%s",          curr_tuner_rds_pt);
-          //snprintf (res_buf, res_max -1, "%s",          curr_tuner_rds_ps);
-          //snprintf (res_buf, res_max -1, "%s",          curr_tuner_rds_rt);
-// !! Should just use strlcat() instead of snprintf() !!
-          //snprintf (res_buf, res_max -1, "%smArK%smArK%smArK%smArK%smArK%smArK%s", curr_tuner_freq, curr_tuner_rssi, curr_tuner_most, curr_tuner_rds_pi, curr_tuner_rds_pt, curr_tuner_rds_ps, curr_tuner_rds_rt);
-
-          strncpy (res_buf, curr_tuner_freq, res_max -1);
-          strlcat (res_buf, "mArK", res_max -1);
-          strlcat (res_buf, curr_tuner_rssi, res_max -1);
-          strlcat (res_buf, "mArK", res_max -1);
-          strlcat (res_buf, curr_tuner_most, res_max -1);
-          strlcat (res_buf, "mArK", res_max -1);
-          strlcat (res_buf, curr_tuner_rds_pi, res_max -1);
-          strlcat (res_buf, "mArK", res_max -1);
-          strlcat (res_buf, curr_tuner_rds_pt, res_max -1);
-          strlcat (res_buf, "mArK", res_max -1);
-          strlcat (res_buf, curr_tuner_rds_ps, res_max -1);
-          strlcat (res_buf, "mArK", res_max -1);
-          strlcat (res_buf, curr_tuner_rds_rt, res_max -1);
-          //strlcat (res_buf, "mArK", res_max -1);
-//loge ("res_buf: \"%s\"", res_buf);
-        }
-
-
-
-        return (strlen (res_buf));
-      }
-
-    strncpy (res_buf, "-555", res_max);                                 // If unknown command...
-    return (strlen (res_buf));
-  }
-
-
-
-/*
-  void info_display () {
-    //int ret = 0;
-    logd ("get_frequency:             %d", tnr_funcs->get_frequency (NULL));
-    logd ("get_signal_strength:       %d", tnr_funcs->get_signal_strength (NULL));
-    logd ("is_playing_in_stereo:      %d", tnr_funcs->is_playing_in_stereo (NULL));
-    //logd ("is_rds_data_supported:     %d", tnr_funcs->is_rds_data_supported (NULL));
-    logd ("is_tuned_to_valid_channel: %d", tnr_funcs->is_tuned_to_valid_channel (NULL));
-    logd ("get_threshold:             %d", tnr_funcs->get_threshold (NULL));       // 0x1f4
-  }
-*/
-
-
-
-  int daemon_cmd (int cmd_len, char * cmd_buf, int res_len, char * res_buf) {
-    res_len = client_cmd (cmd_buf, cmd_len, res_buf, res_len);      // Send cmd_buf and get response to res_buf
-    if (res_len > 0 && res_len <= DEF_BUF) {
-      memcpy (cmd_buf, res_buf, res_len);
-      return (res_len);
-    }
-    cmd_buf [0] = '7';
-    cmd_buf [1] = 0;
-    return (2);
-  }
-
-/*
-  #include <signal.h>
-  static struct sigaction old_sa[NSIG];
-  void android_sigaction (int signal, siginfo_t * info, void * reserved) {
-    //if (_hndl > 0)
-    //  close (_hndl);
-    old_sa [signal].sa_handler (signal);                                // Original signal handler
-  }
-
-  void signal_catch_start () {
-	// Try to catch crashes...
-    struct sigaction handler;
-    memset (& handler, 0, sizeof (sigaction));
-    handler.sa_sigaction = android_sigaction;
-    handler.sa_flags = SA_RESETHAND;
-
-    #define CATCHSIG(X) sigaction(X, &handler, &old_sa[X])
-    CATCHSIG (SIGILL);
-    CATCHSIG (SIGABRT);
-    CATCHSIG (SIGBUS);
-    CATCHSIG (SIGFPE);
-    CATCHSIG (SIGSEGV);
-    CATCHSIG (SIGSTKFLT);
-    CATCHSIG (SIGPIPE);
-  }
-*/
-
-  int main (int argc, char ** argv) {
-    if (argc > 1)
-      strncpy (logtag, DMN_LOGTAG, sizeof (logtag));
-    else
-      strncpy (logtag, CLT_LOGTAG, sizeof (logtag));
-
-    logd ("Spirit FM Radio daemon version 2015, Jan 16");               // !! Need automatic version
-    logd (copyright);                                                   // Copyright
-
-    exiting = 0;
-
+  int client_run () {
+    logd ("main client mode");
     char store_line [DEF_BUF] = {0};
     char * line = store_line;
+    while (line != NULL) {
+      //line = readline (store_line);                                   // Caller must free malloc'd memory
+      line = fgets (store_line, sizeof (store_line), stdin);          // Never  use  gets()
+      //logd ("line: %p", line);
 
-      if (argc > 1) {
-        logd ("Server mode argv [1]: %s", argv [1]);
-        curr_radio_device_int = atoi (argv [1]);
-        logd ("Server mode curr_radio_device_int: %d", curr_radio_device_int);
+      if (line != NULL) {
+        int cmd_len = strlen (line);// + 1;
+        if (cmd_len > 0 && cmd_len < sizeof (store_line)) {
+          char * cmd_buf = line;
+          if (cmd_buf [cmd_len - 1] == '\r' || cmd_buf [cmd_len - 1] == '\n')
+            cmd_buf [cmd_len - 1] = 0;
 
-        s2_tx = 0;
-        if (argc > 2) {
-          s2_tx = 1;
-          s2d_port = 2132;
+          logd ("main To    gen_client_cmd cmd_len: %d  cmd_buf: \"%s\"", cmd_len, cmd_buf);
+          unsigned char res_buf [RES_DATA_MAX] = {0};
+
+          int res_len = gen_client_cmd (cmd_buf, cmd_len + 1, res_buf, sizeof (res_buf), s2d_port, 1000);  // Send command at line / store_line and get response to res_buf
+          logd ("main res_len: %d  res_buf: \"%s\"", res_len, res_buf);
         }
-//tuner_state
+      }
+    }
+    logd ("main done client: %s %s", binary_description, manifest_version);
+    return (0);                                                         // Done client mode
+  }
 
-        int ret = daemon (0, 0);
-        logd ("daemon() ret: %d", ret);
+  int server_run () {
+    killall ("libs2d.so", 1);                                           // Kill all other running instances of this libs2d.so daemon, except this one
 
-        //signal_catch_start ();
+    int nochdir = 0;                                                    // 0 = Change current working directory to root "/"
+    int noclose = 0;                                                    // 0 = Redirect standard input, standard output and standard error to /dev/null
+    int ret = daemon (nochdir, noclose);                                // Daemonize: Detach from controlling terminal and run in the background as system daemon
+    logd ("main daemon() ret: %d", ret);
 
-        while (! exiting) {
-          server_work ();
-          if (! exiting)                                                // Must be an error
-            sleep (3);
-        }
+    gen_server_exiting = 0;
+    while (! gen_server_exiting) {                                      // Do server work until gen_server_exiting
+      file_write (s2d_running_file, "", 0, O_CREAT | O_RDWR);                   // Signal running
+
+      gen_server_loop (s2d_port, S2D_POLL_MS);                          // Continue servicing requests on s2d_port with 100 ms polling
+
+      if (! gen_server_exiting) {                                       // Must be an error  if gen_server_loop() returned & not gen_server_exiting
+        loge ("main gen_server_loop() returned & not gen_server_exiting");
+        ms_sleep (3000);                                                // Take a rest: Sleep it off-*////////////////////////////
       }
       else {
-        logd ("Client mode");
-
-        while (! exiting && line != NULL) {
-
-          //line = readline (store_line);       // Called must free malloc'd memory
-          //line = gets (store_line);
-          line = fgets (store_line, sizeof (store_line), stdin);
-          //logd ("line: %p", line);
-
-          if (line == NULL) {
-          }
-          else {
-            int cmd_len = strlen (line);// + 1;
-            if (cmd_len > 0 && cmd_len < sizeof (store_line)) {
-              char * cmd_buf = line;
-              if (cmd_buf [cmd_len - 1] == '\r' || cmd_buf [cmd_len - 1] == '\n')
-                cmd_buf [cmd_len - 1] = 0;
-              logd ("To    client_cmd cmd_len: %d  cmd_buf: \"%s\"", cmd_len, cmd_buf);
-              unsigned char res_buf [RES_DATA_MAX] = {0};
-              int res_len = client_cmd (cmd_buf, cmd_len + 1, res_buf, sizeof (res_buf));  // Send command at line / store_line and get response to res_buf
-              logd ("res_len: %d  res_buf: \"%s\"", res_len, res_buf);
-            }
-          }
-        }
-        return (0);
+        logd ("main gen_server_loop() returned & gen_server_exiting");
+        file_delete (s2d_running_file);                                         // Signal NOT running
       }
+    }
+      // When done server mode:
+    //curr_tuner_state_int = tnr_funcs->tnr_state_sg (0);               // Ensure FM is turned off, but this can hang... do disable and see Feb 9, 2015
+    //strncpy (curr_tuner_state, "Stop", sizeof (curr_tuner_state));
+    //logd ("main tuner_state_sg: %d", ret);
+    //service_device_set (DEV_UNK);                                     // Process exit takes care of unloading libraries. Don't chance the hang...
+    //curr_service_device_int = DEV_UNK;                                // Not initialized
 
-        // Here because done. Turn FM off and exit.
-    if (tuner_initialized) {
-      int ret = tnr_funcs->reset (NULL);
-      logd ("main reset: %d", ret);
-      //lib_unload ();
-      //tuner_initialized = 0;
+    logd ("main done server: %s %s", binary_description, manifest_version);
+    return (0);                                                         // Done client mode
+  }
+
+    // Main entrance:
+
+  int main (int argc, char ** argv) {
+    int server_mode = 0;
+    if (argc > 1)                                                       // If server mode... (If 1 or more parameters)
+      server_mode = 1;
+
+    if (server_mode)                                                    // If server mode...
+      strncpy (LOGTAG, DMN_LOGTAG, sizeof (LOGTAG));                    // Server daemon logtag
+    else
+      strncpy (LOGTAG, CLT_LOGTAG, sizeof (LOGTAG));                    // Client/tester logtag
+
+    logd ("main start: %s %s", binary_description, manifest_version);        // manifest_version automatically set during build
+    logd (copyright);                                                   // Copyright
+
+    if (server_mode) {                                                  // If server mode...
+      return (server_run ());
     }
 
-    logd ("main done");
-    return (0);
-
+    return (client_run ());
   }
 

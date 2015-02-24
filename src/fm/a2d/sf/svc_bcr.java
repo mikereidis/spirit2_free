@@ -1,5 +1,6 @@
 
     // Media button and other remote controls: Lockscreen, AVRCP & future components
+
 package fm.a2d.sf;
 
 import android.content.BroadcastReceiver;
@@ -15,9 +16,7 @@ import android.view.KeyEvent;
 
 public class svc_bcr extends BroadcastReceiver {                        // !! Operates in same process as gui_act !!
 
-  private static    int                 m_obinits   = 0;
-  //private static    int                 m_creates   = 0;
-  //private static com_api gui_act.m_com_api = null;                    // Static: Need to maintain state across broadcasts !!
+  private static int m_obinits = 0;
 
   public svc_bcr () {                                                   // Need empty constructor since system will start via AndroidManifest.xml, before app ever starts
     m_obinits ++;
@@ -31,60 +30,51 @@ public class svc_bcr extends BroadcastReceiver {                        // !! Op
   @Override
   public void onReceive (Context context, Intent intent) {
     try {
-      com_uti.logv ("gui_act.m_com_api: " + gui_act.m_com_api);
+      com_uti.logd ("gui_act.m_com_api: " + gui_act.m_com_api + "  tuner_state: " + gui_act.m_com_api.tuner_state);
 
       if (gui_act.m_com_api == null) {
         gui_act.m_com_api = new com_api (context);                      // !! Operates in same process as gui_act !!
-        com_uti.logd ("gui_act.m_com_api: " + gui_act.m_com_api);
+        com_uti.logd ("gui_act.m_com_api == null    gui_act.m_com_api: " + gui_act.m_com_api);
       }
 
       if (gui_act.m_com_api == null) {
         com_uti.loge ("gui_act.m_com_api == null, no action");
         return;
       }
-      com_uti.logv ("tuner_state: " + gui_act.m_com_api.tuner_state);
+      //com_uti.logv ("tuner_state: " + gui_act.m_com_api.tuner_state);
 
       String action = intent.getAction ();
-      com_uti.logv ("context: " + context + "  intent: " + intent + "  action: " + action);
+      com_uti.logd ("context: " + context + "  intent: " + intent + "  action: " + action);
       if (action == null)
         return;
-//      if (action.equalsIgnoreCase ("fm.a2d.sf.result.get")) {
-//        radio_update (context, intent);
-//        return;
-//      }
 
-        // radio_update above must happen before state checking to see if media button events can be sent to svc_svc
       if (gui_act.m_com_api.tuner_state.equalsIgnoreCase ("stop")) {
-        com_uti.logd ("tuner_state == stop, no action");
+        com_uti.logd ("tuner_state == stop so ignore");
         return;
       }
 
-      if (action.equalsIgnoreCase (android.media.AudioManager.ACTION_AUDIO_BECOMING_NOISY)) {   // !!!! Get this at bootup !!!!  ; Disabled for now
-        com_uti.logd ("audio noisy");
-        //gui_act.m_com_api.key_set ("audio_state", "pause");
+                                                                        // Get this at bootup
+      if (action.equalsIgnoreCase (android.media.AudioManager.ACTION_AUDIO_BECOMING_NOISY)) {
+        com_uti.logd ("Wired Headset/Antenna Unplugged");               // Note duplication in svc_svc w/ m_hdst_plgd
+        gui_act.m_com_api.key_set ("audio_state", "pause");
       }
       else if (action.equalsIgnoreCase (Intent.ACTION_MEDIA_BUTTON)) {
         handle_key_event (context, (KeyEvent) intent.getExtras ().get (Intent.EXTRA_KEY_EVENT));
+      }
+      else if (action.equalsIgnoreCase ("android.media.MASTER_VOLUME_CHANGED_ACTION")) {
+        com_uti.loge ("Action android.media.MASTER_VOLUME_CHANGED_ACTION");
+      }
+      else if (action.equalsIgnoreCase ("android.media.VOLUME_CHANGED_ACTION")) {
+        com_uti.loge ("Action android.media.VOLUME_CHANGED_ACTION");
+      }
+      else {
+        com_uti.loge ("Unknown action  context: " + context + "  intent: " + intent + "  action: " + action);
       }
     }
     catch (Throwable e) {
       e.printStackTrace ();
     }
   }
-/*
-  private void radio_update (Context context, Intent intent) {
-    com_uti.logv ("");
-
-    if (gui_act.m_com_api == null) {
-      gui_act.m_com_api = new com_api (context);
-      com_uti.logd ("gui_act.m_com_api: " + gui_act.m_com_api);
-    }
-
-    gui_act.m_com_api.api_radio_update (intent);                        // Context change issues between broadcasts ???
-
-    com_uti.logv ("tuner_state: " + gui_act.m_com_api.tuner_state + "  audio_state: " + gui_act.m_com_api.audio_state);
-  }
-*/
 
   private void handle_key_event (Context context, KeyEvent key_event) {
     com_uti.logd ("context: " + context + "  key_event: " + key_event);
@@ -115,10 +105,10 @@ public class svc_bcr extends BroadcastReceiver {                        // !! Op
         break;
 
       case KeyEvent.KEYCODE_MEDIA_PREVIOUS:
-        gui_act.m_com_api.key_set ("radio_freq", "down");
+        gui_act.m_com_api.key_set ("service_seek_state", "down");
         break;
       case KeyEvent.KEYCODE_MEDIA_NEXT:
-        gui_act.m_com_api.key_set ("radio_freq", "up");
+        gui_act.m_com_api.key_set ("service_seek_state", "up");
         break;
     }
   }

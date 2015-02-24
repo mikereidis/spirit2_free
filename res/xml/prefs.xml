@@ -1,0 +1,295 @@
+<?xml version="1.0" encoding="utf-8"?>
+
+<PreferenceScreen
+xmlns:android="http://schemas.android.com/apk/res/android">
+<!--
+    <com.quietlycoding.android.picker.NumberPickerPreference
+        android:ke y="demo.preference"
+        android:title="Sample Number Picker"
+        android:summary="Number picker as a preference"
+        picker:defaultValue="15"
+        picker:startRange="-50"
+        picker:endRange="50" />
+
+
+    <ListPreference
+    android:ke y="ui_"
+    android:title=""
+    android:entries="@array/_entries"
+    android:entryValues="@array/_values"/>
+
+-->
+
+<!--
+title is for Settings Screen.
+dialogTitle is for change value dialog.
+dialogTitle not needed if same as title
+-->
+
+
+  <PreferenceScreen   android:title="Tuner">
+   <PreferenceCategory
+   android:title="General">
+    <ListPreference
+    android:key="tuner_band"
+    android:title="Band"
+    android:entries="@array/tuner_band"
+    android:entryValues="@array/tuner_band"
+    />
+    <EditTextPreference
+    android:key="tuner_freq"
+    android:title="Frequency"
+    />
+    <ListPreference
+    android:key="tuner_stereo"
+    android:title="Stereo"
+    android:entries="@array/tuner_stereo"
+    android:entryValues="@array/tuner_stereo"
+    />
+   </PreferenceCategory>
+   <PreferenceCategory
+   android:title="RDS">
+    <ListPreference
+    android:key="tuner_rds_state"
+    android:title="RDS State"
+    android:entries="@array/state_2"
+    android:entryValues="@array/state_2"
+    />
+    <ListPreference
+    android:key="tuner_rds_af_state"
+    android:title="RDS AF State"
+    android:entries="@array/state_2"
+    android:entryValues="@array/state_2"
+    />
+   </PreferenceCategory>
+   <PreferenceCategory
+   android:title="QCom">
+    <EditTextPreference
+    android:key="tuner_rds_pi"
+    android:title="Transmit RDS PI"
+    />
+    <EditTextPreference
+    android:key="tuner_rds_pt"
+    android:title="Transmit RDS PT"
+    />
+    <EditTextPreference
+    android:key="tuner_rds_ps"
+    android:title="Transmit RDS PS"
+    />
+    <EditTextPreference
+    android:key="tuner_rds_rt"
+    android:title="Transmit RDS RT"
+    />
+<!--
+    <ListPreference
+    android:key="tuner_qcv_antenna"
+    android:title="QCom Antenna"
+    android:entries="@array/tuner_qcv_antenna"
+    android:entryValues="@array/tuner_qcv_antenna"
+    />
+    <ListPreference
+    android:key="tuner_qcv_transmit"
+    android:title="QCom Transmit"
+    android:entries="@array/state_2"
+    android:entryValues="@array/state_2"
+    />
+-->
+   </PreferenceCategory>
+  </PreferenceScreen>
+
+
+  <PreferenceScreen   android:title="Audio">
+    <ListPreference
+    android:key="audio_mode"
+    android:title="Mode"
+    android:entries="@array/audio_mode"
+    android:entryValues="@array/audio_mode"
+    />
+   <PreferenceCategory
+   android:title="General">
+    <ListPreference
+    android:key="audio_output"
+    android:title="Output"
+    android:entries="@array/audio_output"
+    android:entryValues="@array/audio_output"
+    />
+    <ListPreference
+    android:key="audio_stereo"
+    android:title="Stereo"
+    android:entries="@array/audio_stereo"
+    android:entryValues="@array/audio_stereo"
+    />
+   </PreferenceCategory>
+   <PreferenceCategory
+   android:title="Record">
+    <EditTextPreference
+    android:key="audio_record_directory"
+    android:title="Record Directory"
+    />
+    <EditTextPreference
+    android:key="audio_record_filename"
+    android:title="Record Filename"
+    />
+<!--
+    <EditTextPreference
+    android:key="audio_record_fileextension"
+    android:title="Record File Extension"
+    />
+-->
+   </PreferenceCategory>
+   <PreferenceCategory
+   android:title="Debug">
+    <EditTextPreference
+    android:key="audio_digital_amp"
+    android:title="Digital Amp"
+    />
+    <EditTextPreference
+    android:key="audio_samplerate"
+    android:title="Sample Rate"
+    />
+    <EditTextPreference
+    android:key="audio_buffersize"
+    android:title="Buffer Size"
+    />
+    <ListPreference
+    android:key="audio_pseudo_source"
+    android:title="Pseudo Source"
+    android:entries="@array/audio_pseudo_source"
+    android:entryValues="@array/audio_pseudo_source"
+    />
+   </PreferenceCategory>
+  </PreferenceScreen>
+
+  <PreferenceScreen   android:title="GUI">
+    <ListPreference
+    android:key="gui_visualizer_state"
+    android:title="Visual State"
+    android:entries="@array/state_2"
+    android:entryValues="@array/state_2"/>
+    <ListPreference
+    android:key="gui_display_name"
+    android:title="Display Name"
+    android:entries="@array/dynamic_metadata"
+    android:entryValues="@array/dynamic_metadata"
+    />
+    <ListPreference
+    android:key="gui_display_type"
+    android:title="Display Type"
+    android:entries="@array/dynamic_metadata"
+    android:entryValues="@array/dynamic_metadata"
+    />
+  </PreferenceScreen>
+<!--
+-->
+<!--
+    <ListPreference
+    android:key="service_action_antenna"
+    android:title="Antenna/Headset Unplug"
+    android:entries="@array/service_action"
+    android:entryValues="@array/service_action"
+    />
+-->
+
+  <PreferenceScreen   android:title="Service">
+<!--
+   <PreferenceCategory
+   android:title="General">
+    <ListPreference
+    android:key="service_preset_list"
+    android:title="Preset List"
+    android:entries="@array/values_4"
+    android:entryValues="@array/values_4"
+    />
+   </PreferenceCategory>
+-->
+   <PreferenceCategory
+   android:title="Media Button Actions">
+    <ListPreference
+    android:key="service_action_media_pauseplay"
+    android:title="Media Button Pause/Play"
+    android:entries="@array/service_action"
+    android:entryValues="@array/service_action"
+    />
+    <ListPreference
+    android:key="service_action_media_previous"
+    android:title="Media Button Previous"
+    android:entries="@array/service_action"
+    android:entryValues="@array/service_action"
+    />
+    <ListPreference
+    android:key="service_action_media_next"
+    android:title="Media Button Next"
+    android:entries="@array/service_action"
+    android:entryValues="@array/service_action"
+    />
+   </PreferenceCategory>
+   <PreferenceCategory
+   android:title="Updates">
+    <ListPreference
+    android:key="service_update_notification"
+    android:title="Update Notification"
+    android:entries="@array/service_update"
+    android:entryValues="@array/service_update"/>
+    <ListPreference
+    android:key="service_notifremote_title"
+    android:title="Notif/Remote Title"
+    android:entries="@array/dynamic_metadata"
+    android:entryValues="@array/dynamic_metadata"
+    />
+    <ListPreference
+    android:key="service_notifremote_text"
+    android:title="Notif/Remote Text"
+    android:entries="@array/dynamic_metadata"
+    android:entryValues="@array/dynamic_metadata"
+    />
+    <ListPreference
+    android:key="service_update_gui"
+    android:title="Update GUI Intents"
+    android:entries="@array/service_update"
+    android:entryValues="@array/service_update"/>
+    <ListPreference
+    android:key="service_update_remote"
+    android:title="Update Remote RCC:AVRCP/4.4Lockscr"
+    android:entries="@array/service_update"
+    android:entryValues="@array/service_update"/>
+   </PreferenceCategory>
+   <PreferenceCategory
+   android:title="Debug">
+    <ListPreference
+    android:key="service_plugin_device"
+    android:title="Device"
+    android:entries="@array/service_plugin_device"
+    android:entryValues="@array/service_plugin_device"
+    />
+    <ListPreference
+    android:key="service_plugin_tuner"
+    android:title="Tuner"
+    android:entries="@array/service_plugin_tuner"
+    android:entryValues="@array/service_plugin_tuner"
+    />
+    <ListPreference
+    android:key="service_plugin_audio"
+    android:title="Audio"
+    android:entries="@array/service_plugin_audio"
+    android:entryValues="@array/service_plugin_audio"
+    />
+   </PreferenceCategory>
+  </PreferenceScreen>
+
+<!--
+-->
+  <PreferenceScreen   android:title="Debug">
+   <PreferenceCategory
+   android:title="General">
+    <ListPreference
+    android:key="debug_debug"
+    android:title="Debug"
+    android:entries="@array/state_2"
+    android:entryValues="@array/state_2"
+    />
+   </PreferenceCategory>
+  </PreferenceScreen>
+
+
+</PreferenceScreen>
+

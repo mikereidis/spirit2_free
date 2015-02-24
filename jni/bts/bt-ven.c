@@ -31,20 +31,15 @@ a mount -o remount,rw /system ; adb push libs/armeabi/libbt-vendor.so /sdcard/ ;
 
   const char * copyright = "Copyright (c) 2011-2015 Michael A. Reid. All rights reserved.";
 
-  #ifndef DEF_BUF
-  #define DEF_BUF 512    // Raised from 256 so we can add headers to 255-256 byte buffers
-  #endif
-
-#define HCI_BLUEDROID   // Activated needed code in acc_hci.c
+  #include "hcd/hcd_bch.c"                                                  // Patchram data !!!!  //unsigned char make_over_60k_for_hal_file_size_get [32768] = {0};
 
   char bfm_rx_buf [288] = {0};
   int  bfm_rx_len = 0;
 
-  #include "utils.c"
-  //int hcd_num = 0;
-
   int shim_hci_enable = 1;//0;                                              // Default 0 = UART, 1 = Bluedroid SHIM
-  #include "tnr/bch_hci.c"
+
+#define  GENERIC_SERVER
+  #include "utils.c"
 
 
   static bt_vendor_callbacks_t * bt_ven_cbacks = NULL;
@@ -61,6 +56,9 @@ a mount -o remount,rw /system ; adb push libs/armeabi/libbt-vendor.so /sdcard/ ;
   static volatile uint8_t     thread_state = 0;                         // 0 = stopped, 1 = started, 2 = not needed but thread still alive
 
   void * bfm_send (char * buf, int len);
+
+  #include "bts/bt-svc.c"
+
 /*
 int bc_g2_pcm_set () {
   unsigned char res_buf [MAX_HCI];
@@ -78,57 +76,32 @@ void * res_ptr = bfm_send (& hci_g2 [5], hci_len + 3);    // 5 + 3 = 8
 //void * res_ptr = bfm_send (& hci_buf [5], sizeof (hci_buf) - 5);
 
   if (res_ptr == NULL)
-    loge ("bc_g2_pcm_set hci_cmd error res_ptr: %p", res_ptr);
+    loge ("bc_g2_pcm_set bfm_send error res_ptr: %p", res_ptr);
   else 
     loge ("bc_g2_pcm_set OK");
   return (0);
 }
 */
 
-/*
-  res_len = hci_cmd (0x3f, 0x00, hci_buf, sizeof (hci_buf), res_buf, sizeof (res_buf));
-  if (res_buf [7]) {
-    loge ("bc_g2_pcm_set hci error: %d %s", res_buf [7], hci_err_get (res_buf [7]));
-    return (res_buf [7]);
-  }
-  if (res_len < 1 + 8)
-    loge ("bc_g2_pcm_set hci_cmd error res_len: %d", res_len);
-  else 
-    loge ("bc_g2_pcm_set OK");
-*/
-/*?? bad:
-12-12 04:02:27.149 D/sven   ( 2847): bfm_send buf: 0xa1eedbe1  len: 8
-12-12 04:02:27.149 D/bt_userial( 2847): Entering userial_read_thread()
-12-12 04:02:27.149 D/sven   ( 2847): bfm_send ogf: 0x3f  ocf: 0x0  opcode: 0xfc00  hci_data: 0xa1eedbe4  hci_len: 5
-12-12 04:02:27.149 D/sven   ( 2847): TXB 00 20 08 00 00 00 00 fc 00 fc 05 f3 88 01 02 05 
-
-Good:                                 TXB 00 20 08 00 00 00 00 fc 00 fc 05 f3 88 01 02 05 
-
-12-12 04:02:27.149 E/sven   ( 2847): !!!!!! NULL cback !!!
-12-12 04:02:27.149 D/sven   ( 2847): bfm_send ret: 1
-*/
-
-
 
   static void * bt_server_thread (void * arg) {
     uint16_t events;
     logd ("bt_server_thread start");
 
-//    if (acc_hci_start (4))                                              // Start Access to HCI for Bluedroid mode only  (From sprtd.c)
-//      return (NULL);                                                    // If not available, terminate... (never an error March 2014)
+    //bc_g2_pcm_set ();
 
-//bc_g2_pcm_set ();
+    int poll_tmo_ms = 0;                                                // No polling
+    int hci_port = NET_PORT_HCI;
 
     while (thread_state == 1) {                                         // While needed and running...
       logd ("bt_server_thread thread_state = needed and running");
-      do_server ();                                                     // !! Doesn't return if no packets sent
+      gen_server_loop (hci_port, poll_tmo_ms);                          // !! Doesn't return if no packets sent
 
       if (thread_state == 1)
         sleep (1);                                                      // Keep trying if error return
     }
-    logd ("bt_server_thread exiting");
+    logd ("bt_server_thread gen_server_exiting");
 
-//    acc_hci_stop ();
     thread_state = 0;
     logd ("bt_server_thread exit");
 
@@ -179,7 +152,7 @@ Good:                                 TXB 00 20 08 00 00 00 00 fc 00 fc 05 f3 88
       //param.sched_priority = BTHC_MAIN_THREAD_PRIORITY;
       result = pthread_setschedparam (server_thread.server_thread, policy, & param);
       if (result != 0) {
-        loge ("server_thread_start pthread_setschedparam failed (%s)", strerror (result));
+        loge ("server_thread_start pthread_setschedparam failed (%s)", strerror (result));  // errno ??
       }
     }
     logd ("server_thread_start done");
@@ -278,7 +251,7 @@ Good:                                 TXB 00 20 08 00 00 00 00 fc 00 fc 05 f3 88
     return ("UNKNOWN");
   }
 
-int need_bc_g2 = 1;
+  int need_bc_g2 = 1;
     // Requested operation
   static int ven_op (bt_vendor_opcode_t opcode, void * param) {
     if (ena_log_ven_extra && opcode != BT_VND_OP_LPM_WAKE_SET_STATE)
@@ -286,10 +259,10 @@ int need_bc_g2 = 1;
     int ret = -77;
     if (veno_op)
       ret = veno_op (opcode, param);
-if (need_bc_g2 && opcode == 7){//BT_VND_OP_LPM_WAKE_SET_STATE   1) {    // BT_VND_OP_FW_CFG
-need_bc_g2 = 0;
-//bc_g2_pcm_set ();
-}
+    if (need_bc_g2 && opcode == 7){//BT_VND_OP_LPM_WAKE_SET_STATE   1) {    // BT_VND_OP_FW_CFG
+      need_bc_g2 = 0;
+      //bc_g2_pcm_set ();
+    }
     if (ena_log_ven_extra && opcode != BT_VND_OP_LPM_WAKE_SET_STATE)
       logd ("ven_op ret: %d", ret);
     return (ret);

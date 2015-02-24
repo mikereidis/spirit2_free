@@ -9,10 +9,8 @@ public interface svc_tap {
 /*
 t_api_state
 tuner_band
-tuner_extra_cmd
-tuner_extra_resp
 tuner_freq
-tuner_most
+tuner_pilot 
 tuner_qual
 tuner_rds_af
 tuner_rds_af_state
@@ -31,7 +29,7 @@ tuner_rds_ta_state
 tuner_rds_tmc
 tuner_rds_tp
 tuner_rssi
-tuner_scan_state
+tuner_seek_state
 tuner_state
 tuner_stereo
 tuner_thresh
@@ -40,11 +38,10 @@ tuner_thresh
   public abstract String tuner_set (String key, String val);
 /*
 t_api_state
-tuner_extra_cmd
 tuner_freq
 tuner_rds_af_state
 tuner_rds_state
-tuner_scan_state
+tuner_seek_state
 tuner_state
 tuner_stereo
 */

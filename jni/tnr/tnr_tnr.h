@@ -1,162 +1,123 @@
 
-#define  NO_RDS
+  #define  NO_RDS                                                  // RDS include line removed from SpiritFree
 
-            /*
-             * Interface file between the vendor specific drivers and the fmradio
-             * jni layer. The vendor driver need to define register function with
-             * name defined by FMRADIO_REGISTER_FUNC of type fmradio_reg_func_t that
-             * will return a pointer to a signature (FMRADIO_SIGNATURE) to make sure
-             * it executed correctly and fill struct fmradio_vendor_methods with
-             * functions implementing functions (or NULL if not supported).
-             */    
+    // RDS:
 
-            #ifndef ANDROID_FMRADIO_INTERFACE_H
-            #define ANDROID_FMRADIO_INTERFACE_H
+  #define RDS_MAX_PS     8                                              // RDS PS   has maximum of  8 characters.
+  #define RDS_MAX_RT    64                                              // RDS RT   has maximum of 64 characters.
+  #define RDS_MAX_AFS   25                                              // RDS AF   has maximum of 25 alternate frequencies.
 
-#define bool    int
-#define false   0
-#define true    1
+  //#define RDS_MAX_PTYN   8                                              // RDS PTYN has maximum of  8 characters. Translated name form of RDS PT integer.
+  //#define RDS_MAX_CT    14                                              // RDS CT   has maximum of 14 characters. String from RDS UTC time
+  //#define RDS_MAX_TMC    3                                              // RDS TMC  has maximum of  3 entries.
+
+  typedef struct {                                                      // rds__struct_t
+
+    unsigned short  srds_pi;
+    short           srds_pt;
+    short           srds_af_num;
+    short           rsvd        [5];
+
+    char            srds_ps     [RDS_MAX_PS  + 8];
+    char            srds_rt     [RDS_MAX_RT  + 8];
+
+    int             srds_af     [RDS_MAX_AFS + 3];
+// Above:   bytes: 216
+
+    //short           tp;
+    //short           ta;
+    //short           ms;
+    //char            ct        [RDS_MAX_CT  + 1];
+    //char            ptyn      [RDS_MAX_PTYN+ 1];
+    //short           tmc       [RDS_MAX_TMC];
+    //int             taf;
+  } rds_struct_t;
+
+    // Plugin Callbacks structure:
+
+  typedef struct {
+    void (* cb_tuner_state)  (int new_state);
+    void (* cb_tuner_rssi)   (int new_rssi);
+    void (* cb_tuner_pilot)  (int new_pilot);
+    void (* cb_tuner_rds)    (rds_struct_t * new_rds);
+    void (* cb_tuner_rds_af) (int new_freq);
+  } plugin_cbs_t;
+
+    // Plugin Functions structure:
+
+  typedef struct {     // plugin_funcs_t            All implemented in tnr_tnr.c:            As tuner_mode_sg(), tuner_event_sg(), 
+
+        // 21 Remote sget Set/Get:  Implemented in tnr_tnr.c, with 16 calls to similar functions in tnr_abc.c and 5 just a getter/setter for a local variable
+
+    int (* tnr_tuner_event_sg)         (unsigned char * rds_grpd);//int event_sg_ms);             // Connection to chip_imp_event_sg()
+
+    int (* tnr_tuner_api_mode_sg)      (int api_mode);                // Set/get curr_api_mode
+    int (* tnr_tuner_api_state_sg)     (int api_state);
+    int (* tnr_tuner_mode_sg)          (int mode);                    // Set/get curr_mode
+    int (* tnr_tuner_state_sg)         (int state);
+
+    int (* tnr_tuner_band_sg)          (int band);
+    int (* tnr_tuner_freq_sg)          (int freq);
+    int (* tnr_tuner_vol_sg)           (int vol);
+    int (* tnr_tuner_thresh_sg)        (int thresh);                  // Set/get curr_thresh
+
+    int (* tnr_tuner_mute_sg)          (int mute);
+    int (* tnr_tuner_stereo_sg)        (int stereo);
+    int (* tnr_tuner_seek_state_sg)    (int seek_state);
+    int (* tnr_tuner_rds_state_sg)     (int rds_state);               // Set/get curr_pwr_rds
+    int (* tnr_tuner_rds_af_state_sg)  (int af_state);                // Set/get curr_rds_af_state
+
+    int (* tnr_tuner_rssi_sg)          (int fake_rssi);
+    int (* tnr_tuner_pilot_sg)         (int fake_pilot);
+
+    int (* tnr_tuner_rds_pi_sg)        (int rds_pi);
+    int (* tnr_tuner_rds_pt_sg)        (int rds_pt);
+
+    char * (* tnr_tuner_rds_ps_sg)     (char * rds_ps);
+    char * (* tnr_tuner_rds_rt_sg)     (char * rds_rt);
+
+    char * (* tnr_tuner_extension_sg)  (char * reg);                   // FM tuner chip low level register access and other extensions
+
+  }  plugin_funcs_t;
 
 
 
-            __BEGIN_DECLS
+  int chip_imp_event_sg        (unsigned char * rds_grpd);//int event_sg_ms);             // Connection to chip_imp_event_sg()
 
-#define FMRADIO_REGISTER_FUNC "register_fmradio_functions"
+  int chip_imp_api_mode_sg     (int api_mode);                          // Set/get curr_api_mode
+  int chip_imp_api_state_sg    (int api_state);
+  int chip_imp_mode_sg         (int mode);                              // Set/get curr_mode
+  int chip_imp_state_sg        (int state);
 
-            #define FMRADIO_SIGNATURE 0xDEADBABE
+  int chip_imp_band_sg         (int band);
+  int chip_imp_freq_sg         (int freq);
+  int chip_imp_vol_sg          (int vol);
+  int chip_imp_thresh_sg       (int thresh);                            // Set/get curr_thresh
 
-            #define FMRADIO_CAPABILITY_RECEIVER 0x0001
-            #define FMRADIO_CAPABILITY_TRANSMITTER 0x0002
-            #define FMRADIO_CAPABILITY_TUNER_WRAP_AROUND 0x0004
-            #define FMRADIO_CAPABILITY_RDS_SUPPORTED 0x0008
+  int chip_imp_mute_sg         (int mute);
+  int chip_imp_stereo_sg       (int stereo);
+  int chip_imp_seek_state_sg   (int seek_state);
+  int chip_imp_rds_state_sg    (int rds_state);                         // Set/get curr_pwr_rds
+  int chip_imp_rds_af_state_sg (int af_state);                          // Set/get curr_rds_af_state
 
-            /*
-             * return values. Not defined as enum since some functions either
-             * return a positive value or these codes, like getFrequency.
-             */
-            #define  FMRADIO_OK 0
-            #define  FMRADIO_INVALID_STATE -1       /* internally in jni layer */
-            #define  FMRADIO_UNSUPPORTED_OPERATION -2
-            #define  FMRADIO_IO_ERROR -3
-            #define  FMRADIO_INVALID_PARAMETER -4
-            #define  FMRADIO_FORCED_RESET -5
+  int chip_imp_rssi_sg         (int fake_rssi);                         // Fake = read-only; set makes no sense for receive
+  int chip_imp_pilot_sg        (int fake_pilot);                        // Fake = read-only; set makes no sense for receive
 
-            /* RDS */
-            #define RDS_MAX_AFS 25
-            #define RDS_PSN_MAX_LENGTH 8
-            #define RDS_RT_MAX_LENGTH 64
-            #define RDS_CT_MAX_LENGTH 14
-            #define RDS_PTYN_MAX_LENGTH 8
-            #define RDS_NUMBER_OF_TMC 3
+  int chip_imp_rds_pi_sg       (int rds_pi);
+  int chip_imp_rds_pt_sg       (int rds_pt);
 
-            enum fmradio_band_t {
-                FMRADIO_BAND_US,
-                FMRADIO_BAND_EU,
-                FMRADIO_BAND_JAPAN,
-                FMRADIO_BAND_CHINA
-            };
+  char * chip_imp_rds_ps_sg    (char * rds_ps);
+  char * chip_imp_rds_rt_sg    (char * rds_rt);
 
-            enum fmradio_seek_direction_t {
-                FMRADIO_SEEK_DOWN,
-                FMRADIO_SEEK_UP
-            };
+  char * chip_imp_extension_sg (char * reg);                   // FM tuner chip low level register access and other extensions
 
-            enum fmradio_reset_reason_t {
-                FMRADIO_RESET_NON_CRITICAL = 0,
-                FMRADIO_RESET_CRITICAL,
-                FMRADIO_RESET_OTHER_IN_USE,    /* internally in jni layer */
-                FMRADIO_RESET_RADIO_FORBIDDEN, /* internally in java layer */
-            };
 
-            enum fmradio_extra_command_type_t {
-                FMRADIO_TYPE_INT,
-                FMRADIO_TYPE_STRING
-            };
 
-            enum fmradio_switch_reason_t {
-                FMRADIO_SWITCH_AF,
-                FMRADIO_SWITCH_TA,
-                FMRADIO_SWITCH_TA_END
-            };
+    // Plugin Registration function typedef implemented by plugin.
+    // Returns plugin signature and pointer to functions structure.
+    // Expects callback pointers to be returned.
 
-            union fmradio_extra_data_t {
-                int int_value;
-                char *string_value;
-            };
+  typedef int (* plugin_reg_t) (unsigned int * sig, plugin_funcs_t * funcs, plugin_cbs_t * cbs);
 
-            struct fmradio_rds_bundle_t {
-                unsigned short  pi;
-                short           tp;
-                short           pty;
-                short           ta;
-                short           ms;
-                short           num_afs;
-                int             af      [RDS_MAX_AFS];
-                char            psn     [RDS_PSN_MAX_LENGTH + 1];
-                char            rt      [RDS_RT_MAX_LENGTH + 1];
-                char            ct      [RDS_CT_MAX_LENGTH + 1];
-                char            ptyn    [RDS_PTYN_MAX_LENGTH + 1];
-                short           tmc     [RDS_NUMBER_OF_TMC];
-                int taf;
-            };
-
-            struct fmradio_extra_command_ret_item_t {
-                char *key;
-                enum fmradio_extra_command_type_t type;
-                union fmradio_extra_data_t data;
-            };
-
-            /* vendor callbacks only for RX */
-            struct fmradio_vendor_callbacks_t {
-                void (*on_playing_in_stereo_changed) (int is_stereo);
-                void (*on_rds_data_found) (struct fmradio_rds_bundle_t * rds_bundle,
-                                           int frequency);
-                void (*on_signal_strength_changed) (int new_level);
-                void (*on_automatic_switch) (int new_freq,
-                                             enum fmradio_switch_reason_t reason);
-                void (*on_forced_reset) (enum fmradio_reset_reason_t reason);
-            };
-            struct fmradio_vendor_methods_t {
-                int (*rx_start) (void ** session_data,
-                                const struct fmradio_vendor_callbacks_t * callbacks,
-                                int low_freq, int high_freq, int default_freq, int grid);
-                int (*tx_start) (void ** session_data,
-                                const struct fmradio_vendor_callbacks_t * callbacks,
-                                int low_freq, int high_freq, int default_freq, int grid);
-                int (*pause2) (void ** session_data);
-                int (*resume) (void ** session_data);
-                int (*reset) (void ** session_data);
-                int (*set_frequency) (void ** session_data, int frequency);
-                int (*get_frequency) (void ** session_data);
-                int (*stop_scan) (void ** session_data);
-                int (*send_extra_command) (void ** session_data, const char * command,
-                                         char ** parameters,
-                                         struct fmradio_extra_command_ret_item_t ** out_parameters);
-                /* rx only */
-                int (*scan) (void ** session_data, enum fmradio_seek_direction_t direction);
-
-                int (*full_scan) (void ** session_data, int ** found_freqs,
-                                 int ** signal_strenghts);
-                int (*get_signal_strength) (void ** session_data);
-                int (*is_playing_in_stereo) (void ** session_data);
-                int (*is_rds_data_supported) (void ** session_data);
-                int (*is_tuned_to_valid_channel) (void ** session_data);
-                int (*set_automatic_af_switching) (void ** session_data, int automatic);
-                int (*set_automatic_ta_switching) (void ** session_data, int automatic);
-                int (*set_force_mono) (void ** session_data, int force_mono);
-                int (*get_threshold) (void ** session_data);
-                int (*set_threshold) (void ** session_data, int threshold);
-                int (*set_rds_reception) (void ** session_data, int use_rds);
-                /* tx only */
-                int (*block_scan) (void ** session_data, int low_freq, int high_freq,
-                                  int ** found_freqs, int ** signal_strenghts);
-                int (*set_rds_data) (void ** session_data, char * key, void * value);
-            };
-
-            typedef int (*fmradio_reg_func_t) (unsigned int * signature_p,
-                                               struct fmradio_vendor_methods_t * vendor_funcs_p);
-
-            __END_DECLS
-
-            #endif  // ANDROID_FMRADIO_INTERFACE_H;
+  #define PLUGIN_SIG 0xABCDEF01                                         // Plugin signature to test
 

@@ -2,6 +2,16 @@
     // Derived from Linux asound.h
     // Like Google's "cleaned Linux headers" this file is not copyrightable as it contains only definitions/facts
 
+    // Used by alsa.h:
+
+  #ifndef __user
+  #define __user
+  #endif
+
+  #ifndef __force
+  #define __force
+  #endif
+
 #ifndef __SOUND_ASOUND_H
 #define __SOUND_ASOUND_H
 

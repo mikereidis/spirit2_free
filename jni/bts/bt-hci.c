@@ -23,48 +23,21 @@ al  /system/lib/libbt-hci*
 
   const char * copyright = "Copyright (c) 2011-2015 Michael A. Reid. All rights reserved.";
 
-  #ifndef DEF_BUF
-  #define DEF_BUF 512    // Raised from 256 so we can add headers to 255-256 byte buffers
-  #endif
-
-#define HCI_BLUEDROID
+  #include "hcd/hcd_bch.c"                                              // Patchram data !!!!  //unsigned char make_over_60k_for_hal_file_size_get [32768] = {0};
 
   char bfm_rx_buf [288] = {0};
   int  bfm_rx_len = 0;
 
+  int shim_hci_enable = 1;//0;                                          // Default 0 = UART, 1 = Bluedroid SHIM
+
+#define  GENERIC_SERVER
   #include "utils.c"
 
-  //int hcd_num = 0;
-
-  int shim_hci_enable = 1;//0;                                          // Default 0 = UART, 1 = Bluedroid SHIM
-#include "tnr/bch_hci.c"
-
-#define USE_BDROID_INC
-#ifdef  USE_BDROID_INC
   #include "halhci.h"
-#else
 
-    // Most removed...
-  typedef void  (* dealloc_mem_cb) (TRANSAC transac, char * p_buf);     // datapath buffer deallocation callback (callout)
+  void * bfm_send (char * buf, int len);
 
-    // Bluetooth Host/Controller Interface
-
-  typedef struct {
-    size_t  size;       /** Set to sizeof(bt_hc_interface_t) */
-    int     (* init)        (const bt_hc_callbacks_t * p_cb, unsigned char * local_bdaddr);      /** Opens the interface and provides the callback routines to the implemenation of this interface. */
-    void    (* set_power)   (bt_hc_chip_power_state_t state);           /** Chip power control */
-    int     (* lpm)         (bt_hc_low_power_event_t event);            /** Set low power mode wake */
-    void    (* preload)     (TRANSAC transac);                          /** Called prior to stack initialization */
-    void    (* postload)    (TRANSAC transac);                          /** Called post stack initialization */
-    int     (* transmit_buf)(TRANSAC transac, char * p_buf, int len);   /** Transmit buffer */
-//    int     (* set_rxflow)  (bt_rx_flow_state_t state);                 /** Controls receive flow */
-//    int     (* logging)     (bt_hc_logging_state_t state, char * p_path);   /** Controls HCI logging on/off */
-    int     (* logging)     (bt_hc_logging_state_t state, char * p_path, bool save_existing);   /** Controls HCI logging on/off */
-    void    (* cleanup)     (void);                                     /** Closes the interface */
-int   (*tx_cmd)(TRANSAC transac, char *p_buf, int len);    /** sends commands to hc layer (e.g. SCO state) */
-
-  } bt_hc_interface_t;
-#endif
+  #include "bts/bt-svc.c"
 
     // Host/Controller lib thread control block
   typedef struct {
@@ -80,20 +53,17 @@ int   (*tx_cmd)(TRANSAC transac, char *p_buf, int len);    /** sends commands to
     uint16_t events;
     logd ("bt_server_thread started");
 
-//    if (acc_hci_start (4))                                              // Start Access to HCI for Bluedroid mode only  (From sprtd.c)
-//      return (NULL);                                                    // If not available, terminate... (never an error March 2014)
+    int poll_tmo_ms = 0;                                                // No polling
+    int hci_port = NET_PORT_HCI;
 
     while (thread_state == 1) {                                         // While needed and running...
       logd ("bt_server_thread thread_state = needed and running");
+      gen_server_loop (hci_port, poll_tmo_ms);                          // !! Doesn't return if no packets sent
 
-      do_server ();     // !! Doesn't return if no packets sent
-
-    if (thread_state == 1)
-      sleep (1);                                                          // Keep trying if error return
+      if (thread_state == 1)
+        sleep (1);                                                      // Keep trying if error return
     }
-    logd ("bt_server_thread exiting");
-
-//    acc_hci_stop ();
+    logd ("bt_server_thread gen_server_exiting");
 
     thread_state = 0;
 
@@ -245,7 +215,7 @@ int   (*tx_cmd)(TRANSAC transac, char *p_buf, int len);    /** sends commands to
       //param.sched_priority = BTHC_MAIN_THREAD_PRIORITY;
       result = pthread_setschedparam (hc_cb.server_thread, policy, & param);
       if (result != 0) {
-        logd ("libbt-hci init: pthread_setschedparam failed (%s)", strerror(result));
+        logd ("libbt-hci init: pthread_setschedparam failed (%s)", strerror (result));  // errno ??
       }
     }
     return (BT_HC_STATUS_SUCCESS);

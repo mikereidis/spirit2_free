@@ -2,14 +2,7 @@
 <!--
 -->
 <!-- -->
-<!-- Layout gravity not needed; only for positioning a view within a parent, not for text
-android:layout_gravity="left|center_vertical"
-android:gravity="center_horizontal"
-
-android:gravity="center_vertical|center_horizontal"
-android:layout_gravity="center_vertical|center_horizontal"
-
-android:layout_gravity="top"
+<!-- Layout gravity not needed for text; only for positioning a view within a parent
 
 Default:
     android:focusable="true"

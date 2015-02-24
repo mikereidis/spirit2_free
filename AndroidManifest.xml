@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     package="fm.a2d.sf"
-    android:versionCode="90"
-    android:versionName="2015_02_01_beta" >
+    android:versionCode="95"
+    android:versionName="2015_02_24_beta" >
 
 <!-- 
 !! See to add android.intent.action.BUG_REPORT
@@ -115,6 +115,27 @@ Could be used with App Inventor API aia_act
 android:theme="@android:style/Theme.Translucent.NoTitleBar"
  -->
 
+
+    <activity
+    android:name="fm.a2d.sf.set_act"
+    android:label="Settings"
+    >
+
+<!-- Intent: Settings launch. -->
+      <intent-filter>
+        <action android:name="android.intent.action.MAIN"/>
+      </intent-filter>
+    </activity>
+
+<!--
+    <activity
+    android:name="com.google.ads.AdActivity"
+    android:configChanges="keyboard|keyboardHidden|orientation"
+    />
+-->
+
+
+
 <!-- 
 
 ! Need separate process or get fg/bg problems !!!
@@ -147,10 +168,20 @@ Intent API
             <intent-filter android:priority="2147483647">                       <!-- REMOVE_FOR_TX -->
                 <action android:name="android.intent.action.MEDIA_BUTTON" />    <!-- REMOVE_FOR_TX -->
             </intent-filter>                                                    <!-- REMOVE_FOR_TX -->
+
 <!-- 
-            <intent-filter>
-                <action android:name="android.media.AUDIO_BECOMING_NOISY" />
-            </intent-filter>
+            <intent-filter>                                                      REMOVE_FOR_TX 
+                <action android:name="android.media.VOLUME_CHANGED_ACTION" />    REMOVE_FOR_TX 
+            </intent-filter>                                                     REMOVE_FOR_TX 
+            <intent-filter>                                                      REMOVE_FOR_TX 
+                <action android:name="android.media.MASTER_VOLUME_CHANGED_ACTION" />    REMOVE_FOR_TX 
+            </intent-filter>                                                     REMOVE_FOR_TX -->
+-->
+
+            <intent-filter>                                                     <!-- REMOVE_FOR_TX -->
+                <action android:name="android.media.AUDIO_BECOMING_NOISY" />    <!-- REMOVE_FOR_TX -->
+            </intent-filter>                                                    <!-- REMOVE_FOR_TX -->
+<!-- 
 -->
         </receiver>                                                             <!-- REMOVE_FOR_TX -->
 

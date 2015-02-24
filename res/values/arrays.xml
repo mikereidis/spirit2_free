@@ -1,0 +1,257 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+
+  <string-array name="values_4">
+  <item></item>
+  <item>1</item>
+  <item>2</item>
+  <item>3</item>
+  <item>4</item>
+  </string-array>
+
+  <string-array name="state_2">
+  <item></item>
+  <item>Start</item>
+  <item>Stop</item>
+  </string-array>
+
+  <string-array name="state_3">
+  <item></item>
+  <item>Start</item>
+  <item>Stop</item>
+  <item>Pause</item>
+  </string-array>
+
+  <string-array name="state_4">
+  <item></item>
+  <item>Start</item>
+  <item>Stop</item>
+  <item>Pause</item>
+  <item>ReStart</item>
+  </string-array>
+
+  <string-array name="dynamic_metadata">
+  <item></item>
+  <item>Preset</item>
+  <item>Frequency</item>
+  <item>RDS PI Hex</item>
+  <item>RDS PI Call</item>
+  <item>RDS PT</item>
+  <item>RDS PS</item>
+  <item>RDS RT</item>
+  <item>Disable</item>
+  </string-array>
+
+  <string-array name="tuner_band">
+  <item></item>
+  <item>EU</item>
+  <item>US</item>
+  </string-array>
+  <string-array name="tuner_stereo">
+  <item></item>
+  <item>Blend</item>
+  <item>Switch</item>
+  <item>Stereo</item>
+  <item>Mono</item>
+  </string-array>
+  <string-array name="tuner_qcv_antenna">
+  <item></item>
+  <item>External</item>
+  <item>Internal</item>
+  </string-array>
+
+  <string-array name="audio_output">
+  <item></item>
+  <item>Headset</item>
+  <item>Speaker</item>
+  </string-array>
+  <string-array name="audio_stereo">
+  <item></item>
+  <item>Stereo</item>
+  <item>Mono</item>
+  </string-array>
+  <string-array name="audio_mode">
+  <item></item>
+  <item>Digital</item>
+  <item>Analog</item>
+  </string-array>
+  <string-array name="audio_pseudo_source">
+  <item></item>
+  <item>0  = Default</item>
+  <item>1  = Mike</item>
+  <item>2  = Voice Uplink</item>
+  <item>3  = Voice Downlink</item>
+  <item>4  = Voice Call</item>
+  <item>5  = Camcorder</item>
+  <item>6  = Voice Recognition</item>
+  <item>7  = Voice Communication</item>
+  <item>8  = FM1 GS3Note</item>
+  <item>9  = FM2 SonyJB422</item>
+  <item>10 = FM3 SonyFXP</item>
+  <item>11 = FM4</item>
+  <item>12 = FM5</item>
+  <item>13 = FM6</item>
+  <item>14 = FM7</item>
+  <item>15 = FM8</item>
+  </string-array>
+
+  <string-array name="service_update">
+  <item></item>
+  <item>Enable</item>
+  <item>Disable</item>
+  </string-array>
+
+
+  <string-array name="service_action">
+  <item></item>
+  <item>Preset -</item>
+  <item>Preset +</item>
+  <item>Seek -</item>
+  <item>Seek +</item>
+  <item>Volume +</item>
+  <item>Volume -</item>
+  <item>Mute Tog</item>
+  <item>Mute +</item>
+  <item>Mute -</item>
+  <item>Record Tog</item>
+  <item>Record +</item>
+  <item>Record -</item>
+  <item>Output Tog</item>
+  <item>Speaker +</item>
+  <item>Headset +</item>
+  <item>Next Handler</item>
+  <item>Disable</item>
+  </string-array>
+
+
+  <string-array name="a1">
+  <item></item>
+  <item>.</item>
+  <item>.</item>
+  <item>Disable</item>
+  </string-array>
+
+  <string-array name="a2">
+  <item></item>
+  <item>.</item>
+  <item>.</item>
+  <item>Disable</item>
+  </string-array>
+
+  <string-array name="a3">
+  <item></item>
+  <item>.</item>
+  <item>.</item>
+  <item>Disable</item>
+  </string-array>
+
+  <string-array name="service_plugin_device">
+  <item></item>
+  <item>GT-I9300</item>
+  <item>GT-I9100</item>
+  <item>GT-I9000</item>
+  <item>GT-N7100</item>
+  <item>GT-N7000</item>
+  <item>One-M8</item>
+  <item>One-XLte</item>
+  <item>Moto-G</item>
+  <item>One-M7</item>
+  <item>LG-G2</item>
+  <item>Sony-Z1-</item>
+  <item>Sony-Z2+</item>
+  <item>QCom-All</item>
+  </string-array>
+  <string-array name="service_plugin_tuner">
+  <item>SSL-SamsungGalaxySiliconLabs</item>
+  <item>QCV-QualcommV4L</item>
+  <item>BCM-Broadcom</item>
+  <item></item>
+  </string-array>
+  <string-array name="service_plugin_audio">
+  <item>GT-I9300/GT-N7100</item>
+  <item>GT-I9100/GT-N7000</item>
+  <item>GT-I9000</item>
+  <item>QCV-Qualcomm All</item>
+  <item>One-M7</item>
+  <item>LG-G2</item>
+  <item>Sony-Z2+</item>
+  <item></item>
+  </string-array>
+
+  <string-array name="service_plugin_device_old">
+  <item></item>
+  <item>3N2:GS3/NO2</item>
+  <item>2N1:GS2/NO1</item>
+  <item>GS1</item>
+  <item>QCV:OXL/XZ0/XZ1/OM8/MOG</item>
+  <item>OM7</item>
+  <item>LG2</item>
+  <item>XZ2</item>
+  </string-array>
+  <string-array name="service_plugin_tuner_old">
+  <item></item>
+  <item>SSL</item>
+  <item>QCV</item>
+  <item>BCM</item>
+  <item></item>
+  </string-array>
+  <string-array name="service_plugin_audio_old">
+  <item></item>
+  <item>3N2</item>
+  <item>2N1</item>
+  <item>GS1</item>
+  <item>QCV</item>
+  <item>OM7</item>
+  <item>LG2</item>
+  <item>XZ2</item>
+  <item></item>
+  </string-array>
+
+  <string-array name="service_antenna_action_old">
+  <item></item>
+  <item>Warn</item>
+  <item>Ignore</item>
+  <item>Mute</item>
+  <item>PowerOff</item>
+  </string-array>
+
+  <string-array name="index_values_old">
+  <item>0</item>
+  <item>1</item>
+  <item>2</item>
+  <item>3</item>
+  <item>4</item>
+  <item>5</item>
+  <item>6</item>
+  <item>7</item>
+  <item>8</item>
+  <item>9</item>
+  <item>10</item>
+  <item>11</item>
+  <item>12</item>
+  <item>13</item>
+  <item>14</item>
+  <item>15</item>
+  <item>16</item>
+  <item>17</item>
+  <item>18</item>
+  <item>19</item>
+  <item>20</item>
+  <item>21</item>
+  <item>22</item>
+  <item>23</item>
+  <item>24</item>
+  <item>25</item>
+  <item>26</item>
+  <item>27</item>
+  <item>28</item>
+  <item>29</item>
+  <item>30</item>
+  <item>31</item>
+  <item>32</item>
+  <item>33</item>
+  <item>34</item>
+  <item>35</item>
+  </string-array>
+
+</resources>
