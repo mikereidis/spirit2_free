@@ -88,9 +88,27 @@
   }
 
 
+  #define PLUG_AUD_UNK -1
+  #define PLUG_AUD_GEN 0
+  #define PLUG_AUD_GS1 1
+  #define PLUG_AUD_GS2 2
+  #define PLUG_AUD_GS3 3
+  #define PLUG_AUD_QCV 4
+  #define PLUG_AUD_OM7 5
+  #define PLUG_AUD_LG2 6
+  #define PLUG_AUD_XZ2 7
+
+  #define PLUG_TNR_UNK -1
+  #define PLUG_TNR_GEN 0
+  #define PLUG_TNR_SSL 1
+  #define PLUG_TNR_QCV 2
+  #define PLUG_TNR_BCH 3
+
+
     // !!!! Eliminate duplicates, such as ms_get, hcd_file_find, ...
 
   #define MAX_ITOA_SIZE 32      // Int 2^32 need max 10 characters, 2^64 need 21
+
   char * itoa (int val, char * ret, int radix) {
     if (radix == 10)
       snprintf (ret, MAX_ITOA_SIZE - 1, "%d", val);
@@ -100,8 +118,8 @@
       loge ("radix != 10 && != 16: %d", radix);
     return (ret);
   }
-/*
-  int noblock_set (int fd) {
+
+/*int noblock_set (int fd) {
     //#define IOCTL_METH
     #ifdef  IOCTL_METH
     int nbio = 1;
@@ -130,12 +148,9 @@
       logd ("noblock_set fcntl result get flags: %d  nonblock flags: %d", flags, flags & O_NONBLOCK);
     #endif
     return (0);
-  }
+  }*/
 
-*/
-
-/*
-  void alt_usleep (uint32_t us) {
+/*void alt_usleep (uint32_t us) {
     struct timespec delay;
     int err;
     //if (us == 0)
@@ -146,8 +161,7 @@
     do {
       err = nanosleep (& delay, & delay);
     } while (err < 0 && errno == EINTR);
-  }
-*/
+  }*/
 
   long quiet_ms_sleep (long ms) {
     usleep (ms * 1000);
@@ -155,8 +169,7 @@
   }
 
   long ms_sleep (long ms) {
-
-//    if (ms > 10 && (ms % 101 != 0) && (ms % 11 != 0))
+    //if (ms > 10 && (ms % 101 != 0) && (ms % 11 != 0))
       loge ("ms_sleep ms: %d", ms);
 
     usleep (ms * 1000);
@@ -165,7 +178,7 @@
 
 
     // In utils.c so that aud_all and tnr_qcv can access the same function:
-/*
+    /*DISABLED: messy
   int utils_qcv_ana_vol_set (int vol) {
     //alsa_long_set ("HPHL Volume", vol / 3276); // Range 0 - 20        // !! Doesn't work so must use Internal FM RX Volume
     //alsa_long_set ("HPHR Volume", vol / 3276); // Range 0 - 20
@@ -173,213 +186,310 @@
     logd ("Setting Internal FM RX Volume to alsa_vol: %d", alsa_vol);
     alsa_long_set ("Internal FM RX Volume", alsa_vol);
     return (vol);
-  }
-*/
+  }*/
 
 
-char user_dev [DEF_BUF] = "";
-
-char * user_char_dev_get (char * dir_or_dev, int user) {
-  DIR  * dp;
-  struct dirent * dirp;
-  struct stat sb;
-  int ret = 0;
-  logd ("user_char_dev_get: %s  %d", dir_or_dev, user);
-
-  ret = stat (dir_or_dev, & sb);                                        // Get file/dir status.
-  if (ret == -1) {
-    loge ("user_char_dev_get: dir_or_dev stat errno: %d", errno);
-    return (NULL);
-  }
-
-  if (S_ISCHR (sb.st_mode)) {                                           // If this is a character device...
-    if (sb.st_uid == user) {                                            // If user match...
-      //strlcpy (user_dev, dir_or_dev, sizeof (user_dev));
-      //return (user_dev);                                              // Device found
-      return (dir_or_dev);
-    }
-    return (NULL);
-  }
-
-  if ((dp = opendir (dir_or_dev)) == NULL) {                            // Open the directory. If error...
-    loge ("user_char_dev_get: can't open dir_or_dev: %s  errno: %d", dir_or_dev, errno);
-    return (NULL);                                                      // Done w/ no result
-  }
-  //logd ("user_char_dev_get opened directory %s", dir_or_dev);
-
-  while ((dirp = readdir (dp)) != NULL) {                               // For all files/dirs in this directory... (Could terminate with errno set !!)
-    //logd ("user_char_dev_get: readdir returned file/dir %s", dirp->d_name);
-
-    char filename [DEF_BUF] = {0};
-    strlcpy (filename, dir_or_dev, sizeof (filename));
-    strlcat (filename, "/", sizeof (filename));
-    strlcat (filename, dirp->d_name, sizeof (filename));                // Set fully qualified filename
-
-    ret = stat (filename, & sb);                                        // Get file/dir status.
+  char user_dev [DEF_BUF] = "";
+  
+  char * user_char_dev_get (char * dir_or_dev, int user) {
+    DIR  * dp;
+    struct dirent * dirp;
+    struct stat sb;
+    int ret = 0;
+    logd ("user_char_dev_get: %s  %d", dir_or_dev, user);
+  
+    ret = stat (dir_or_dev, & sb);                                        // Get file/dir status.
     if (ret == -1) {
-      loge ("user_char_dev_get: file stat errno: %d", errno);
-      continue;                                                         // Ignore/Next if can't get status
+      loge ("user_char_dev_get: dir_or_dev stat errno: %d", errno);
+      return (NULL);
     }
-
-    if (S_ISCHR (sb.st_mode)) {                                         // If this is a character device...
-      //logd ("user_char_dev_get: dir %d", sb.st_mode);
-      if (sb.st_uid == user) {                                          // If user match...
-        closedir (dp);                                                  // Close the directory.
-        strlcpy (user_dev, filename, sizeof (user_dev));
-        return (user_dev);                                              // Device found
+  
+    if (S_ISCHR (sb.st_mode)) {                                           // If this is a character device...
+      if (sb.st_uid == user) {                                            // If user match...
+        //strlcpy (user_dev, dir_or_dev, sizeof (user_dev));
+        //return (user_dev);                                              // Device found
+        return (dir_or_dev);
+      }
+      return (NULL);
+    }
+  
+    if ((dp = opendir (dir_or_dev)) == NULL) {                            // Open the directory. If error...
+      loge ("user_char_dev_get: can't open dir_or_dev: %s  errno: %d", dir_or_dev, errno);
+      return (NULL);                                                      // Done w/ no result
+    }
+    //logd ("user_char_dev_get opened directory %s", dir_or_dev);
+  
+    while ((dirp = readdir (dp)) != NULL) {                               // For all files/dirs in this directory... (Could terminate with errno set !!)
+      //logd ("user_char_dev_get: readdir returned file/dir %s", dirp->d_name);
+  
+      char filename [DEF_BUF] = {0};
+      strlcpy (filename, dir_or_dev, sizeof (filename));
+      strlcat (filename, "/", sizeof (filename));
+      strlcat (filename, dirp->d_name, sizeof (filename));                // Set fully qualified filename
+  
+      ret = stat (filename, & sb);                                        // Get file/dir status.
+      if (ret == -1) {
+        loge ("user_char_dev_get: file stat errno: %d", errno);
+        continue;                                                         // Ignore/Next if can't get status
+      }
+  
+      if (S_ISCHR (sb.st_mode)) {                                         // If this is a character device...
+        //logd ("user_char_dev_get: dir %d", sb.st_mode);
+        if (sb.st_uid == user) {                                          // If user match...
+          closedir (dp);                                                  // Close the directory.
+          strlcpy (user_dev, filename, sizeof (user_dev));
+          return (user_dev);                                              // Device found
+        }
       }
     }
+    closedir (dp);                                                        // Close the directory.
+    return (NULL);
   }
-  closedir (dp);                                                        // Close the directory.
-  return (NULL);
-}
 
 
-  int version_sdk;
-  char version_sdk_prop_buf       [DEF_BUF];
+  char * upper_set (char * data) {
+    int ctr = 0;
+    int len = strlen (data);
+    for (ctr = 0; ctr < len; ctr ++)
+      data [ctr] = toupper (data [ctr]);
+    return (data);
+  }
 
-  char product_device_prop_buf    [DEF_BUF] = "";
-  char product_manuf_prop_buf     [DEF_BUF] = "";
-  char product_board_prop_buf     [DEF_BUF] = "";
+  char * lower_set (char * data) {
+    int ctr = 0;
+    int len = strlen (data);
+    for (ctr = 0; ctr < len; ctr ++)
+      data [ctr] = tolower (data [ctr]);
+    return (data);
+  }
+
+  char sys_prop_device          [DEF_BUF] = "";
+  char sys_prop_manuf           [DEF_BUF] = "";
+  char sys_prop_board           [DEF_BUF] = "";
+  char sys_prop_modversion      [DEF_BUF] = "";
+
+  char sys_prop_android_version [DEF_BUF] = "";
+  int           android_version           = 0;
 
   void prop_buf_get (const char * prop, char * prop_buf) {
+
     __system_property_get (prop, prop_buf);
+
     logd ("prop_buf_get %s: %s", prop, prop_buf);
+
+    upper_set (prop_buf);
   }
 
-  char def_prop_buf    [DEF_BUF] = "";
+  int utils_init () {
+    if (sys_prop_device [0])                                            // Done if already initialized
+      return (0);
 
-  char * prop_get (const char * prop) {
-    __system_property_get (prop, def_prop_buf);
-    logd ("prop_get %s: %s", prop, def_prop_buf);
-    return (def_prop_buf);
+    logd ("utils_init");
+
+    prop_buf_get ("ro.product.device",          sys_prop_device);
+    prop_buf_get ("ro.product.manufacturer",    sys_prop_manuf);
+    prop_buf_get ("ro.product.board",           sys_prop_board);
+    prop_buf_get ("ro.modversion",              sys_prop_modversion);
+
+    prop_buf_get ("ro.build.version.sdk",       sys_prop_android_version);
+    android_version = atoi (sys_prop_android_version);
+
+    return (0);
   }
 
+  int lg_get () {
+    return (! strncmp (sys_prop_manuf,"LG", strlen ("LG")));        // LG or LGE
+  }  
+  int sony_get () {
+    return (! strncmp (sys_prop_manuf,"SONY", strlen ("SONY")));
+  }  
+  int htc_get () {
+    return (! strncmp (sys_prop_manuf,"HTC", strlen ("HTC")));
+  }  
 
+  int qcv_internal_antenna_get () {
+    int internal_antenna = 0;
 
-int file_find (char * dir, char * pat, char * path_buf, int path_len) {      // Find first file under subdir dir, with pattern pat. Put results in path_buf of size path_len.
-  static int nest = 0;
-  path_buf [0] = 0;
-  if (nest == 0)
-    logd ("file_find: %d %s %s", nest, dir, pat);
+    // These use internal:
+    //if (! strncmp (sys_prop_device, "LT29", 4))      // 29i = TX
+    //if (! strncmp (sys_prop_device, "LT30", 4))      // 30p/30at/30a = T
+    //if (! strncmp (sys_prop_device, "MINT", 4))      // FreeXperia T
+    //if (! strncmp (sys_prop_device, "HAYA", 4))      // FreeXperia TX "HAYABUSA"
+    //! strncmp (sys_prop_device, "C53", 3)
+    //! strncmp (sys_prop_device, "M35", 3)
+    //! strncmp (sys_prop_device, "C19", 3)
+    //! strncmp (sys_prop_device, "HUASHAN", 7)
 
-  nest ++;
-  if (nest > 16) {                                                      // Routine is recursive; if more than 16 subdirectories nested... (/system/xbin/bb -> /system/xbin)
-    logd ("file_find maximum nests: %d  dir: %s  path: %s", nest, dir, pat);
-    nest --;
-    return (0);                                                         // Done w/ no result
+    if (! sony_get ())
+      return (0);
+
+        // These use external:
+    if (! strncmp (sys_prop_device, "C2",    2) || ! strncmp (sys_prop_device, "S39",     3) || ! strncmp (sys_prop_device, "C19", 3) ||
+        ! strncmp (sys_prop_device, "NICKI", 5) || ! strncmp (sys_prop_device, "TAOSHAN", 7)
+        )
+      return (0);
+
+    return (1);
   }
 
-  DIR  *dp;
-  struct dirent *dirp;
-  struct stat sb;
-  int ret = 0;
+//  int om7_get () {
+//  }
+/*
+  int lg2_get () {
+    if (! strncmp (sys_prop_board, "GALBI",  strlen ("GALBI")))     is_lg2 = 1;
 
-  if ((dp = opendir (dir)) == NULL) {                                    // Open the directory. If error...
-    //#define EACCES      13  /* Permission denied */
-    if (errno == 13)                                                    // Common problem (Even w/ SU)
-      logd ("file_find: can't open directory %s  errno: %d (EACCES Permission denied)", dir, errno);
-    else
-      logd ("file_find: can't open directory %s  errno: %d", dir, errno);
-    nest --;
-    return (0);//-13);                                                       // Done w/ no result & error code -EPERM
+    if (! strncmp (sys_prop_device, "G2",    strlen ("G2")))        is_lg2 = 1;
+    if (! strncmp (sys_prop_device, "LS980", strlen ("LS980")))     is_lg2 = 1;
+    if (! strncmp (sys_prop_device, "VS980", strlen ("VS980")))     is_lg2 = 1;
+    if (! strncmp (sys_prop_device,  "D800", strlen ( "D800")))     is_lg2 = 1;
+    if (! strncmp (sys_prop_device,  "D801", strlen ( "D801")))     is_lg2 = 1;
+    if (! strncmp (sys_prop_device,  "D802", strlen ( "D802")))     is_lg2 = 1;
+    if (! strncmp (sys_prop_device,  "D803", strlen ( "D803")))     is_lg2 = 1;
+    if (! strncmp (sys_prop_device,   "D80", strlen (  "D80")))     is_lg2 = 1;
+
+    if (! strncmp (sys_prop_manuf,   "LG", strlen (   "LG")))       is_lg2 = 1;     // LG or LGE
   }
-  //logd ("file_find opened directory %s", dir);
+*/
+/*int no2_set = 0;
+  int no2_val = 0;
+  int no2_get () {
+    if (no2_set)
+      return (no2_val);
+    no2_val = 0;
+    if (! strncmp (sys_prop_device, "T03G",     strlen ("T03G")))     // Galaxy Note2 3G
+      no2_val = 1;
+    else if (! strncmp (sys_prop_device, "GT-N71",   strlen ("GT-N71")))
+      no2_val = 1;
+    else if (! strncmp (sys_prop_device, "GALAXYN71",strlen ("GALAXYN71")))
+      no2_val = 1;
+    logd ("no2_val: %d", no2_val);
+    no2_set = 1;
+    return (no2_val);
+  }  */
 
-  while ((dirp = readdir (dp)) != NULL) {                                // For all files/dirs in this directory... (Could terminate with errno set !!)
-    //logd ("file_find: readdir returned file/dir %s", dirp->d_name);
 
-    if (strlen (dirp->d_name) == 1)
-      if (dirp->d_name[0] == '.')
-        continue;                                                       // Ignore/Next if "." current dir
+    // Find first file under subdir dir, with pattern pat. Put results in path_buf of size path_len:
 
-    if (strlen (dirp->d_name) == 2)
-      if (dirp->d_name[0] == '.' && dirp->d_name[1] == '.')
-        continue;                                                       // Ignore/Next if ".." parent dir
-
-    char filename[DEF_BUF] = {0};
-    strlcpy (filename, dir, sizeof (filename));
-    strlcat (filename, "/", sizeof (filename));
-    strlcat (filename, dirp->d_name, sizeof (filename));                // Set fully qualified filename
-
-    ret = stat (filename, &sb);                                         // Get file/dir status.
-    if (ret == -1) {
-      logd ("file_find: stat errno: %d", errno);
-      continue;                                                         // Ignore/Next if can't get status
+  int file_find (char * dir, char * pat, char * path_buf, int path_len) {
+    static int nest = 0;
+    path_buf [0] = 0;
+    if (nest == 0)
+      logd ("file_find: %d %s %s", nest, dir, pat);
+  
+    nest ++;
+    if (nest > 16) {                                                    // Routine is recursive; if more than 16 subdirectories nested... (/system/xbin/bb -> /system/xbin)
+      logd ("file_find maximum nests: %d  dir: %s  path: %s", nest, dir, pat);
+      nest --;
+      return (0);                                                       // Done w/ no result
     }
-
-    if (S_ISDIR (sb.st_mode)) {                                         // If this is a directory...
-      //logd ("file_find: dir %d", sb.st_mode);
-      if (file_find (filename, pat, path_buf, path_len)) {              // Recursively call self: Go deeper to find the file, If found...
-        closedir (dp);                                                  // Close the directory.
-        nest --;
-        return (1);                                                     // File found
+  
+    DIR  * dp;
+    struct dirent * dirp;
+    struct stat sb;
+    int ret = 0;
+  
+    if ((dp = opendir (dir)) == NULL) {                                 // Open the directory. If error...
+      //#define EACCES      13  /* Permission denied */
+      if (errno == 13)                                                  // Common problem (Even w/ SU)
+        logd ("file_find: can't open directory %s  errno: %d (EACCES Permission denied)", dir, errno);
+      else
+        logd ("file_find: can't open directory %s  errno: %d", dir, errno);
+      nest --;
+      return (0);//-13);                                                // Done w/ no result & error code -EPERM
+    }
+    //logd ("file_find opened directory %s", dir);
+  
+    while ((dirp = readdir (dp)) != NULL) {                             // For all files/dirs in this directory... (Could terminate with errno set !!)
+      //logd ("file_find: readdir returned file/dir %s", dirp->d_name);
+  
+      if (strlen (dirp->d_name) == 1)
+        if (dirp->d_name[0] == '.')
+          continue;                                                     // Ignore/Next if "." current dir
+  
+      if (strlen (dirp->d_name) == 2)
+        if (dirp->d_name[0] == '.' && dirp->d_name[1] == '.')
+          continue;                                                     // Ignore/Next if ".." parent dir
+  
+      char filename[DEF_BUF] = {0};
+      strlcpy (filename, dir, sizeof (filename));
+      strlcat (filename, "/", sizeof (filename));
+      strlcat (filename, dirp->d_name, sizeof (filename));              // Set fully qualified filename
+  
+      ret = stat (filename, &sb);                                       // Get file/dir status.
+      if (ret == -1) {
+        logd ("file_find: stat errno: %d", errno);
+        continue;                                                       // Ignore/Next if can't get status
       }
-    }
-
-    else if (S_ISREG (sb.st_mode)) {                                     // If this is a regular file...
-      //logd ("file_find: reg %d", sb.st_mode);
-      int pat_len = strlen (pat);
-      int filename_len = strlen (filename);
-      if (filename_len >= pat_len) {
-        if (! strncasecmp (pat, &filename [filename_len - pat_len], pat_len)) {   // !! Case insensitive
-          logd ("file_find pattern: %s  filename: %s", pat, filename);
-          strlcpy (path_buf,filename, path_len);
+  
+      if (S_ISDIR (sb.st_mode)) {                                       // If this is a directory...
+        //logd ("file_find: dir %d", sb.st_mode);
+        if (file_find (filename, pat, path_buf, path_len)) {            // Recursively call self: Go deeper to find the file, If found...
           closedir (dp);                                                // Close the directory.
           nest --;
           return (1);                                                   // File found
         }
       }
+  
+      else if (S_ISREG (sb.st_mode)) {                                  // If this is a regular file...
+        //logd ("file_find: reg %d", sb.st_mode);
+        int pat_len = strlen (pat);
+        int filename_len = strlen (filename);
+        if (filename_len >= pat_len) {
+                                                                        // !! Case insensitive
+          if (! strncasecmp (pat, & filename [filename_len - pat_len], pat_len)) {
+            logd ("file_find pattern: %s  filename: %s", pat, filename);
+            strlcpy (path_buf,filename, path_len);
+            closedir (dp);                                              // Close the directory.
+            nest --;
+            return (1);                                                 // File found
+          }
+        }
+      }
+      else {
+        logd ("file_find: unk %d", sb.st_mode);
+      }
+    }
+    closedir (dp);                                                      // Close the directory.
+    nest --;
+    return (0);                                                         // Done w/ no result
+  }
+  
+  int hcd_num = 0;
+  
+  int hcd_file_find (char * path_buf, int path_len) {      // Find first file under subdir dir, with pattern pat. Put results in path_buf of size path_len.
+    int ret = file_find ("/system", ".hcd", path_buf, path_len);          // Sometimes under system/vendor/firmware instead of system/etc/firmware
+    logd ("HCD hcd file_find ret: %d", ret);
+    hcd_num = 0;
+  
+    if (ret)                  // If we have at least one BC *.hcd or *.HCD firmware file in /system...
+      logd ("hcd_file_find have *.hcd file: %s", path_buf);
+  
+    if (lg_get ()) {
+      logd ("hcd_file_find LG G2");
+      strlcpy (path_buf, "/data/data/fm.a2d.sf/files/b2.bin", path_len);
+      hcd_num = 2;
+    }
+    else if (sony_get ()) {
+      logd ("hcd_file_find Sony Z2+");
+      //strlcpy (path_buf, "/data/data/fm.a2d.sf/files/b3.bin", path_len);
+      hcd_num = 0;    // Use actual file
+    }
+    else if (htc_get ()) {
+      logd ("hcd_file_find HTC One M7");
+      strlcpy (path_buf, "/data/data/fm.a2d.sf/files/b1.bin", path_len);
+      hcd_num = 1;
     }
     else {
-      logd ("file_find: unk %d", sb.st_mode);
+      logd ("hcd_file_find Unknown");
+      hcd_num = 0;    // Use actual file
     }
+  
+    if (ret || hcd_num)   // If we have a file or can use internal...
+      return (1);
+  
+    loge ("hcd_file_find no *.hcd file or no permission");
+    return (0);                                                           // Done w/ no result
   }
-  closedir (dp);                                                        // Close the directory.
-  nest --;
-  return (0);                                                           // Done w/ no result
-}
-
-
-
-int hcd_num = 0;
-
-int hcd_file_find (char * path_buf, int path_len) {      // Find first file under subdir dir, with pattern pat. Put results in path_buf of size path_len.
-  int ret = file_find ("/system", ".hcd", path_buf, path_len);          // Sometimes under system/vendor/firmware instead of system/etc/firmware
-  logd ("HCD hcd file_find ret: %d", ret);
-  hcd_num = 0;
-
-  if (ret)                  // If we have at least one BC *.hcd or *.HCD firmware file in /system...
-    logd ("hcd_file_find have *.hcd file: %s", path_buf);
-
-  prop_buf_get ("ro.product.manufacturer",           product_manuf_prop_buf);
-
-  if (! strncasecmp (product_manuf_prop_buf,"LG", strlen ("LG"))) {     // LG or LGE
-    logd ("hcd_file_find LG G2");
-    strncpy (path_buf, "/data/data/fm.a2d.sf/files/b2.bin", path_len);
-    hcd_num = 2;
-  }
-  else if (! strncasecmp (product_manuf_prop_buf,"SONY", strlen ("SONY"))) {
-    logd ("hcd_file_find Sony Z2+");
-    //strncpy (path_buf, "/data/data/fm.a2d.sf/files/b3.bin", path_len);
-    hcd_num = 0;    // Use actual file
-  }
-  else if (! strncasecmp (product_manuf_prop_buf,"HTC", strlen ("HTC"))) {
-    logd ("hcd_file_find HTC One M7");
-    strncpy (path_buf, "/data/data/fm.a2d.sf/files/b1.bin", path_len);
-    hcd_num = 1;
-  }
-  else {
-    logd ("hcd_file_find Unknown");
-    hcd_num = 0;    // Use actual file
-  }
-
-  if (ret || hcd_num)   // If we have a file or can use internal...
-    return (1);
-
-  loge ("hcd_file_find no *.hcd file or no permission");
-  return (0);                                                           // Done w/ no result
-}
 
 
   int flags_file_get (const char * filename, int flags) {               // Return 1 if file, or directory, or device node etc. exists and we can open it
@@ -429,16 +539,16 @@ int hcd_file_find (char * path_buf, int path_len) {      // Find first file unde
   }
 
 
-long ms_get () {
-  struct timespec tspec = {0, 0};
-  int res = clock_gettime (CLOCK_MONOTONIC, & tspec);
-  //logd ("sec": %d  nsec: %d, tspec.tv_sec, tspec.tv_nsec);
+  long ms_get () {                                                      // !!!! Affected by time jumps ?
+    struct timespec tspec = {0, 0};
+    int res = clock_gettime (CLOCK_MONOTONIC, & tspec);
+    //logd ("sec": %d  nsec: %d, tspec.tv_sec, tspec.tv_nsec);
 
-  long millisecs= (tspec.tv_nsec / 1000000);
-  millisecs += (tspec.tv_sec * 1000);       // remaining 22 bits good for monotonic time up to 4 million seconds =~ 46 days. (?? - 10 bits for 1024 ??)
+    long millisecs= (tspec.tv_nsec / 1000000);
+    millisecs += (tspec.tv_sec * 1000);       // remaining 22 bits good for monotonic time up to 4 million seconds =~ 46 days. (?? - 10 bits for 1024 ??)
 
-  return (millisecs);
-}
+    return (millisecs);
+  }
 
 /*
   int chip_lock_val = 0;
@@ -487,7 +597,7 @@ long ms_get () {
       strlcpy (line, prefix, sizeof (line));
     for (i = 0, n = 1; i < len; i ++, n ++) {
       snprintf (tmp, sizeof (tmp), "%2.2x ", buf [i]);
-      strncat (line, tmp, sizeof (line));
+      strlcat (line, tmp, sizeof (line));
       if (n == width) {
         n = 0;
         loge (line);
@@ -513,7 +623,7 @@ long ms_get () {
       snprintf (cmd, sizeof (cmd), "%s", new_cmd);
     else
       snprintf (cmd, sizeof (cmd), " ; %s", new_cmd);
-    strncat (sys_cmd, cmd, sizeof (sys_cmd));
+    strlcat (sys_cmd, cmd, sizeof (sys_cmd));
     int ret = sys_commit ();                                            // Commit every command now, due to GS3/Note problems
     return (ret);
   }
@@ -679,63 +789,60 @@ long ms_get () {
  }
 
 
-/*
-  char * holder_id = "None";
-
-int lock_open (const char * id, volatile int * lock, int tmo) {
-  int attempts = 0;
-  volatile int lock_val = * lock;
-
-  //logd ("lock_open %s  lock_val: %d  lock: %d  tmo: %d", id, lock_val, * lock, tmo);
-  int start_time   = ms_get ();                                         // Set start time
-  int timeout_time = start_time + tmo;                                  // Set end/timeout time
-  int elapsed_time = ms_get () - start_time;
-  long alt_sleep_ctr = 0;
-
-  while (ms_get () < timeout_time) {                                    // Until timeout
-    if (* lock < 0) {                                                   // If negative...
-      * lock = 0;                                                       // Fix
-      loge ("!!!!!!!!! lock_open clear negative lock id: %s  holder_id: %s", id, holder_id, attempts);
-    }
-
-    while ((* lock) && ms_get () < timeout_time) {                      // While the lock is NOT acquired and we have not timed out...
-      if (elapsed_time > 100)
-        loge ("lock_open sleep 10 ms id: %s  holder_id: %s  attempts: %d  lock_val: %d  lock: %d  elapsed_time: %d", id, holder_id, attempts, lock_val, * lock, elapsed_time);// Else we lost attempt
-      if (attempts) {                                                   // If not 1st try...
-        alt_sleep_ctr = 0;
-        while (alt_sleep_ctr ++ < 10000);       // !!!! Because ms_sleep was crashing ?
+/*char * holder_id = "None";
+  int lock_open (const char * id, volatile int * lock, int tmo) {
+    int attempts = 0;
+    volatile int lock_val = * lock;
+  
+    //logd ("lock_open %s  lock_val: %d  lock: %d  tmo: %d", id, lock_val, * lock, tmo);
+    int start_time   = ms_get ();                                         // Set start time
+    int timeout_time = start_time + tmo;                                  // Set end/timeout time
+    int elapsed_time = ms_get () - start_time;
+    long alt_sleep_ctr = 0;
+  
+    while (ms_get () < timeout_time) {                                    // Until timeout
+      if (* lock < 0) {                                                   // If negative...
+        * lock = 0;                                                       // Fix
+        loge ("!!!!!!!!! lock_open clear negative lock id: %s  holder_id: %s", id, holder_id, attempts);
       }
-      else
-        ms_sleep (10);                                                  // Sleep a while then try again
+  
+      while ((* lock) && ms_get () < timeout_time) {                      // While the lock is NOT acquired and we have not timed out...
+        if (elapsed_time > 100)
+          loge ("lock_open sleep 10 ms id: %s  holder_id: %s  attempts: %d  lock_val: %d  lock: %d  elapsed_time: %d", id, holder_id, attempts, lock_val, * lock, elapsed_time);// Else we lost attempt
+        if (attempts) {                                                   // If not 1st try...
+          alt_sleep_ctr = 0;
+          while (alt_sleep_ctr ++ < 10000);       // !!!! Because ms_sleep was crashing ?
+        }
+        else
+          ms_sleep (10);                                                  // Sleep a while then try again
+      }
+      elapsed_time = ms_get () - start_time;
+  
+      (* lock) ++;                                                        // Attempt to acquire lock (1st or again)
+      lock_val = (* lock);
+      if (lock_val == 1) {                                                // If success...
+        if (attempts)                                                     // If not 1st try...
+          loge ("lock_open %s success id: %s  holder_id: %s  attempts: %d  lock_val: %d  lock: %d  elapsed_time: %d", id, holder_id, attempts, lock_val, * lock, elapsed_time);
+        holder_id = (char *) id;                                          // We are last holder (though done now)
+        return (0);                                                       // Lock acquired
+      }
+      else {
+        (* lock) --;                                                      // Release lock attempt
+        loge ("lock_open lost id: %s  holder_id: %s  attempts: %d  lock_val: %d  lock: %d  elapsed_time: %d", id, holder_id, attempts, lock_val, * lock, elapsed_time);// Else we lost attempt
+        attempts ++;
+      }
     }
-    elapsed_time = ms_get () - start_time;
-
-    (* lock) ++;                                                        // Attempt to acquire lock (1st or again)
     lock_val = (* lock);
-    if (lock_val == 1) {                                                // If success...
-      if (attempts)                                                     // If not 1st try...
-        loge ("lock_open %s success id: %s  holder_id: %s  attempts: %d  lock_val: %d  lock: %d  elapsed_time: %d", id, holder_id, attempts, lock_val, * lock, elapsed_time);
-      holder_id = (char *) id;                                          // We are last holder (though done now)
-      return (0);                                                       // Lock acquired
-    }
-    else {
-      (* lock) --;                                                      // Release lock attempt
-      loge ("lock_open lost id: %s  holder_id: %s  attempts: %d  lock_val: %d  lock: %d  elapsed_time: %d", id, holder_id, attempts, lock_val, * lock, elapsed_time);// Else we lost attempt
-      attempts ++;
-    }
+    loge ("lock_open timeout id: %s  holder_id: %s  attempts: %d  lock_val: %d  lock: %d  elapsed_time: %d", id, holder_id, attempts, lock_val, * lock, elapsed_time);
+    return (-1);                                                          // Error, no lock
   }
-  lock_val = (* lock);
-  loge ("lock_open timeout id: %s  holder_id: %s  attempts: %d  lock_val: %d  lock: %d  elapsed_time: %d", id, holder_id, attempts, lock_val, * lock, elapsed_time);
-  return (-1);                                                          // Error, no lock
-}
-
-int lock_close (const char * id, volatile int * lock) {
-  //logd ("lock_close %s  lock: %d", id, (* lock));
-  (* lock) --;
-  //logd ("lock_close %s 2  lock: %d", id, (* lock));
-  return (0);
-}
-*/
+  
+  int lock_close (const char * id, volatile int * lock) {
+    //logd ("lock_close %s  lock: %d", id, (* lock));
+    (* lock) --;
+    //logd ("lock_close %s 2  lock: %d", id, (* lock));
+    return (0);
+  }*/
 
 
   #define ERROR_CODE_NUM 56
@@ -889,7 +996,7 @@ int lock_close (const char * id, volatile int * lock) {
 
         if (ret >= cmd_len) {                                           // Eg: ret = strlen ("/bin/a") = 6, cmd_len = strlen ("a") = 1, compare 1 at cmd_line[5]
 
-          if (! strncmp (cmd, & cmdline [ret - cmd_len], cmd_len)) {    // If a matching process name
+          if (! strcmp (cmd, & cmdline [ret - cmd_len])) {              // If a matching process name
             logd ("pid_get: got pid: %d for cmdline: %s  start_pid: %d", pid, cmdline, start_pid);
             closedir (dp);                                              // Close the directory.
             return (pid);                                               // SUCCESS: Done w/ pid
@@ -1053,7 +1160,7 @@ int lock_close (const char * id, volatile int * lock) {
       unlink (api_clisock);                                                // Remove any lingering client socket
       memset ((char *) & cli_addr, sizeof (cli_addr), 0);
       cli_addr.sun_family = AF_UNIX;
-      strncpy (cli_addr.sun_path, api_clisock, sizeof (cli_addr.sun_path));
+      strlcpy (cli_addr.sun_path, api_clisock, sizeof (cli_addr.sun_path));
       cli_len = strlen (cli_addr.sun_path) + sizeof (cli_addr.sun_family);
   
       if (bind (sockfd, (struct sockaddr *) & cli_addr,cli_len) < 0) {
@@ -1191,7 +1298,7 @@ int lock_close (const char * id, volatile int * lock) {
     memset ((char *) & srv_addr, sizeof (srv_addr), 0);
   #ifdef  CS_AF_UNIX
     srv_addr.sun_family = AF_UNIX;
-    strncpy (srv_addr.sun_path, api_srvsock, sizeof (srv_addr.sun_path));
+    strlcpy (srv_addr.sun_path, api_srvsock, sizeof (srv_addr.sun_path));
     srv_len = strlen (srv_addr.sun_path) + sizeof (srv_addr.sun_family);
   #else
     srv_addr.sin_family = AF_INET;
@@ -1336,5 +1443,4 @@ int lock_close (const char * id, volatile int * lock) {
 
 #endif      //#ifndef GENERIC_SERVER_INCLUDED
 #endif      //#ifdef  GENERIC_SERVER
-
 

@@ -29,8 +29,8 @@ public class gui_act extends Activity {                                 // publi
   public static     Context             m_context   = null;
   public static     com_api             m_com_api   = null;
 
-  private static    BroadcastReceiver   m_gui_api_bcr   = null;
   private           gui_gap             m_gui_gap   = null;
+  private static    BroadcastReceiver   m_gap_bcr   = null;
 
     // Lifecycle:
 
@@ -41,16 +41,23 @@ public class gui_act extends Activity {                                 // publi
     m_context = this;
     com_uti.logd ("m_context: " + m_context);
     com_uti.logd ("m_com_api: " + m_com_api);
-    com_uti.logd ("m_gui_api_bcr: " + m_gui_api_bcr);
+    com_uti.logd ("m_gap_bcr: " + m_gap_bcr);
     com_uti.logd ("m_gui_gap: " + m_gui_gap);
 
-    com_uti.devnum_set (m_context);                                     // Set/get device number
+    //strict_mode_set (true);                                           // Disabled due to remaining main thread issues
 
     if (m_com_api == null) {                                            // If a receiver has not initialized yet...
-      m_com_api = new com_api (m_context);                              // Instantiate Common API
-      com_uti.logd ("m_com_api: " + m_com_api);
+      m_com_api = new com_api (this);                                   // Instantiate Common API   class
+      if (m_com_api == null) {
+        com_uti.loge ("m_com_api: " + m_com_api);
+        return;
+      }
+      else
+        com_uti.logd ("m_com_api: " + m_com_api);
     }
 
+    m_com_api.chass_plug_aud = com_uti.chass_plug_aud_get (m_context);  // Setup Tuner Plugin, and Audio Plugin
+    m_com_api.chass_plug_tnr = com_uti.chass_plug_tnr;
   }
 
   @Override
@@ -61,7 +68,7 @@ public class gui_act extends Activity {                                 // publi
     m_context = this;
     com_uti.logd ("m_context: " + m_context);
     com_uti.logd ("m_com_api: " + m_com_api);
-    com_uti.logd ("m_gui_api_bcr: " + m_gui_api_bcr);
+    com_uti.logd ("m_gap_bcr: " + m_gap_bcr);
     com_uti.logd ("m_gui_gap: " + m_gui_gap);
 
     com_uti.logd ("SpiritF " + com_uti.app_version_get (m_context));
@@ -85,7 +92,7 @@ public class gui_act extends Activity {                                 // publi
 
     setVolumeControlStream (svc_aud.audio_stream);                      // setVolumeControlStream() must be done from an Activity ? Then what stream is used from widget start ?
 
-    gui_api_bcr_start ();                                               // Start Common API Broadcast Receiver
+    gap_bcr_start ();                                               // Start Common API Broadcast Receiver
 
     gui_start ();                                                       // Start GUI
 
@@ -135,7 +142,7 @@ public class gui_act extends Activity {                                 // publi
   public void onDestroy () {
     com_uti.logd ("");
                                                                         // One of these caused crashes; added try / catch below
-    gui_api_bcr_stop ();
+    gap_bcr_stop ();
     gui_stop ();
 
     com_uti.logd ("com_uti.num_daemon_get:              " + com_uti.num_daemon_get);
@@ -157,7 +164,7 @@ public class gui_act extends Activity {                                 // publi
     try {
       if (m_gui_gap == null)
         com_uti.loge ("already stopped");
-      else if (! m_gui_gap.gap_state_set ("stop"))                      // Stop UI. If error...
+      else if (! m_gui_gap.gap_state_set ("Stop"))                      // Stop UI. If error...
         com_uti.loge ("gui_stop error");
       else
         com_uti.logd ("gui_stop OK");
@@ -172,7 +179,7 @@ public class gui_act extends Activity {                                 // publi
       m_gui_gap = new gui_gui (m_context, m_com_api);                   // Instantiate UI
       if (m_gui_gap == null)
         com_uti.loge ("m_gui_gap == null");
-      else if (! m_gui_gap.gap_state_set ("start")) {                   // Start UI. If error...
+      else if (! m_gui_gap.gap_state_set ("Start")) {                   // Start UI. If error...
         com_uti.loge ("gui_start error");
         m_gui_gap = null;
       }
@@ -185,29 +192,29 @@ public class gui_act extends Activity {                                 // publi
   }
 
 
-  private void gui_api_bcr_stop () {
-    if (m_gui_api_bcr != null) {                                        // Remove the State listener
+  private void gap_bcr_stop () {
+    if (m_gap_bcr != null) {                                        // Remove the State listener
       if (m_context != null) {
         try {
-          m_context.unregisterReceiver (m_gui_api_bcr);                 // Caused by: java.lang.IllegalArgumentException: Receiver not registered: fm.a2d.sf.gui_act$1@42549158
+          m_context.unregisterReceiver (m_gap_bcr);                 // Caused by: java.lang.IllegalArgumentException: Receiver not registered: fm.a2d.sf.gui_act$1@42549158
         }
         catch (Throwable e) {
           e.printStackTrace ();
         }
       }
-      m_gui_api_bcr = null;
+      m_gap_bcr = null;
     }
   }
 
-  private void gui_api_bcr_start () {                                   // Common API Intent result & notification Broadcast Receiver
-    if (m_gui_api_bcr == null) {
-      m_gui_api_bcr = new BroadcastReceiver () {
+  private void gap_bcr_start () {                                       // Common API Intent result & notification Broadcast Receiver
+    if (m_gap_bcr == null) {
+      m_gap_bcr = new BroadcastReceiver () {
         @Override
         public void onReceive (Context context, Intent intent) {
           String action = intent.getAction ();
 
           com_uti.logv ("intent: " + intent + "  action: " + action);
-          if (! action.equalsIgnoreCase (com_uti.api_result_id))        // If not for us then done
+          if (! action.equals (com_uti.api_result_id))                  // If not for us then done
             return;
 
           if (m_com_api != null && m_gui_gap != null) {
@@ -219,15 +226,15 @@ public class gui_act extends Activity {                                 // publi
       };
 
       IntentFilter intent_filter = new IntentFilter ();
-      intent_filter.addAction (com_uti.api_result_id);//"fm.a2d.sf.result.get");                 // Can add more actions if needed
+      intent_filter.addAction (com_uti.api_result_id);                  // Can add more actions if needed
       intent_filter.addCategory (Intent.CATEGORY_DEFAULT);
 
       Intent last_sticky_state_intent = null;
       if (m_context != null)
-        last_sticky_state_intent = m_context.registerReceiver (m_gui_api_bcr, intent_filter, null, null);    // No permission, no handler scheduler thread.
+        last_sticky_state_intent = m_context.registerReceiver (m_gap_bcr, intent_filter, null, null);    // No permission, no handler scheduler thread.
       if (last_sticky_state_intent != null) {
         com_uti.logd ("bcast intent last_sticky_state_intent: " + last_sticky_state_intent);
-        //m_gui_api_bcr.onReceive (m_context, last_sticky_state_intent);// Like a resend of last audio status update
+        //m_gap_bcr.onReceive (m_context, last_sticky_state_intent);// Like a resend of last audio status update
       }
     }
   }

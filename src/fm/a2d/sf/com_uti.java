@@ -63,38 +63,6 @@ public final class com_uti  {
   public static final int s2_notif_id = 1963;                           // No relevance except to uniquely identify notification. Spirit1 uses 2112
 
     // Device support:
-  private static boolean motorola_stock_set = false;
-  private static boolean motorola_stock     = false;
-
-  private static boolean samsung_stock_set  = false;
-  private static boolean samsung_stock      = false;
-
-  private static boolean lg2_stock_set      = false;
-  private static boolean lg2_stock          = false;
-
-  private static boolean htc_have           = false;
-  private static boolean htc_have_set       = false;
-
-  private static boolean htc_stock_set      = false;
-  private static boolean htc_stock          = false;
-
-  private static boolean htc_gpe_set        = false;
-  private static boolean htc_gpe            = false;
-
-    //                                      Tuner   Audio
-  public static final int DEV_UNK = -1;
-  public static final int DEV_GEN = 0;  // gen      gen
-  public static final int DEV_GS1 = 1;  // ssl      gs1
-  public static final int DEV_GS2 = 2;  // ssl      gs2
-  public static final int DEV_GS3 = 3;  // ssl      gs3
-  public static final int DEV_QCV = 4;  // qcv      qcv
-  public static final int DEV_OM7 = 5;  // bch      one
-  public static final int DEV_LG2 = 6;  // bch      lg2
-  public static final int DEV_XZ2 = 7;  // bch      xz2
-
-  public static String m_device         = "";
-  public static String m_board          = "";
-  public static String m_manufacturer   = "";
 
   public com_uti () {                                                    // Default constructor
     //com_uti.logd ("m_obinits: " + m_obinits++);   // !! Can't log from internal code, class is not set up yet !!
@@ -194,6 +162,7 @@ public final class com_uti  {
   }
 
 
+    //
 
   public static String country_get (Context context) {
 
@@ -208,16 +177,14 @@ public final class com_uti  {
 
     String nci = mngr.getNetworkCountryIso ();
     String sci = mngr.getSimCountryIso ();
-    if (nci != null && ! nci.equalsIgnoreCase (""))
+    if (nci != null && ! nci.equals (""))
       cc = nci;
-    else if (sci != null && ! sci.equalsIgnoreCase (""))
+    else if (sci != null && ! sci.equals (""))
       cc = sci;
 
     com_uti.logd ("cc: " + cc);
     return (cc);
   }
-
-
 
   public static boolean main_thread_get (String source) {
     boolean ret = (Looper.myLooper () == Looper.getMainLooper ());
@@ -229,7 +196,6 @@ public final class com_uti  {
   }
 
   //public static boolean strict_mode = false;
-
   //StrictMode.ThreadPolicy policy = new StrictMode.ThreadPolicy.Builder().permitAll().build();
   //StrictMode.setThreadPolicy(policy);
 
@@ -398,7 +364,7 @@ public final class com_uti  {
     }
 
     //boolean bg_data_allowed = connectivity_srvc.getBackgroundDataSetting ();    // Deprecated API level 14. ICS+ bg data depends on several factors, always return true.
-    //if (! bg_data_allowed && ! network_access.equalsIgnoreCase ("cell")) {
+    //if (! bg_data_allowed && ! network_access.equals ("cell")) {
     //  com_uti.loge ("bg_data_allowed: " + bg_data_allowed + "  network_access: " + network_access);
     //  return (-3);
     }
@@ -407,13 +373,13 @@ public final class com_uti  {
     boolean connected_cell = false;
     NetworkInfo [] all_net_info = connectivity_srvc.getAllNetworkInfo ();
     for (NetworkInfo ni : all_net_info) {
-      if (ni.getTypeName ().equalsIgnoreCase ("WIFI")) {
+      if (ni.getTypeName ().equals ("WIFI")) {
         if (ni.isConnected ())
           connected_wifi = true;
         if (log_nag)
           com_uti.logd ("connected_wifi: " + connected_wifi);
       }
-      if (ni.getTypeName ().equalsIgnoreCase ("MOBILE")) {
+      if (ni.getTypeName ().equals ("MOBILE")) {
         if (ni.isConnected ())
           connected_cell = true;
         if (log_nag)
@@ -436,7 +402,7 @@ public final class com_uti  {
       return (false);
     }
     boolean is_connected = net_info.isConnected ();     // ! .isConnectedOrConnecting()
-    if ( ! is_connected && ! network_access.equalsIgnoreCase ("cell")) {   // If not "connected" AND if cell activity disallowed (assume we can bypass ?)
+    if ( ! is_connected && ! network_access.equals ("cell")) {   // If not "connected" AND if cell activity disallowed (assume we can bypass ?)
       //com_uti.loge ("is_connected: " + is_connected + "  network_access: " + network_access);
       return (false);
     }
@@ -724,25 +690,21 @@ The first pitfall relating to Runtime.exec() is the IllegalThreadStateException.
 For example, to execute a process that is external to the Java VM, we use the exec() method. To see the value that the external process returns,
 we use the exitValue() method on the Process class. In our first example, we will attempt to execute the Java compiler (javac.exe): 
 
-    public static void main(String args[])
-    {
-        try
-        {            
-            Runtime rt = Runtime.getRuntime();
-            Process proc = rt.exec("javac");
-            int exitVal = proc.exitValue();
-            System.out.println("Process exitValue: " + exitVal);
-        } catch (Throwable t)
-          {
-            t.printStackTrace();
-          }
-    }
+        try {            
+          Runtime rt = Runtime.getRuntime ();
+          Process proc = rt.exec ("javac");
+          int exitVal = proc.exitValue ();
+          logd ("Process exitValue: " + exitVal);
+        }
+        catch (Throwable t) {
+          t.printStackTrace();
+        }
 
 If an external process has not yet completed, the exitValue() method will throw an IllegalThreadStateException
 
-            Runtime rt = Runtime.getRuntime();
-            Process proc = rt.exec("javac");
-            int exitVal = proc.waitFor();
+            Runtime rt = Runtime.getRuntime ();
+            Process proc = rt.exec ("javac");
+            int exitVal = proc.waitFor ();
 
 
 Why Runtime.exec() hangs:  Because some native platforms only provide limited buffer size for standard input and output streams,
@@ -818,105 +780,71 @@ failure to promptly write the input stream or read the output stream of the subp
     return (exists & access);
   }
 
-  public static boolean motog_get () {
-    if (m_device.startsWith ("FALCON") || m_device.startsWith ("PEREGRINE") || m_device.startsWith ("TITAN") || m_device.startsWith ("XT102") || m_device.startsWith ("XT103") || m_device.startsWith ("XT104") || m_device.startsWith ("XT106"))
-      return (true);
-    else
-      return (false);
+
+    // Devices:
+
+/* Unused at this time:
+  public static boolean stock_sam_get () {
+    //return (file_get ("/system/framework/twframework.jar"));// && file_get ("/system/app/FmRadio.apk") && file_get ("/system/lib/libfmradio_jni.so"));
+    return (file_get ("/system/framework/twframework.jar") && file_get ("/system/lib/libfmradio_jni.so"));  // Oct 28, REM-ICS JB 3.0.1 has twframework.jar
   }
 
-  public static boolean motorola_stock_get () {
-    if (! motorola_stock_set) {
-      motorola_stock_set = true;
-      if (file_get ("/system/framework/com.motorola.blur.library.app.service.jar") || file_get ("/system/framework/com.motorola.frameworks.core.addon.jar"))
-        motorola_stock = true;
-    }
-    return (motorola_stock);
+  public static boolean stock_htc_get () {
+    return (om7_get () && (file_get ("/system/framework/com.htc.fusion.fx.jar") || file_get ("/system/framework/com.htc.lockscreen.fusion.jar"))    // Special case for HTC One
+        || file_get ("/system/framework/com.htc.framework.jar") || file_get ("/system/framework/framework-htc-res.apk")
+        || file_get ("/system/framework/HTCDev.jar") || file_get ("/system/framework/HTCExtension.jar"));
   }
 
-  public static boolean samsung_stock_get () {
-    if (! samsung_stock_set) {
-      samsung_stock_set = true;
-      //if (file_get ("/system/framework/twframework.jar"))// && file_get ("/system/app/FmRadio.apk") && file_get ("/system/lib/libfmradio_jni.so"))
-      if (file_get ("/system/framework/twframework.jar") && file_get ("/system/lib/libfmradio_jni.so"))    // Oct 28, REM-ICS JB 3.0.1 has twframework.jar
-        samsung_stock = true;
-    }
-    return (samsung_stock);
+  public static boolean gpe_om7_get () {
+    return (htc_get () && m7_get () && ! stock_htc_get () && file_get ("/system/framework/htcirlibs.jar"));
   }
 
+  public static boolean old_qcv_get () {
+    return (com_uti.sys_prop_device.startsWith ("EVITA") || com_uti.sys_prop_device.startsWith ("VILLE") || com_uti.sys_prop_device.startsWith ("JEWEL"));// || com_uti.sys_prop_device.startsWith ("M7C"));
+  }
+*/
 
-  public static boolean lg2_stock_get () {
-    if (! lg2_stock_set) {
-      lg2_stock_set = true;
-      if (com_uti.file_get ("/system/framework/com.lge.systemservice.core.jar") || com_uti.file_get ("/system/framework/com.lge.core.jar") || com_uti.file_get ("/system/framework/com.lge.frameworks.jar"))
-        lg2_stock = true;
-    }
-    return (lg2_stock);
+    // Manuf:
+  public static boolean sony_get () {
+    return (com_uti.sys_prop_manuf.startsWith ("SONY"));
+  }
+  public static boolean htc_get () {
+    return (file_get ("/sys/class/htc_accessory/fm/flag") || sys_prop_manuf.startsWith ("HTC"));// || stock_htc_get ());
   }
 
-
-  public static boolean htc_gpe_get () {
-    if (! htc_gpe_set) {
-      htc_gpe_set = true;
-      htc_gpe    = false;
-      if (! htc_stock_get () && file_get ("/system/framework/htcirlibs.jar") /*&& "M7"*/)
-        htc_gpe    = true;
-    }
-    logd ("htc_gpe_get: " + htc_gpe);
-    return (htc_gpe);
+    // Stock Manuf:
+  public static boolean stock_mot_get () {
+    return (file_get ("/system/framework/com.motorola.blur.library.app.service.jar") || file_get ("/system/framework/com.motorola.frameworks.core.addon.jar"));
+  }
+  public static boolean stock_lg2_get () {
+    return (com_uti.file_get ("/system/framework/com.lge.systemservice.core.jar") || com_uti.file_get ("/system/framework/com.lge.core.jar") || com_uti.file_get ("/system/framework/com.lge.frameworks.jar"));
   }
 
-  public static boolean htc_one_onemini_get () {
-    boolean ret = false;
-    if (m_device.startsWith ("M7"))
-      ret = true;
-    else if (m_device.startsWith ("M4") && htc_have_get ())
-      ret = true;
-    else if (m_device.startsWith ("HTC_M4"))
-      ret = true;
-    return (ret);
+    // Device:
+  public static boolean om8_get () {
+    return (com_uti.sys_prop_device.startsWith ("M8") || com_uti.sys_prop_device.startsWith ("HTC_M8") || sys_prop_device.startsWith ("M7C"));   // M7C is HTC One dual sim 802w/802d/802t);
   }
-  public static boolean htc_stock_get () {
-    if (! htc_stock_set) {
-      htc_stock_set = true;
-
-      if (htc_one_onemini_get ()) {                                     // Special case for HTC One
-        if (file_get ("/system/framework/com.htc.fusion.fx.jar") || file_get ("/system/framework/com.htc.lockscreen.fusion.jar"))
-          htc_stock = true;
-      }
-      else if (file_get ("/system/framework/com.htc.framework.jar") || file_get ("/system/framework/framework-htc-res.apk") || file_get ("/system/framework/HTCDev.jar") || file_get ("/system/framework/HTCExtension.jar"))
-        htc_stock = true;
-    }
-    return (htc_stock);
+  public static boolean om7_get () {                                    // For One M7 and One Mini, which has same FM
+    return (sys_prop_device.startsWith ("M7") || (sys_prop_device.startsWith ("M4") && htc_get ()) || sys_prop_device.startsWith ("HTC_M4"));
   }
+  private static boolean gs3_no2_get () {
+    if (sys_prop_device.startsWith ("T03G")        ||                          // Galaxy Note2 3G
+        sys_prop_device.startsWith ("GT-N71")      ||
+        sys_prop_device.startsWith ("GALAXYN71")   ||
 
-  public static boolean htc_have_get () {
-    if (! htc_have_set) {
-      htc_have_set = true;
-      if (file_get ("/sys/class/htc_accessory/fm/flag"))
-        htc_have = true;
-      else if (m_manufacturer.startsWith ("HTC"))
-        htc_have = true;
-      else if (htc_stock_get ())
-        htc_have = true;
-    }
-    return (htc_have);
-  }
-
-
-
-  private static boolean is_gs3_note2 () {
-    if (m_device.startsWith ("T03G")        ||                          // Galaxy Note2 3G
-        m_device.startsWith ("GT-N71")      ||
-        m_device.startsWith ("GALAXYN71")   ||
-
-        m_device.startsWith ("M0")          ||                          // Galaxy S3
-        m_device.startsWith ("GALAXYS3")    ||
-        m_device.startsWith ("I93")         ||                          // OmniROM
-        m_device.startsWith ("GT-I93")    )  {
+        sys_prop_device.startsWith ("M0")          ||                          // Galaxy S3
+        sys_prop_device.startsWith ("GALAXYS3")    ||
+        sys_prop_device.startsWith ("I93")         ||                          // OmniROM
+        sys_prop_device.startsWith ("GT-I93")    )  {
       return (true);
     }
     return (false);
+  }
+  public static boolean mog_get () {
+    return (sys_prop_device.startsWith ("FALCON") || sys_prop_device.startsWith ("PEREGRINE") || sys_prop_device.startsWith ("TITAN") || sys_prop_device.startsWith ("XT102") || sys_prop_device.startsWith ("XT103") || sys_prop_device.startsWith ("XT104") || sys_prop_device.startsWith ("XT106"));
+  }
+  public static boolean gs4_mini_get () {
+    return (com_uti.sys_prop_device.startsWith ("SERRANO"));
   }
 
 /* OMNIROM:
@@ -933,7 +861,19 @@ GT-I9000    GT-I9000        Mackay. Unofficial ?
 Evo 4G LTE  jewel
 */
 
-  private static String service_device_get (int device) {
+/*
+    //                                      Tuner   Audio
+  public static final int DEV_UNK = -1;
+  public static final int DEV_GEN = 0;  // gen      gen
+  public static final int DEV_GS1 = 1;  // ssl      gs1
+  public static final int DEV_GS2 = 2;  // ssl      gs2
+  public static final int DEV_GS3 = 3;  // ssl      gs3
+  public static final int DEV_QCV = 4;  // qcv      qcv
+  public static final int DEV_OM7 = 5;  // bch      one
+  public static final int DEV_LG2 = 6;  // bch      lg2
+  public static final int DEV_XZ2 = 7;  // bch      xz2
+
+  private static String device_string_get (int device) {
     switch (device) {
       case DEV_UNK: return ("UNK");
       case DEV_GEN: return ("GEN");
@@ -947,51 +887,31 @@ Evo 4G LTE  jewel
     }
     return ("UNK");
   }
-
-/*
-  private String getProperty (String propertyName) {
-    String ret = System.getProperty (propertyName);         // Need to be system user for some properties ?
-    if (ret != null)
-      return (ret);
-
-    String cmd = "getprop " + propertyName + " | grep 1";      // !! Only works with binary 0/1 results !!!
-    int iret = com_uti.WAS_sys_run (cmd, true);
-    if (iret == 0)
-      ret = "1";
-    else
-      ret = "0";
-    return (ret);
-  }
 */
 
+  private static String  sys_prop_device    = "";
+  private static String  sys_prop_board     = "";
+  private static String  sys_prop_manuf     = "";
 
-  private static boolean strict_set = false;
+  private static String chass_plug_aud = "UNK";
+  public  static String chass_plug_tnr = "UNK";
 
-  public static int devnum = DEV_UNK;                                   // !!!! Need to match m_com_api.service_device_int !!!!
-  public static final String DEV_UNK_STR = "" + DEV_UNK;
+  public static String chass_plug_aud_get (Context context) {
 
-  public static int devnum_set (Context context) {
-    com_uti.devnum = devnum_get (context);
-    return (com_uti.devnum);
-  }
-
-  private static int devnum_get (Context context) {
-
-    if (! strict_set) {
-      strict_set = true;
-      //strict_mode_set (true);
-    }
+    com_uti.chass_plug_aud = "UNK";
                                                                         // Can't get these from getprop !!
     String arch = System.getProperty ("os.arch");                       // armv7l           armv7l
     if (arch != null)
       com_uti.logd ("os.arch: " + arch);
     else
       com_uti.loge ("!!!! os.arch");
+
     String name = System.getProperty ("os.name");                       // Linux            Linux
     if (name != null)
       com_uti.logd ("os.name: " + name);
     else
       com_uti.loge ("!!!! os.name");
+
     String vers = System.getProperty ("os.version");                    // 3.0.31-CM-ge296ffc   3.0.60-g8a65ee9
     if (vers != null)
       com_uti.logd ("os.vers: " + vers);
@@ -1007,134 +927,110 @@ Evo 4G LTE  jewel
     com_uti.logd ("ro.product.model:        " + android.os.Build.MODEL);                                // GT-I9300       GT-I9000
     com_uti.logd ("ro.product.name:         " + android.os.Build.PRODUCT);                              // m0xx           GT-I9000
 
-    //if (android.os.Build.DEVICE.toUpperCase (Locale.getDefault ()).equals "GT-I900")
+    if (sys_prop_board.equals (""))
+      sys_prop_board = android.os.Build.BOARD.toUpperCase (Locale.getDefault ());
 
-    if (m_board.equals (""))
-      m_board = android.os.Build.BOARD.toUpperCase (Locale.getDefault ());
+    if (sys_prop_device.equals (""))
+      sys_prop_device = android.os.Build.DEVICE.toUpperCase (Locale.getDefault ());
 
-    if (m_device.equals (""))
-      m_device = android.os.Build.DEVICE.toUpperCase (Locale.getDefault ());
+    if (sys_prop_manuf.equals (""))
+      sys_prop_manuf = android.os.Build.MANUFACTURER.toUpperCase (Locale.getDefault ());
 
-    if (m_manufacturer.equals (""))
-      m_manufacturer = android.os.Build.MANUFACTURER.toUpperCase (Locale.getDefault ());
-
-
-    int dev = DEV_UNK;
 
     if (false)
       com_uti.loge ("Impossible !");
 
-    else if (is_gs3_note2 ())
-      dev = (DEV_GS3);
+    else if (gs3_no2_get ())
+      com_uti.chass_plug_aud = "GS3";
 
-    else if (m_manufacturer.startsWith ("SONY") && file_get ("/system/lib/libbt-fmrds.so"))     // ? Z2/Z3 need to be more specific ?
-      dev = (DEV_XZ2);
-    else if (m_device.startsWith ("SGP5") || m_device.startsWith ("SOT") || m_device.startsWith ("SO-05") || m_device.startsWith ("D65") || m_device.startsWith ("SO-03") || m_device.startsWith ("CASTOR") || m_device.startsWith ("SIRIUS") || 
-        m_device.startsWith ("D66") || m_device.startsWith ("D58") || m_device.startsWith ("LEO"))
-      dev = (DEV_XZ2);
+    else if (com_uti.sony_get () && file_get ("/system/lib/libbt-fmrds.so"))     // ? Z2/Z3 need to be more specific ?
+      com_uti.chass_plug_aud = "XZ2";
+    else if (sys_prop_device.startsWith ("SGP5") || sys_prop_device.startsWith ("SOT") || sys_prop_device.startsWith ("SO-05") || sys_prop_device.startsWith ("D65") || sys_prop_device.startsWith ("SO-03") || sys_prop_device.startsWith ("CASTOR") || sys_prop_device.startsWith ("SIRIUS") || 
+        sys_prop_device.startsWith ("D66") || sys_prop_device.startsWith ("D58") || sys_prop_device.startsWith ("LEO"))
+      com_uti.chass_plug_aud = "XZ2";
 
 //C65, C66, C69
                                 // NECCASIO G'zOne Commando 4G LTE– C811
-    else if (m_device.startsWith ("C811") || m_device.startsWith ("EVITA") || m_device.startsWith ("VILLE") || m_device.startsWith ("JEWEL")//) // || m_device.startsWith ("SCORPION")) //_MINI_U"))
-          || m_device.startsWith ("C2") || m_device.startsWith ("C21") || m_device.startsWith ("C19") || m_device.startsWith ("C6") || m_device.startsWith ("SGP3") || m_device.startsWith ("LT29") || m_device.startsWith ("LT30") ||
-                //  || m_device.startsWith ("C65") || m_device.startsWith ("C66") || m_device.startsWith ("C69")    // Japan Xperia Z1  SO-01f & SOL23 (Australia also SOL23)
-             m_device.startsWith ("YUGA") || m_device.startsWith ("ODIN") || m_device.startsWith ("TSUBASA") || m_device.startsWith ("HAYABUSA") || m_device.startsWith ("MINT") || m_device.startsWith ("POLLUX") || m_device.startsWith ("HONAMI") ||
-             m_device.startsWith ("GEE")   )    // LG Optimus G/G Pro
-      dev = (DEV_QCV);
+    else if (sys_prop_device.startsWith ("C811") || sys_prop_device.startsWith ("EVITA") || sys_prop_device.startsWith ("VILLE") || sys_prop_device.startsWith ("JEWEL")//) // || sys_prop_device.startsWith ("SCORPION")) //_MINI_U"))
+          || sys_prop_device.startsWith ("C2") || sys_prop_device.startsWith ("C21") || sys_prop_device.startsWith ("C19") || sys_prop_device.startsWith ("C6") || sys_prop_device.startsWith ("SGP3") || sys_prop_device.startsWith ("LT29") || sys_prop_device.startsWith ("LT30") ||
+                //  || sys_prop_device.startsWith ("C65") || sys_prop_device.startsWith ("C66") || sys_prop_device.startsWith ("C69")    // Japan Xperia Z1  SO-01f & SOL23 (Australia also SOL23)
+             sys_prop_device.startsWith ("YUGA") || sys_prop_device.startsWith ("ODIN") || sys_prop_device.startsWith ("TSUBASA") || sys_prop_device.startsWith ("HAYABUSA") || sys_prop_device.startsWith ("MINT") || sys_prop_device.startsWith ("POLLUX") || sys_prop_device.startsWith ("HONAMI") ||
+             sys_prop_device.startsWith ("GEE")   )    // LG Optimus G/G Pro
+      com_uti.chass_plug_aud = "QCV";
 
-    else if (m_device.startsWith ("GT-I9000") || m_device.startsWith ("GT-I9010") || m_device.equals ("GALAXYS") || m_device.startsWith ("GALAXYSM") || m_device.startsWith ("SC-02B") || m_device.startsWith ("YP"))
-      dev = (DEV_GS1);
+    else if (sys_prop_device.startsWith ("GT-I9000") || sys_prop_device.startsWith ("GT-I9010") || sys_prop_device.equals ("GALAXYS") || sys_prop_device.startsWith ("GALAXYSM") || sys_prop_device.startsWith ("SC-02B") || sys_prop_device.startsWith ("YP"))
+      com_uti.chass_plug_aud = "GS1";
 
-    else if (m_device.startsWith ("GT-I91") || m_device.startsWith ("I91") || m_device.startsWith ("N70") || m_device.startsWith ("GT-N70") || m_device.equals ("GALAXYS2") || m_device.startsWith ("SC-02C") || m_device.startsWith ("GALAXYN"))
-      dev = (DEV_GS2);
+    else if (sys_prop_device.startsWith ("GT-I91") || sys_prop_device.startsWith ("I91") || sys_prop_device.startsWith ("N70") || sys_prop_device.startsWith ("GT-N70") || sys_prop_device.equals ("GALAXYS2") || sys_prop_device.startsWith ("SC-02C") || sys_prop_device.startsWith ("GALAXYN"))
+      com_uti.chass_plug_aud = "GS2";
 
-    else if (m_device.startsWith ("M8") || m_device.startsWith ("HTC_M8"))                                // HTC One M8 2014
-      dev = (DEV_QCV);
+    else if (com_uti.om8_get ())                                        // HTC One M8 2014
+      com_uti.chass_plug_aud = "QCV";
 
-    else if (m_device.startsWith ("M7C"))                               // HTC One dual sim 802w/802d/802t
-      dev = (DEV_QCV);
+    else if (om7_get ())
+      com_uti.chass_plug_aud = "OM7";
 
-    else if (htc_one_onemini_get ())
-      dev = (DEV_OM7);
+    else if (mog_get ())
+      com_uti.chass_plug_aud = "QCV";
 
-    else if (motog_get ())
-      dev = (DEV_QCV);
-
-    else if (m_board.startsWith ("GALBI") || m_device.startsWith ("G2") || m_device.startsWith ("LS980") || m_device.startsWith ("D80") || m_device.startsWith ("ZEE"))  // "zee" RayGlobe Flex - ls980     Non-Sprint US & VZN VS980 = No FM
-      dev = (DEV_LG2);
+    else if (sys_prop_board.startsWith ("GALBI") || sys_prop_device.startsWith ("G2") || sys_prop_device.startsWith ("LS980") || sys_prop_device.startsWith ("D80") || sys_prop_device.startsWith ("ZEE"))  // "zee" RayGlobe Flex - ls980     Non-Sprint US & VZN VS980 = No FM
+      com_uti.chass_plug_aud = "LG2";
 
     else
-      dev = (DEV_UNK);
+      com_uti.chass_plug_aud = "UNK";
 
 
-    if (dev == DEV_UNK) {
-      // From android_fmradio.cpp
+    if (com_uti.chass_plug_aud.equals ("UNK")) {
       if (com_uti.file_get ("/dev/radio0") && com_uti.file_get ("/sys/devices/platform/APPS_FM.6")) {   // Qualcomm is always V4L and has this FM /sys directory
-        dev = DEV_QCV;                                                                                  // Redundant, see 
+        com_uti.chass_plug_aud = "QCV";
       }
       else if (com_uti.file_get ("/dev/radio0") || com_uti.file_get ("/dev/fmradio")) {                 // Samsung GalaxyS class devices always have one of these driver names for Samsung Silicon Labs driver
         if (com_uti.file_get ("/sys/kernel/debug/asoc/smdkc110/wm8994-samsung-codec.4-001a/codec_reg"))
-          dev = DEV_GS1;
+          com_uti.chass_plug_aud = "GS1";
         else if (com_uti.file_get ("/sys/kernel/debug/asoc/U1-YMU823") || com_uti.file_get ("/sys/devices/platform/soc-audio/MC1N2 AIF1") || com_uti.file_get ("/sys/kernel/debug/asoc/U1-YMU823/mc1n2.6-003a"))
-          dev = DEV_GS2;
+          com_uti.chass_plug_aud = "GS2";
         else if (com_uti.file_get ("/sys/kernel/debug/asoc/T0_WM1811/wm8994-codec/codec_reg") || com_uti.file_get ("/sys/kernel/debug/asoc/Midas_WM1811/wm8994-codec/codec_reg") || com_uti.file_get ("/sys/devices/platform/soc-audio/WM8994 AIF1/codec_reg"))
-          dev = DEV_GS3;
+          com_uti.chass_plug_aud = "GS3";
       }
       else {                                                                          // Only remaining alternative is Broadcom
         if (com_uti.file_get ("/dev/ttyHS99") && com_uti.file_get ("/sys/class/g2_rgb_led"))
-          dev = DEV_LG2;
+          com_uti.chass_plug_aud = "LG2";
         else if (com_uti.file_get ("/dev/ttyHS0") && (com_uti.file_get ("/sys/devices/platform/m7_rfkill") || com_uti.file_get ("/sys/devices/platform/mipi_m7.0") || com_uti.file_get ("/sys/module/board_m7_audio")))
-          dev = DEV_OM7;
+          com_uti.chass_plug_aud = "OM7";
       }
-      com_uti.loge ("DEV_UNK fix -> dev: " + dev);
+      com_uti.loge ("UNK fix -> chass_plug_aud: " + com_uti.chass_plug_aud);
     }
 
-    com_uti.logd ("Auto-Detected dev: " + dev + "  service_device_get: " + service_device_get (dev));
+    com_uti.logd ("Auto-Detected chass_plug_aud: " + com_uti.chass_plug_aud);
 
-    String plg_dev = com_uti.prefs_get (context, "service_plugin_device", "").toUpperCase (Locale.getDefault ());
-    com_uti.logd ("Prefs service_plugin_device plg_dev: " + plg_dev);
+    com_uti.chass_plug_aud = com_uti.prefs_get (context, "chass_plug_aud", com_uti.chass_plug_aud);
+    com_uti.logd ("Final chass_plug_aud: " + com_uti.chass_plug_aud);
 
-    if (plg_dev.equals (""))
-      com_uti.logd ("default device");
-    else if (plg_dev.startsWith ("GEN"))
-      dev = DEV_GEN;
-    else if (plg_dev.startsWith ("GT-I9300"))
-      dev = DEV_GS2;
-    else if (plg_dev.startsWith ("GT-I9100"))
-      dev = DEV_GS2;
-    else if (plg_dev.startsWith ("GT-I9000"))
-      dev = DEV_GS1;
-    else if (plg_dev.startsWith ("GT-N7100"))
-      dev = DEV_GS3;
-    else if (plg_dev.startsWith ("GT-N7000"))
-      dev = DEV_GS2;
-    else if (plg_dev.startsWith ("One-M8"))
-      dev = DEV_QCV;
-    else if (plg_dev.startsWith ("One-X"))//Lte"))
-      dev = DEV_QCV;
-    else if (plg_dev.startsWith ("Moto-"))//G"))
-      dev = DEV_QCV;
-    else if (plg_dev.startsWith ("One-M7"))
-      dev = DEV_OM7;
-    else if (plg_dev.startsWith ("LG-G2"))
-      dev = DEV_LG2;
-    else if (plg_dev.startsWith ("Sony-Z1"))//-"))
-      dev = DEV_QCV;
-    else if (plg_dev.startsWith ("Sony-Z2"))//+"))
-      dev = DEV_XZ2;
-    else if (plg_dev.startsWith ("QCom"))//-All"))
-      dev = DEV_QCV;
+    if (com_uti.chass_plug_aud.equals ("UNK"))
+      com_uti.chass_plug_tnr = "UNK";
+    else if (com_uti.chass_plug_aud.equals ("GEN"))
+      com_uti.chass_plug_tnr = "GEN";
+    else if (com_uti.chass_plug_aud.equals ("GS3"))
+      com_uti.chass_plug_tnr = "SSL";
+    else if (com_uti.chass_plug_aud.equals ("GS2"))
+      com_uti.chass_plug_tnr = "SSL";
+    else if (com_uti.chass_plug_aud.equals ("GS1"))
+      com_uti.chass_plug_tnr = "SSL";
+    else if (com_uti.chass_plug_aud.equals ("QCV"))
+      com_uti.chass_plug_tnr = "QCV";
+    else if (com_uti.chass_plug_aud.equals ("OM7"))
+      com_uti.chass_plug_tnr = "BCH";
+    else if (com_uti.chass_plug_aud.equals ("LG2"))
+      com_uti.chass_plug_tnr = "BCH";
+    else if (com_uti.chass_plug_aud.equals ("XZ2"))
+      com_uti.chass_plug_tnr = "BCH";
+    else
+      com_uti.chass_plug_tnr = "UNK";
 
-    com_uti.logd ("Final dev: " + dev + "  service_device_get: " + service_device_get (dev));
+    com_uti.chass_plug_tnr = com_uti.prefs_get (context, "chass_plug_tnr", com_uti.chass_plug_tnr);
+    com_uti.logd ("Final chass_plug_tnr: " + com_uti.chass_plug_tnr);
 
-
-    String plg_tnr = com_uti.prefs_get (context, "service_plugin_tuner", "").toUpperCase (Locale.getDefault ());
-    com_uti.logd ("Prefs service_plugin_device plg_tnr: " + plg_tnr);
-
-    String plg_aud = com_uti.prefs_get (context, "service_plugin_audio", "").toUpperCase (Locale.getDefault ());
-    com_uti.logd ("Prefs service_plugin_device plg_aud: " + plg_aud);
-
-    return (dev);
+    return (com_uti.chass_plug_aud);
   }
 
 
@@ -1188,7 +1084,7 @@ Evo 4G LTE  jewel
       SharedPreferences m_sp = sp_get (context);
       if (m_sp != null) {
         res = m_sp.getString (key, def);                                // java.lang.ClassCastException if wrong type
-        if (res.equalsIgnoreCase (""))
+        if (res.equals (""))
           res = def;
       }
     }
@@ -1329,7 +1225,7 @@ Evo 4G LTE  jewel
     public enum device_connection_state {
         DEVICE_STATE_UNAVAILABLE    (0),
         DEVICE_STATE_AVAILABLE      (1),
-        NUM_DEVICE_STATES
+        NUsys_prop_device_STATES
     };
 */
   public static final int FOR_COMMUNICATION = 0;
@@ -1928,8 +1824,7 @@ com_uti.logd ("getForceUse 2: " + getForceUse (usage));
   }
 
     // PCM other:
-  private native int native_priority_set    (int priority);
-  private native int native_prop_get        (int prop);
+  private        native int native_priority_set    (int priority);
   private static native int native_daemon_cmd      (int cmd_len, byte [] cmd_buf, int res_len, byte [] res_buf, int net_port, int rx_tmo);
 
 
@@ -2027,7 +1922,7 @@ com_uti.logd ("getForceUse 2: " + getForceUse (usage));
     bytear_daemon_cmd_sem ++;
     while (bytear_daemon_cmd_sem != 1) {                                // Get semaphore
       bytear_daemon_cmd_sem --;
-      if (cmd.equalsIgnoreCase ("tuner_bulk")) {
+      if (cmd.equals ("tuner_bulk")) {
         com_uti.loge ("Aborting tuner_bulk for bytear_daemon_cmd_sem: " + bytear_daemon_cmd_sem + "  res_len: " + res_len + "  rx_tmo: " + rx_tmo + "  cmd: \"" + cmd + "\"  last_cmd: \"" + last_cmd + "\"");
         return (-1);
       }
@@ -2112,7 +2007,7 @@ com_uti.logd ("getForceUse 2: " + getForceUse (usage));
     num_daemon_get ++;
 
     int rx_tmo = 400;//800;//500;//300;
-    if (key.equalsIgnoreCase ("tuner_bulk"))
+    if (key.equals ("tuner_bulk"))
       rx_tmo = 100;                                                     // Keep "disposable" commands like get tuner_bulk at a low timeout
 
     if (ena_log_daemon_cmd)
@@ -2136,17 +2031,17 @@ com_uti.logd ("getForceUse 2: " + getForceUse (usage));
     String res = "";
     int timeouts = 0;
     int rx_tmo = 800;                                                   // 500; // 300;
-    if (key.startsWith ("test"))
+    if (key.startsWith ("test_99s_tmo"))
       rx_tmo = 99000;
-    else if (key.equalsIgnoreCase ("tuner_seek_state"))
+    else if (key.equals ("tuner_seek_state"))
       rx_tmo = 20000;
-    else if (key.equalsIgnoreCase ("tuner_api_state"))
+    else if (key.equals ("tuner_api_state"))
       rx_tmo = 10000;
-    else if (key.equalsIgnoreCase ("tuner_state"))
+    else if (key.equals ("tuner_state"))
       rx_tmo =  6000;
-    else if (key.equalsIgnoreCase ("audio_mode"))
+    else if (key.equals ("audio_mode"))
       rx_tmo = 10000;
-    else if (key.equalsIgnoreCase ("audio_state"))
+    else if (key.equals ("audio_state"))
       rx_tmo =  6000;
 
     if (ena_log_daemon_cmd)
@@ -2389,21 +2284,21 @@ http://www.netmite.com/android/mydroid/frameworks/base/include/utils/threads.h
     com_uti.band_freq_inc = 100;
     com_uti.band_freq_odd = 0;
 
-    if (band.equalsIgnoreCase ("US")) {
+    if (band.equals ("US")) {
       com_uti.band_freq_inc = 200;
       com_uti.band_freq_odd = 1;
     }
-    else if (band.equalsIgnoreCase ("EU")) {
+    else if (band.equals ("EU")) {
     }
-    else if (band.equalsIgnoreCase ("JAPAN")) {
+    else if (band.equals ("JAPAN")) {
       com_uti.band_freq_lo =  76000;
       com_uti.band_freq_hi =  90000;
     }
-    else if (band.equalsIgnoreCase ("CHINA")) {
+    else if (band.equals ("CHINA")) {
       com_uti.band_freq_lo =  70000;
       com_uti.band_freq_inc = 50;
     }
-    else if (band.equalsIgnoreCase ("EU_50K_OFFSET")) {
+    else if (band.equals ("EU_50K_OFFSET")) {
       com_uti.band_freq_inc = 50;
     }
 
@@ -2446,9 +2341,9 @@ http://www.netmite.com/android/mydroid/frameworks/base/include/utils/threads.h
 
   public static int tnru_band_new_freq_get (String freq, int tuner_freq_int) {
     int ifreq = 106900;
-    if (freq.equalsIgnoreCase ("down"))
+    if (freq.equals ("Down"))
       ifreq = com_uti.band_freq_updn_get (tuner_freq_int, false);
-    else if (freq.equalsIgnoreCase ("up"))
+    else if (freq.equals ("Up"))
       ifreq = com_uti.band_freq_updn_get (tuner_freq_int, true);
     else
       ifreq = com_uti.tnru_khz_get (freq);
@@ -2491,7 +2386,7 @@ http://www.netmite.com/android/mydroid/frameworks/base/include/utils/threads.h
   public static String tnru_rds_picl_get (String band, int pi) {             // Get North American callsign string for Program ID
     String ret = "";
 
-    if (band.equalsIgnoreCase ("US"))                                   // If North America...
+    if (band.equals ("US"))                                   // If North America...
       ret = na_pi_parse (pi);                                              // Parse/convert PI to callsign
     else if (pi != 0)
       ret = com_uti.hex_get ((short) pi);                                 // Return hex PI
@@ -2783,7 +2678,7 @@ It should be noted that operation in this region is the same as it is for all RD
 
   public static String tnru_rds_ptype_get (String band, int pt) {            // !! English only !!
     String ret = "";
-    if (band.equalsIgnoreCase ("US"))                                           // If outside North America...
+    if (band.equals ("US"))                                           // If outside North America...
       ret = tuner_rbds_pt_str_get (pt);
     else
       ret = tuner_rds_pt_str_get (pt);
@@ -2899,7 +2794,7 @@ It should be noted that operation in this region is the same as it is for all RD
   public static boolean shim_files_possible_get () {
     if (com_uti.file_get ("/system/lib/libbt-hci.so"))
       return (true);
-    if (com_uti.file_get ("/system/vendor/lib/libbt-vendor.so") && com_uti.devnum != DEV_LG2)   // Disable libbt-vendor for LG2 due to Audio enable issue !!!!
+    if (com_uti.file_get ("/system/vendor/lib/libbt-vendor.so") && ! chass_plug_aud.equals ("LG2"))   // Disable libbt-vendor for LG2 due to Audio enable issue !!!!
       return (true);
     return (false);
   }
@@ -3120,4 +3015,19 @@ private final int getAndIncrement(int modulo) {
   }*/
 
 }
+
+/*private String getProperty (String propertyName) {
+    String ret = System.getProperty (propertyName);         // Need to be system user for some properties ?
+    if (ret != null)
+      return (ret);
+
+    String cmd = "getprop " + propertyName + " | grep 1";      // !! Only works with binary 0/1 results !!!
+    int iret = com_uti.WAS_sys_run (cmd, true);
+    if (iret == 0)
+      ret = "1";
+    else
+      ret = "0";
+    return (ret);
+  }*/
+
 

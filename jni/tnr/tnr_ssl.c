@@ -1,4 +1,9 @@
 
+    // Spirit2 Tuner Plugin for "Samsung Silicon Labs" API:
+
+    // See /home/m/spirit/kernel/gt-i9305/drivers/samsung/fm_si4709/ for GS1/GS2/Note1      (Si4709 FM tuner chip)
+    // See /home/m/spirit/kernel/gt-i9305/drivers/samsung/fm_si47xx/ for     GS3/Note2      (Si4705 FM tuner chip)
+
   #define LOGTAG "sftnrssl"
 
   #include <stdio.h>
@@ -148,13 +153,13 @@
   #define Si4709_IOC_RDS_ENABLE                       _IO(Si4709_IOC_MAGIC, 23)
   #define Si4709_IOC_RDS_DISABLE                      _IO(Si4709_IOC_MAGIC, 24)
   #define Si4709_IOC_RDS_TIMEOUT_SET                  _IOW(Si4709_IOC_MAGIC, 25, u32)
-  #define Si4709_IOC_SEEK_CANCEL                      _IO(Si4709_IOC_MAGIC, 26)               // VNVS:START 13-OCT'09---- Added IOCTLs for reading the device-id,chip-id,power configuration, system configuration2 registers
+  #define Si4709_IOC_SEEK_CANCEL                      _IO(Si4709_IOC_MAGIC, 26)                 // VNVS:START 13-OCT'09---- Added IOCTLs for reading the device-id,chip-id,power configuration, system configuration2 registers
   #define Si4709_IOC_DEVICE_ID_GET                    _IOR(Si4709_IOC_MAGIC, 27,device_id_t)
   #define Si4709_IOC_CHIP_ID_GET                      _IOR(Si4709_IOC_MAGIC, 28,chip_id_t)
   #define Si4709_IOC_SYS_CONFIG2_GET                  _IOR(Si4709_IOC_MAGIC, 29,sys_config2)
-  #define Si4709_IOC_POWER_CONFIG_GET                 _IOR(Si4709_IOC_MAGIC, 30,power_config)
-  #define Si4709_IOC_AFCRL_GET                        _IOR(Si4709_IOC_MAGIC, 31,u8)            // AFCRL bit, to check for a valid channel
-  #define Si4709_IOC_DE_SET                           _IOW(Si4709_IOC_MAGIC, 32,uint8_t)       // DE-emphasis Time Constant. DE= 0, TC=50us (Europe,Japan,Australia) and DE=1, TC=75us (USA)
+  #define Si4709_IOC_POWER_CONFIG_GET                 _IOR(Si4709_IOC_MAGIC, 30,power_config)   // !! #define Si47xx_IOC_POWER_CONFIG_GET   _IO(Si47xx_IOC_MAGIC, 30)
+  #define Si4709_IOC_AFCRL_GET                        _IOR(Si4709_IOC_MAGIC, 31,u8)             // AFCRL bit, to check for a valid channel
+  #define Si4709_IOC_DE_SET                           _IOW(Si4709_IOC_MAGIC, 32,uint8_t)        // DE-emphasis Time Constant. DE= 0, TC=50us (Europe,Japan,Australia) and DE=1, TC=75us (USA)
   #define Si4709_IOC_SYS_CONFIG3_GET                  _IOR(Si4709_IOC_MAGIC, 33, sys_config3)
   #define Si4709_IOC_STATUS_RSSI_GET                  _IOR(Si4709_IOC_MAGIC, 34, status_rssi_t)
   #define Si4709_IOC_SYS_CONFIG2_SET                  _IOW(Si4709_IOC_MAGIC, 35, sys_config2)
@@ -162,6 +167,7 @@
   #define Si4709_IOC_DSMUTE_ON                        _IO(Si4709_IOC_MAGIC, 37)
   #define Si4709_IOC_DSMUTE_OFF                       _IO(Si4709_IOC_MAGIC, 38)
   #define Si4709_IOC_RESET_RDS_DATA                   _IO(Si4709_IOC_MAGIC, 39)
+  #define Si4709_IOC_SEEK_FULL                        _IOR(Si4709_IOC_MAGIC, 40, u32)           // !! New
 
   int band_set (int low , int high, int band) {                 // ? Do we need to stop/restart RDS power in reg 0x00 ? Or rbds_set to flush ?
     logd ("band_set low: %d  high: %d  band: %d", low, high, band);
@@ -735,9 +741,9 @@ sys/bus/i2c/drivers/Si4709
     else
       ret = ioctl (dev_hndl, Si4709_IOC_MONO_SET);
     if (ret < 0)
-      loge ("chip_imp_stereo_sg IOCTL Si4709_pilot_SET error: %d %d", ret, errno);
+      loge ("chip_imp_stereo_sg IOCTL Si4709_IOC_STEREO_SET/Si4709_IOC_MONO_SET error: %d %d", ret, errno);
     else
-      logd ("chip_imp_stereo_sg IOCTL Si4709_pilot_SET success");
+      logd ("chip_imp_stereo_sg IOCTL Si4709_IOC_STEREO_SET/Si4709_IOC_MONO_SET success");
 
     curr_stereo = stereo;
     logd ("chip_imp_stereo_sg curr_stereo: %d", curr_stereo);
@@ -860,7 +866,7 @@ sys/bus/i2c/drivers/Si4709
       return (curr_rds_ps);
     int ret = -1;
     //ret = rds_ps_set (rds_ps);
-    strncpy (curr_rds_ps, rds_ps, sizeof (curr_rds_ps));
+    strlcpy (curr_rds_ps, rds_ps, sizeof (curr_rds_ps));
     return (curr_rds_ps);
   }
   char * chip_imp_rds_rt_sg (char * rds_rt) {
@@ -868,7 +874,7 @@ sys/bus/i2c/drivers/Si4709
       return (curr_rds_rt);
     int ret = -1;
     //ret = rds_rt_set (rds_rt);
-    strncpy (curr_rds_rt, rds_rt, sizeof (curr_rds_rt));
+    strlcpy (curr_rds_rt, rds_rt, sizeof (curr_rds_rt));
     return (curr_rds_rt);
   }
 
@@ -877,7 +883,7 @@ sys/bus/i2c/drivers/Si4709
       return (curr_extension);
     int ret = -1;
     //ret = reg_set (reg);
-    strncpy (curr_extension, reg, sizeof (curr_extension));
+    strlcpy (curr_extension, reg, sizeof (curr_extension));
     return (curr_extension);
   }
 

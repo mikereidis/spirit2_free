@@ -42,6 +42,11 @@
   <item>Disable</item>
   </string-array>
 
+  <string-array name="tuner_mode">
+  <item></item>
+  <item>Receive</item>
+  <item>Transmit</item>
+  </string-array>
   <string-array name="tuner_band">
   <item></item>
   <item>EU</item>
@@ -54,7 +59,7 @@
   <item>Stereo</item>
   <item>Mono</item>
   </string-array>
-  <string-array name="tuner_qcv_antenna">
+  <string-array name="tuner_antenna">
   <item></item>
   <item>External</item>
   <item>Internal</item>
@@ -95,14 +100,14 @@
   <item>15 = FM8</item>
   </string-array>
 
-  <string-array name="service_update">
+  <string-array name="enable_disable">
   <item></item>
   <item>Enable</item>
   <item>Disable</item>
   </string-array>
 
 
-  <string-array name="service_action">
+  <string-array name="chass_action">
   <item></item>
   <item>Preset -</item>
   <item>Preset +</item>
@@ -145,7 +150,30 @@
   <item>Disable</item>
   </string-array>
 
-  <string-array name="service_plugin_device">
+
+  <string-array name="chass_plug_tnr">
+  <item></item>
+  <item>SSL</item>
+  <item>QCV</item>
+  <item>BCH</item>
+  <item>GEN</item>
+  </string-array>
+
+  <string-array name="chass_plug_aud">
+  <item></item>
+  <item>GS1</item>
+  <item>GS2</item>
+  <item>GS3</item>
+  <item>QCV</item>
+  <item>OM7</item>
+  <item>LG2</item>
+  <item>XZ2</item>
+  <item>GEN</item>
+  </string-array>
+
+
+
+  <string-array name="chass_plug_dev_old2">
   <item></item>
   <item>GT-I9300</item>
   <item>GT-I9100</item>
@@ -161,13 +189,14 @@
   <item>Sony-Z2+</item>
   <item>QCom-All</item>
   </string-array>
-  <string-array name="service_plugin_tuner">
+
+  <string-array name="chass_plug_tnr_old">
   <item>SSL-SamsungGalaxySiliconLabs</item>
   <item>QCV-QualcommV4L</item>
   <item>BCM-Broadcom</item>
   <item></item>
   </string-array>
-  <string-array name="service_plugin_audio">
+  <string-array name="chass_plug_aud_old">
   <item>GT-I9300/GT-N7100</item>
   <item>GT-I9100/GT-N7000</item>
   <item>GT-I9000</item>
@@ -178,7 +207,7 @@
   <item></item>
   </string-array>
 
-  <string-array name="service_plugin_device_old">
+  <string-array name="chass_plug_dev_old">
   <item></item>
   <item>3N2:GS3/NO2</item>
   <item>2N1:GS2/NO1</item>
@@ -188,26 +217,9 @@
   <item>LG2</item>
   <item>XZ2</item>
   </string-array>
-  <string-array name="service_plugin_tuner_old">
-  <item></item>
-  <item>SSL</item>
-  <item>QCV</item>
-  <item>BCM</item>
-  <item></item>
-  </string-array>
-  <string-array name="service_plugin_audio_old">
-  <item></item>
-  <item>3N2</item>
-  <item>2N1</item>
-  <item>GS1</item>
-  <item>QCV</item>
-  <item>OM7</item>
-  <item>LG2</item>
-  <item>XZ2</item>
-  <item></item>
-  </string-array>
 
-  <string-array name="service_antenna_action_old">
+
+  <string-array name="chass_antenna_action_old">
   <item></item>
   <item>Warn</item>
   <item>Ignore</item>

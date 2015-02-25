@@ -1,4 +1,8 @@
 
+    // Spirit2 Tuner Plugin for "Generic / Test / Custom" API:
+
+    // Does nothing at present, but expected to become a "Custom" demonstration API that allows binaries / scripts to access a real or emulated FM tuner chip
+
   #define LOGTAG "sftnrgen"
 
   #include <stdio.h>
@@ -222,7 +226,7 @@
       return (curr_rds_ps);
     int ret = -1;
     //ret = rds_ps_set (rds_ps);
-    strncpy (curr_rds_ps, rds_ps, sizeof (curr_rds_ps));
+    strlcpy (curr_rds_ps, rds_ps, sizeof (curr_rds_ps));
     return (curr_rds_ps);
   }
 
@@ -231,7 +235,7 @@
       return (curr_rds_rt);
     int ret = -1;
     //ret = rds_rt_set (rds_rt);
-    strncpy (curr_rds_rt, rds_rt, sizeof (curr_rds_rt));
+    strlcpy (curr_rds_rt, rds_rt, sizeof (curr_rds_rt));
     return (curr_rds_rt);
   }
 
@@ -240,7 +244,7 @@
       return (curr_extension);
     int ret = -1;
     //ret = reg_set (reg);
-    strncpy (curr_extension, reg, sizeof (curr_extension));
+    strlcpy (curr_extension, reg, sizeof (curr_extension));
     return (curr_extension);
   }
 

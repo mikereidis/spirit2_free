@@ -15,6 +15,7 @@ import android.graphics.BitmapFactory;
 import android.media.AudioManager;
 import android.media.MediaMetadataRetriever;
 import android.media.RemoteControlClient;
+import android.os.Build.VERSION_CODES;
 import android.os.Bundle;
 import android.os.IBinder;
 import android.os.PowerManager;
@@ -55,8 +56,8 @@ public class svc_svc extends Service implements svc_tcb, svc_acb {  // Service c
   //private int                 start_type  = START_NOT_STICKY;             // Don't restart if killed; not important enough to restart, which may crash again. ?? But still restarts ??
   private int                   start_type  = START_STICKY;                 // !!!! See if Sticky reduces audio dropouts
 
-  private String []             plst_freq   = new String [com_api.max_presets];
-  private String []             plst_name   = new String [com_api.max_presets];
+  private String []             plst_freq   = new String [com_api.chass_preset_max];
+  private String []             plst_name   = new String [com_api.chass_preset_max];
   private int                   preset_curr = 0;
   private int                   preset_num  = 0;
 
@@ -74,11 +75,24 @@ public class svc_svc extends Service implements svc_tcb, svc_acb {  // Service c
 
   @Override
   public void onCreate () {                                             // When service newly created...
-    com_uti.logd ("stat_creates: " + stat_creates++);
+    com_uti.logd ("stat_creates: " + stat_creates ++);
 
     try {
 
-      com_uti.devnum_set (m_context);                                   // Set/get device number
+      //strict_mode_set (true);                                         // Disabled due to remaining main thread issues
+
+      if (m_com_api == null) {                                          // If not yet initialized...
+        m_com_api = new com_api (this);                                 // Instantiate Common API   class
+        if (m_com_api == null) {
+          com_uti.loge ("m_com_api: " + m_com_api);
+          return;
+        }
+        else
+          com_uti.logd ("m_com_api: " + m_com_api);
+      }
+
+      m_com_api.chass_plug_aud = com_uti.chass_plug_aud_get (m_context);// Setup Tuner Plugin, and Audio Plugin
+      m_com_api.chass_plug_tnr = com_uti.chass_plug_tnr;
 
       //com_uti.strict_mode_set (true);                                 // Enable strict mode; disabled for now
       com_uti.strict_mode_set (false);                                  // !!!! Disable strict mode so we can send network packets from Java
@@ -90,21 +104,15 @@ public class svc_svc extends Service implements svc_tcb, svc_acb {  // Service c
         com_uti.logd ("s2_tx");
 
       if (s2_tx) {                                                      // If Transmit mode
-        remote_rcc_enable = false;
+        remote_rcc_enable = false;                                      // Not needed; need for receive only
       }
-      else if (com_uti.android_version <  21) {                          // Else if receive mode and Kitkat or earlier
-// && com_uti.bt_get () ) {     // Needed for lockscreen and AVRCP on BT devices
-        remote_rcc_enable = true;
+                                                                        // Else if receive mode and Kitkat or earlier
+      else if (com_uti.android_version <  VERSION_CODES.LOLLIPOP) {
+        remote_rcc_enable = true;                                       // Needed for lockscreen and AVRCP on BT devices
       }
-      else if (com_uti.android_version >= 21) {                          // Else if receive mode and Lollipop or later
-// Needed for AVRCP on BT devices only ?
-        remote_rcc_enable = true;
-      }
-
-
-      if (m_com_api == null) {
-        m_com_api = new com_api (this);                                 // Instantiate Common API   class
-        com_uti.logd ("m_com_api: " + m_com_api);
+                                                                        // Else if receive mode and Lollipop or later
+      else if (com_uti.android_version >= VERSION_CODES.LOLLIPOP) {
+        remote_rcc_enable = true;                                       // Needed for AVRCP on BT devices only ?
       }
 
       m_svc_aap = new svc_aud (this, this, m_com_api);                  // Instantiate audio        class
@@ -112,17 +120,17 @@ public class svc_svc extends Service implements svc_tcb, svc_acb {  // Service c
       m_svc_tap = new svc_tnr (this, this, m_com_api);                  // Instantiate tuner        class
 
       String update_gui = com_uti.prefs_get (m_context, "service_update_gui", "");
-      if (update_gui.equalsIgnoreCase ("Disable"))
+      if (update_gui.equals ("Disable"))
         service_update_gui = false;
       else
         service_update_gui = true;
       String update_notification = com_uti.prefs_get (m_context, "service_update_notification", "");
-      if (update_notification.equalsIgnoreCase ("Disable"))
+      if (update_notification.equals ("Disable"))
         service_update_notification = false;
       else
         service_update_notification = true;
       String update_remote = com_uti.prefs_get (m_context, "service_update_remote", "");
-      if (update_remote.equalsIgnoreCase ("Disable"))
+      if (update_remote.equals ("Disable"))
         service_update_remote = false;
       else
         service_update_remote = true;
@@ -156,16 +164,16 @@ public class svc_svc extends Service implements svc_tcb, svc_acb {  // Service c
       com_uti.logd ("m_com_api.num_api_service_update:  " + m_com_api.num_api_service_update);
     }
 
-    if (! m_com_api.audio_state.equalsIgnoreCase ("stop"))
+    if (! m_com_api.audio_state.equals ("Stop"))
       com_uti.loge ("destroy with m_com_api.audio_state: " + m_com_api.audio_state);
 
-    if (! m_com_api.tuner_state.equalsIgnoreCase ("stop"))
+    if (! m_com_api.tuner_state.equals ("Stop"))
       com_uti.loge ("destroy with m_com_api.tuner_state: " + m_com_api.tuner_state);
 
-    if (! m_com_api.tuner_api_state.equalsIgnoreCase ("stop"))
+    if (! m_com_api.tuner_api_state.equals ("Stop"))
       com_uti.loge ("destroy with m_com_api.tuner_api_state: " + m_com_api.tuner_api_state);
 
-    //tuner_state_set ("stop");                                         // This might take a while, and hang, since presumably tuner should already be stopped when onDestroy() is called
+    //tuner_state_set ("Stop");                                         // This might take a while, and hang, since presumably tuner should already be stopped when onDestroy() is called
                                                                         // Just settle for the error logging above
 
     foreground_stop ();                                                 // !! match startForeground()
@@ -195,7 +203,11 @@ public class svc_svc extends Service implements svc_tcb, svc_acb {  // Service c
    return (null);                                                       // Binding not allowed ; no direct call API, must use Intents
   }
 
-  @Override                                                             // Handle command intents sent via startService()
+
+    // Main entrance for commands sent from other components: GUI, Widget, Notification Shade, Remote Controls...
+    // onStartCommand handles command intents sent via key_set() (->startService())
+
+  @Override                                                             //
   public int onStartCommand (Intent intent, int flags, int startId) {   //
     com_uti.logd ("intent: " + intent + "  flags: " + flags + "  startId: " + startId);
 
@@ -210,9 +222,9 @@ public class svc_svc extends Service implements svc_tcb, svc_acb {  // Service c
       com_uti.loge ("action == null");
       return (start_type);
     }
-    if (! action.equalsIgnoreCase (com_uti.api_action_id)) {//"fm.a2d.sf.action.set")) {
+    if (! action.equals (com_uti.api_action_id)) {                      // If this is NOT our "fm.a2d.sf.action.set" Intent...
       com_uti.loge ("action: " + action);
-      return (start_type);
+      return (start_type);                                              // Done w/ error
     }
 
     Bundle extras = intent.getExtras ();
@@ -222,14 +234,15 @@ public class svc_svc extends Service implements svc_tcb, svc_acb {  // Service c
     }
     com_uti.logd ("extras: " + extras.describeContents ());
 
-    String val = "";
+    String val = "";                                                    // Value used for many
+
 
 // audio_android_smo    // ?? setMode == setPhoneState ???
-    if (! (val = extras.getString ("audio_android_smo", "")).equalsIgnoreCase (""))
+    if (! (val = extras.getString ("audio_android_smo", "")).equals (""))
       m_AM.setMode (com_uti.int_get (val));
 
 // audio_android_sso
-    if (! (val = extras.getString ("audio_android_sso", "")).equalsIgnoreCase ("")) {
+    if (! (val = extras.getString ("audio_android_sso", "")).equals ("")) {
       if (com_uti.int_get (val) == 0)
         m_AM.setSpeakerphoneOn (false);
       else
@@ -237,35 +250,35 @@ public class svc_svc extends Service implements svc_tcb, svc_acb {  // Service c
     }
 
 // audio_android_spa
-    if (! (val = extras.getString ("audio_android_spa", "")).equalsIgnoreCase (""))
+    if (! (val = extras.getString ("audio_android_spa", "")).equals (""))
       m_AM.setParameters (val);
 
 // audio_android_gpa
-    if (! (val = extras.getString ("audio_android_gpa", "")).equalsIgnoreCase (""))
+    if (! (val = extras.getString ("audio_android_gpa", "")).equals (""))
       com_uti.logd ("m_AM.getParameters (): " + m_AM.getParameters (val));
 
 // audio_android_sfc
-    if (! (val = extras.getString ("audio_android_sfc", "")).equalsIgnoreCase (""))
+    if (! (val = extras.getString ("audio_android_sfc", "")).equals (""))
       com_uti.logd ("com_uti.setForceUse (FOR_COMMUNICATION): " + com_uti.setForceUse (com_uti.FOR_COMMUNICATION, com_uti.int_get (val)));
 // audio_android_sfm
-    if (! (val = extras.getString ("audio_android_sfm", "")).equalsIgnoreCase (""))
+    if (! (val = extras.getString ("audio_android_sfm", "")).equals (""))
       com_uti.logd ("com_uti.setForceUse (FOR_MEDIA): "         + com_uti.setForceUse (com_uti.FOR_MEDIA,         com_uti.int_get (val)));
 // audio_android_sfr
-    if (! (val = extras.getString ("audio_android_sfr", "")).equalsIgnoreCase (""))
+    if (! (val = extras.getString ("audio_android_sfr", "")).equals (""))
       com_uti.logd ("com_uti.setForceUse (FOR_RECORD): "        + com_uti.setForceUse (com_uti.FOR_RECORD,        com_uti.int_get (val)));
 // audio_android_sfd
-    if (! (val = extras.getString ("audio_android_sfd", "")).equalsIgnoreCase (""))
+    if (! (val = extras.getString ("audio_android_sfd", "")).equals (""))
       com_uti.logd ("com_uti.setForceUse (FOR_DOCK): "          + com_uti.setForceUse (com_uti.FOR_DOCK,          com_uti.int_get (val)));
 
 
 // audio_android_gdc
-    if (! (val = extras.getString ("audio_android_gdc", "")).equalsIgnoreCase (""))
+    if (! (val = extras.getString ("audio_android_gdc", "")).equals (""))
       com_uti.logd ("com_uti.getDeviceConnectionState (): " + com_uti.getDeviceConnectionState (com_uti.int_get (val), ""));
 // audio_android_sdu
-    if (! (val = extras.getString ("audio_android_sdu", "")).equalsIgnoreCase (""))
+    if (! (val = extras.getString ("audio_android_sdu", "")).equals (""))
       com_uti.logd ("com_uti.setDeviceConnectionState (UNAVAILABLE): " + com_uti.setDeviceConnectionState (com_uti.int_get (val), com_uti.DEVICE_STATE_UNAVAILABLE, ""));
 // audio_android_sda
-    if (! (val = extras.getString ("audio_android_sda", "")).equalsIgnoreCase (""))
+    if (! (val = extras.getString ("audio_android_sda", "")).equals (""))
       com_uti.logd ("com_uti.setDeviceConnectionState (AVAILABLE): " + com_uti.setDeviceConnectionState (com_uti.int_get (val), com_uti.DEVICE_STATE_AVAILABLE, ""));
 
 
@@ -282,20 +295,20 @@ public class svc_svc extends Service implements svc_tcb, svc_acb {  // Service c
     //com_uti.loge ("preset or seek extras.getString (\"service_seek_state\", \"\") val: " + val);
     //com_uti.loge ("preset_num: " + preset_num);
     //com_uti.loge ("preset_curr: " + preset_curr);
-    if (val.equalsIgnoreCase ("down")) {
+    if (val.equals ("Down")) {
       if (preset_num <= 1) {
         m_svc_tap.tuner_set ("tuner_seek_state", val);
       }
       else
         preset_next (false);
     }
-    else if (val.equalsIgnoreCase ("up")) {
+    else if (val.equals ("Up")) {
       if (preset_num <= 1)
         m_svc_tap.tuner_set ("tuner_seek_state", val);
       else
         preset_next (true);
     }
-    else if (val.equalsIgnoreCase ("")) {
+    else if (val.equals ("")) {
     }
     else {
     }
@@ -347,8 +360,13 @@ public class svc_svc extends Service implements svc_tcb, svc_acb {  // Service c
     com_uti.extras_daemon_set ("tuner_rds_ps", extras);
     com_uti.extras_daemon_set ("tuner_rds_rt", extras);
 
-    com_uti.extras_daemon_set ("tuner_acdb", extras);
+    com_uti.extras_daemon_set ("tuner_acdb",   extras);
 
+    com_uti.extras_daemon_set ("tuner_softmute", extras);
+    com_uti.extras_daemon_set ("tuner_antenna", extras);
+
+    com_uti.extras_daemon_set ("chass_plug_aud", extras);
+    com_uti.extras_daemon_set ("chass_plug_tnr", extras);
 
     // Audio:
     val = extras.getString ("audio_mode", "");
@@ -369,7 +387,7 @@ public class svc_svc extends Service implements svc_tcb, svc_acb {  // Service c
 
     val = extras.getString ("audio_output", "");
     if (! val.equals ("")) {
-      if (m_com_api.audio_state.equalsIgnoreCase ("start"))             // If audio is started...
+      if (m_com_api.audio_state.equals ("Start"))             // If audio is started...
         m_svc_aap.audio_output_set (val, true);                         // Set new audio output with restart
                                                                         // Save audio output preference     !! Toggle may be converted
       com_uti.prefs_set (m_context, "audio_output", m_com_api.audio_output);
@@ -386,17 +404,17 @@ public class svc_svc extends Service implements svc_tcb, svc_acb {  // Service c
       m_svc_aap.audio_record_state_set (val);
 
     val = extras.getString ("service_update_gui", "");
-    if (val.equalsIgnoreCase ("Disable"))
+    if (val.equals ("Disable"))
       service_update_gui = false;
     else
       service_update_gui = true;
     val = extras.getString ("service_update_notification", "");
-    if (val.equalsIgnoreCase ("Disable"))
+    if (val.equals ("Disable"))
       service_update_notification = false;
     else
       service_update_notification = true;
     val = extras.getString ("service_update_remote", "");
-    if (val.equalsIgnoreCase ("Disable"))
+    if (val.equals ("Disable"))
       service_update_remote = false;
     else
       service_update_remote = true;
@@ -497,11 +515,11 @@ public class svc_svc extends Service implements svc_tcb, svc_acb {  // Service c
 
     com_uti.logv ("audio_state: " + m_com_api.audio_state + "  audio_output: " + m_com_api.audio_output + "  audio_stereo: " + m_com_api.audio_stereo + "  audio_record_state: " + m_com_api.audio_record_state);
 
-    Intent intent = new Intent (com_uti.api_result_id);//"fm.a2d.sf.result.get");           // Create a new broadcast result Intent
+    Intent intent = new Intent (com_uti.api_result_id);                 // Create a new broadcast result Intent
                                                                         // Send service data
     for (int ctr = 0; ctr < preset_num; ctr ++) {                       // Send preset list
-      intent.putExtra ("service_preset_freq_" + ctr, plst_freq [ctr]);
-      intent.putExtra ("service_preset_name_" + ctr, plst_name [ctr]);
+      intent.putExtra ("chass_preset_freq_" + ctr, plst_freq [ctr]);
+      intent.putExtra ("chass_preset_name_" + ctr, plst_name [ctr]);
     }
                                                                         // Send audio data
     intent.putExtra ("audio_state",        m_com_api.audio_state);
@@ -511,11 +529,11 @@ public class svc_svc extends Service implements svc_tcb, svc_acb {  // Service c
     intent.putExtra ("audio_sessid",       m_com_api.audio_sessid);
                                                                         // Send tuner data
     if (m_svc_tap == null)
-      intent.putExtra ("tuner_state",      "stop");
+      intent.putExtra ("tuner_state",      "Stop");
     else
       tuner_extras_put (intent);
 
-    m_com_api.service_update_send (intent, "", "");//m_com_api.service_phase, m_com_api.service_cdown); // Send Phase Update + More
+    m_com_api.service_update_send (intent, "", "");//m_com_api.chass_phase, m_com_api.chass_phtmo); // Send Phase Update + More
 
     return (intent);
   }
@@ -548,8 +566,8 @@ public class svc_svc extends Service implements svc_tcb, svc_acb {  // Service c
   private int preset_curr_fix () {
     if (preset_num < 0)                                                 // First ensure number of presets is sane
       preset_num = 0;
-    if (preset_num >= com_api.max_presets)
-      preset_num = com_api.max_presets;
+    if (preset_num >= com_api.chass_preset_max)
+      preset_num = com_api.chass_preset_max;
 
     if (preset_curr < 0)                                                // Ensure preset_curr wraps to valid values
       preset_curr = preset_num - 1;
@@ -584,19 +602,19 @@ public class svc_svc extends Service implements svc_tcb, svc_acb {  // Service c
 
   private String audio_state_set (String desired_state) {               // Called only by onStartCommand()
     com_uti.logd ("desired_state: " + desired_state);
-    if (desired_state.equalsIgnoreCase ("toggle")) {                    // TOGGLE:
-      if (m_com_api.audio_state.equalsIgnoreCase ("start"))
-        desired_state = "pause";
+    if (desired_state.equals ("Toggle")) {                    // TOGGLE:
+      if (m_com_api.audio_state.equals ("Start"))
+        desired_state = "Pause";
       else
-        desired_state = "start";
+        desired_state = "Start";
     }
                                                                         // If Audio Stop or Pause...
-    if (desired_state.equalsIgnoreCase ("Stop") || desired_state.equalsIgnoreCase ("Pause")) {
+    if (desired_state.equals ("Stop") || desired_state.equals ("Pause")) {
       m_svc_aap.audio_state_set (desired_state);                        // Set Audio State synchronously
       return (m_com_api.audio_state);                                   // Return current audio state
     }
 
-    if (desired_state.equalsIgnoreCase ("Start")) {
+    if (desired_state.equals ("Start")) {
     }
     else {
       com_uti.loge ("Unexpected desired_state: " + desired_state);
@@ -604,7 +622,7 @@ public class svc_svc extends Service implements svc_tcb, svc_acb {  // Service c
     }
 
                                                                         // Else if Audio Start desired...
-    if (m_com_api.audio_state.equalsIgnoreCase ("start"))               // If audio already started...
+    if (m_com_api.audio_state.equals ("Start"))               // If audio already started...
       return (m_com_api.audio_state);                                   // Return current audio state
 
                                                                         // Else if audio stopped or paused and we want to start audio...
@@ -614,7 +632,7 @@ public class svc_svc extends Service implements svc_tcb, svc_acb {  // Service c
     String stereo = com_uti.prefs_get (m_context, "audio_stereo", "Stereo");
     m_svc_aap.audio_stereo_set (stereo);                                // Set audio stereo from prefs, before audio is started
 
-    if (m_com_api.tuner_state.equalsIgnoreCase ("start")) {             // If tuner started...
+    if (m_com_api.tuner_state.equals ("Start")) {             // If tuner started...
       m_svc_aap.audio_state_set ("Start");                              // Set Audio State immediately & synchronously
     }
     else {                                                              // Else if tuner not started...
@@ -631,13 +649,13 @@ public class svc_svc extends Service implements svc_tcb, svc_acb {  // Service c
   public void cb_audio_state (String new_audio_state) {                 // Audio state changed callback from svc_aud
     com_uti.logd ("new_audio_state: " + new_audio_state);
 
-    if (new_audio_state.equalsIgnoreCase ("start")) {                   // If new audio state = Start...
+    if (new_audio_state.equals ("Start")) {                   // If new audio state = Start...
 //      service_update_send ();                                           // Update GUI/Widget/Remote/Notification with latest data
     }
-    else if (new_audio_state.equalsIgnoreCase ("stop")) {               // Else if new audio state = Stop...
+    else if (new_audio_state.equals ("Stop")) {               // Else if new audio state = Stop...
 //      service_update_send ();                                           // Update GUI/Widget/Remote/Notification with latest data
     }
-    else if (new_audio_state.equalsIgnoreCase ("pause")) {              // Else if new audio state = Pause...
+    else if (new_audio_state.equals ("Pause")) {              // Else if new audio state = Pause...
 //      service_update_send ();                                           // Update GUI/Widget/Remote/Notification with latest data
       // Remote State = Still Playing
     }
@@ -654,14 +672,14 @@ public class svc_svc extends Service implements svc_tcb, svc_acb {  // Service c
 
   private String tuner_state_set (String desired_state) {               // Called only by onStartCommand(), (maybe onDestroy in future)
     com_uti.logd ("desired_state: " + desired_state);
-    if (desired_state.equalsIgnoreCase ("toggle")) {                    // If Toggle...
-      if (m_com_api.tuner_state.equalsIgnoreCase ("start"))
-        desired_state = "stop";
+    if (desired_state.equals ("Toggle")) {                    // If Toggle...
+      if (m_com_api.tuner_state.equals ("Start"))
+        desired_state = "Stop";
       else
-        desired_state = "start";
+        desired_state = "Start";
     }
 
-    if (desired_state.equalsIgnoreCase ("start")) {                     // If Start...
+    if (desired_state.equals ("Start")) {                     // If Start...
       tuner_state_start_tmr = new Timer ("tuner start", true);          // One shot Poll timer for file creates, SU commands, Bluedroid Init, then start tuner
       if (tuner_state_start_tmr == null) {                              // If error...
         com_uti.loge ("Fatal error");
@@ -670,9 +688,9 @@ public class svc_svc extends Service implements svc_tcb, svc_acb {  // Service c
       tuner_state_start_tmr.schedule (new tuner_state_start_tmr_hndlr (), 10);
       return (m_com_api.tuner_state);
     }
-    else if (desired_state.equalsIgnoreCase ("stop")) {                 // If Stop...
+    else if (desired_state.equals ("Stop")) {                 // If Stop...
       m_svc_aap.audio_state_set ("Stop");                               // Set Audio State  synchronously to Stop
-      m_svc_tap.tuner_set ("tuner_state", "stop");                      // Set Tuner State asynchronously to Stop
+      m_svc_tap.tuner_set ("tuner_state", "Stop");                      // Set Tuner State asynchronously to Stop
       return (m_com_api.tuner_state);                                   // Return new tuner state
     }
 
@@ -687,7 +705,7 @@ public class svc_svc extends Service implements svc_tcb, svc_acb {  // Service c
 
   private void cb_tuner_state (String new_tuner_state) {
     com_uti.logd ("new_tuner_state: " + new_tuner_state);
-    if (new_tuner_state.equalsIgnoreCase ("start")) {                   // If tuner state is Start...
+    if (new_tuner_state.equals ("Start")) {                   // If tuner state is Start...
       service_update_send ();                                           // Update GUI/Widget/Remote/Notification with latest data
       foreground_start ();
       tuner_prefs_init ();                                              // Load tuner prefs
@@ -697,7 +715,7 @@ public class svc_svc extends Service implements svc_tcb, svc_acb {  // Service c
       }
       return;
     }
-    else if (new_tuner_state.equalsIgnoreCase ("stop")) {               // Else if tuner state is Stop...
+    else if (new_tuner_state.equals ("Stop")) {               // Else if tuner state is Stop...
       service_update_send ();                                           // Update GUI/Widget/Remote/Notification with latest data
       foreground_stop ();                                                 // !! match startForeground()
 
@@ -724,7 +742,7 @@ public class svc_svc extends Service implements svc_tcb, svc_acb {  // Service c
       if (ret != 0)
         com_uti.loge ("files_init IGNORE Errors: " + ret);
 
-      if (com_uti.devnum == com_uti.DEV_OM7 || com_uti.devnum == com_uti.DEV_LG2 || com_uti.devnum == com_uti.DEV_XZ2) {
+      if (m_com_api.chass_plug_tnr.equals ("BCH")) {
         m_com_api.service_update_send (null, "Broadcom Bluetooth Init", "10");// Send Phase Update
         ret = bcom_bluetooth_init ();
         if (ret != 0) {
@@ -739,7 +757,7 @@ public class svc_svc extends Service implements svc_tcb, svc_acb {  // Service c
       if (tuner_state_start_tmr != null)
         tuner_state_start_tmr.cancel ();                                // Stop one shot poll timer (Not periodic so don't need ?)
 
-      if (m_com_api.tuner_state.equalsIgnoreCase ("start"))             // If tuner started...
+      if (m_com_api.tuner_state.equals ("Start"))             // If tuner started...
         com_uti.logd ("Done Success with m_com_api.tuner_state: " + m_com_api.tuner_state);
       else
         com_uti.loge ("Done Error with m_com_api.tuner_state: " + m_com_api.tuner_state);
@@ -802,23 +820,23 @@ public class svc_svc extends Service implements svc_tcb, svc_acb {  // Service c
 
     if (key == null)
       com_uti.loge ("key: " + key);
-    else if (key.equalsIgnoreCase ("tuner_state"))
+    else if (key.equals ("tuner_state"))
       cb_tuner_state (val);
-    else if (key.equalsIgnoreCase ("tuner_freq"))
+    else if (key.equals ("tuner_freq"))
       cb_tuner_freq (val);
-    else if (key.equalsIgnoreCase ("tuner_rssi"))
+    else if (key.equals ("tuner_rssi"))
       cb_tuner_rssi (val);
-    else if (key.equalsIgnoreCase ("tuner_pilot "))
+    else if (key.equals ("tuner_pilot "))
       cb_tuner_pilot(val);
-    else if (key.equalsIgnoreCase ("tuner_qual"))
+    else if (key.equals ("tuner_qual"))
       cb_tuner_qual (val);
-    else if (key.equalsIgnoreCase ("tuner_rds_pi"))
+    else if (key.equals ("tuner_rds_pi"))
       cb_tuner_rds_pi (val);
-    else if (key.equalsIgnoreCase ("tuner_rds_pt"))
+    else if (key.equals ("tuner_rds_pt"))
       cb_tuner_rds_pt (val);
-    else if (key.equalsIgnoreCase ("tuner_rds_ps"))
+    else if (key.equals ("tuner_rds_ps"))
       cb_tuner_rds_ps (val);
-    else if (key.equalsIgnoreCase ("tuner_rds_rt"))
+    else if (key.equals ("tuner_rds_rt"))
       cb_tuner_rds_rt (val);
     else
       com_uti.loge ("key: " + key);
@@ -889,21 +907,6 @@ public class svc_svc extends Service implements svc_tcb, svc_acb {  // Service c
   }
 
 
-  private String lib_name_get () {
-    switch (com_uti.devnum) {
-      case com_uti.DEV_UNK: return ("libs2t_gen.so");
-      case com_uti.DEV_GEN: return ("libs2t_gen.so");
-      case com_uti.DEV_GS1: return ("libs2t_ssl.so");
-      case com_uti.DEV_GS2: return ("libs2t_ssl.so");
-      case com_uti.DEV_GS3: return ("libs2t_ssl.so");
-      case com_uti.DEV_QCV: return ("libs2t_qcv.so");
-      case com_uti.DEV_OM7: return ("libs2t_bch.so");
-      case com_uti.DEV_LG2: return ("libs2t_bch.so");
-      case com_uti.DEV_XZ2: return ("libs2t_bch.so");
-    }
-    return ("libs2t_gen.so");
-  }
-
     // Hardware / API dependent part of svc_svc:
 
   private int files_init () {
@@ -936,7 +939,7 @@ public class svc_svc extends Service implements svc_tcb, svc_acb {  // Service c
   }
 
   private int bcom_bluetooth_init () {    // Install shim if needed (May change BT state & warm restart). Determine UART or SHIM Mode & create/delete "use_shim" flag file for s2d. Turn BT off if needed.
-    com_uti.logd ("start");
+    com_uti.logd ("Start");
 
     m_com_api.tuner_api_mode = "UART";                                           // Default = UART MODE
 /*
@@ -1005,7 +1008,7 @@ public class svc_svc extends Service implements svc_tcb, svc_acb {  // Service c
       }
     }
 
-    if (m_com_api.tuner_api_mode.equalsIgnoreCase ("UART")) {
+    if (m_com_api.tuner_api_mode.equals ("UART")) {
       if (com_uti.bt_get ()) {
         com_uti.logd ("UART mode needed but BT is on; turn BT Off");
         com_uti.bt_set (false, true);                                   // Bluetooth off, and wait for off

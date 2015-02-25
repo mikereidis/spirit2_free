@@ -103,7 +103,7 @@ public class gui_gui implements gui_gap {
   private CheckBox      cb_speaker  = null;
 
 
-    // Presets: 16 = com_api.max_presets
+    // Presets: 16 = com_api.chass_preset_max
 
   private int           m_presets_curr  = 0;
   private ImageButton[] m_preset_ib     = {null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null};   // 16 Preset Image Buttons
@@ -156,9 +156,9 @@ public class gui_gui implements gui_gap {
 
   public boolean gap_state_set (String state) {
     boolean ret = false;
-    if (state.equalsIgnoreCase ("start"))
+    if (state.equals ("Start"))
       ret = gui_start ();
-    else if (state.equalsIgnoreCase ("stop"))
+    else if (state.equals ("Stop"))
       ret = gui_stop ();
     return (ret);
   }
@@ -340,9 +340,8 @@ public class gui_gui implements gui_gap {
 
     com_uti.def_set (m_context, "service_update_remote");
 
-    com_uti.def_set (m_context, "service_plugin_device");
-    com_uti.def_set (m_context, "service_plugin_tuner");
-    com_uti.def_set (m_context, "service_plugin_audio");
+    com_uti.def_set (m_context, "chass_plug_tnr");
+    com_uti.def_set (m_context, "chass_plug_aud");
 
     com_uti.def_set (m_context, "debug_debug");
 
@@ -371,15 +370,15 @@ public class gui_gui implements gui_gap {
 
     String band = com_uti.prefs_get (m_context, "tuner_band", "EU");
     tuner_band_set (band);
-    if (m_com_api.tuner_band.equalsIgnoreCase ("US")) {
+    if (m_com_api.tuner_band.equals ("US")) {
       rb_band_eu.setChecked (false);
       rb_band_us.setChecked (true);
     }
 
     load_prefs ();
 
-    if (! m_com_api.tuner_state.equalsIgnoreCase ("Start"))             // If tuner not started...
-      m_com_api.key_set ("audio_state", "start");                       // Start audio service (which starts tuner (and daemon) first, if not already started)
+    if (! m_com_api.tuner_state.equals ("Start"))             // If tuner not started...
+      m_com_api.key_set ("audio_state", "Start");                       // Start audio service (which starts tuner (and daemon) first, if not already started)
 
     gui_init = true;
 
@@ -410,34 +409,34 @@ public class gui_gui implements gui_gap {
     m_dial.listener_set (new gui_dia.gui_dia_listener () {                      // Setup listener for state_chngd() and dial_chngd()
 
       public boolean prev_go () {
-        if (! m_com_api.tuner_state.equalsIgnoreCase ("start")) {
+        if (! m_com_api.tuner_state.equals ("Start")) {
           com_uti.logd ("via gui_dia abort tuner_state: " + m_com_api.tuner_state);
           return (false);                                               // Not Consumed
         }
         ani (m_iv_prev);
-        m_com_api.key_set ("tuner_freq", "down");
+        m_com_api.key_set ("tuner_freq", "Down");
         return (true);                                                  // Consumed
       }
       public boolean next_go () {
-        if (! m_com_api.tuner_state.equalsIgnoreCase ("start")) {
+        if (! m_com_api.tuner_state.equals ("Start")) {
           com_uti.logd ("via gui_dia abort tuner_state: " + m_com_api.tuner_state);
           return (false);                                               // Not Consumed
         }
         ani (m_iv_next);
-        m_com_api.key_set ("tuner_freq", "up");
+        m_com_api.key_set ("tuner_freq", "Up");
         return (true);                                                  // Consumed
       }
       public boolean state_chngd () {
         com_uti.logd ("via gui_dia m_com_api.audio_state: " + m_com_api.audio_state);
-        if (m_com_api.audio_state.equalsIgnoreCase ("start"))
-          m_com_api.key_set ("tuner_state", "stop");
+        if (m_com_api.audio_state.equals ("Start"))
+          m_com_api.key_set ("tuner_state", "Stop");
         else
-          m_com_api.key_set ("audio_state", "start");
+          m_com_api.key_set ("audio_state", "Start");
         return (true);                                                  // Consumed
       }
       public boolean freq_go () {
         com_uti.logd ("via gui_dia");
-        if (! m_com_api.tuner_state.equalsIgnoreCase ("start")) {
+        if (! m_com_api.tuner_state.equals ("Start")) {
           com_uti.logd ("via gui_dia abort tuner_state: " + m_com_api.tuner_state);
           return (false);                                               // Not Consumed
         }
@@ -448,7 +447,7 @@ public class gui_gui implements gui_gap {
       }
       private int last_dial_freq = 0;
       public boolean dial_chngd (double angle) {
-        if (! m_com_api.tuner_state.equalsIgnoreCase ("start")) {
+        if (! m_com_api.tuner_state.equals ("Start")) {
           com_uti.logd ("via gui_dia abort tuner_state: " + m_com_api.tuner_state);
           return (false);                                               // Not Consumed
         }
@@ -543,15 +542,15 @@ public class gui_gui implements gui_gap {
     m_preset_ib [14]= (ImageButton) m_gui_act.findViewById (R.id.ib_preset_14);
     m_preset_ib [15]= (ImageButton) m_gui_act.findViewById (R.id.ib_preset_15);
 
-    for (int idx = 0; idx < com_api.max_presets; idx ++) {              // For all presets...
+    for (int idx = 0; idx < com_api.chass_preset_max; idx ++) {              // For all presets...
       m_preset_ib [idx].setOnClickListener     (preset_select_lstnr);   // Set click listener
       m_preset_ib [idx].setOnLongClickListener (preset_change_lstnr);   // Set long click listener
     }
 
 
-    for (int idx = 0; idx < com_api.max_presets; idx ++) {               // For all presets...
-      String name = com_uti.prefs_get (m_context, "service_preset_name_" + idx, "");
-      String freq = com_uti.prefs_get (m_context, "service_preset_freq_" + idx, "");
+    for (int idx = 0; idx < com_api.chass_preset_max; idx ++) {               // For all presets...
+      String name = com_uti.prefs_get (m_context, "chass_preset_name_" + idx, "");
+      String freq = com_uti.prefs_get (m_context, "chass_preset_freq_" + idx, "");
       if (freq != null && ! freq.equals ("")) {                         // If non empty frequency (if setting exists)
         m_presets_curr = idx + 1;                                       // Update number of presets
         m_preset_freq [idx] = freq;
@@ -672,7 +671,7 @@ public class gui_gui implements gui_gap {
     if (free)
       menu_msg = "Select Go Pro or Cancel.";
 
-    if (com_uti.devnum == com_uti.DEV_OM7 || com_uti.devnum == com_uti.DEV_LG2 || com_uti.devnum == com_uti.DEV_XZ2) {
+    if (m_com_api.chass_plug_tnr.equals ("BCH")) {
       if (free)
         menu_msg = "Select Go Pro, Install BT Shim, Remove BT Shim.";
       else
@@ -696,8 +695,7 @@ public class gui_gui implements gui_gap {
       });
     }
 
-    boolean all_devices_shim = true;
-    if (! all_devices_shim && com_uti.devnum != com_uti.DEV_OM7 && com_uti.devnum != com_uti.DEV_LG2 && com_uti.devnum != com_uti.DEV_XZ2) {
+    if (! m_com_api.chass_plug_tnr.equals ("BCH")) {
       dlg_bldr.setPositiveButton ("Cancel", new DialogInterface.OnClickListener () {     //
         public void onClick (DialogInterface dialog, int whichButton) {
         }
@@ -861,10 +859,10 @@ public class gui_gui implements gui_gap {
     if (! com_uti.su_installed_get ()) {
       start_msg +=  "ERROR: NO SuperUser/SuperSU/Root  SpiritF REQUIRES Root.\n\n";
     }
-    else if (com_uti.devnum == com_uti.DEV_UNK) {
+    else if (m_com_api.chass_plug_aud.equals ("UNK")) {
       start_msg +=  "ERROR: Unknown Device. SpiritF REQUIRES International GS1/GS2/GS3/Note/Note2, HTC One, LG G2, Xperia Z+/Qualcomm.\n\n";
     }
-    else if (com_uti.devnum == com_uti.DEV_LG2 || com_uti.devnum == com_uti.DEV_OM7 || com_uti.devnum == com_uti.DEV_XZ2) {
+    else if (m_com_api.chass_plug_tnr.equals ("BCH")) {
       need_daemon = true;
       start_msg +=  "SpiritF Root Daemon Starting...\n\n" +
         "HTC One, LG G2 & Sony Z2+ can take 7 seconds and may REBOOT on install.\n\n";
@@ -1090,7 +1088,7 @@ public class gui_gui implements gui_gap {
     }
     else if (freq < 48001 && freq > 47999) {                            // Code 48 = Enable transmit
       com_uti.s2_tx_set (true);
-      if (! com_uti.m_manufacturer.startsWith ("SONY"))
+      if (! com_uti.sony_get ())
         Toast.makeText (m_context, "!!! TRANSMIT likely on SONY ONLY !!!", Toast.LENGTH_LONG).show ();
       return;
     }
@@ -1142,7 +1140,7 @@ public class gui_gui implements gui_gap {
     m_iv_seekdn.setEnabled  (pwr);
     m_tv_rt.setEnabled      (pwr);
 
-    for (int idx = 0; idx < com_api.max_presets; idx ++)                // For all presets...
+    for (int idx = 0; idx < com_api.chass_preset_max; idx ++)                // For all presets...
       m_preset_ib [idx].setEnabled (pwr);
   }
 
@@ -1215,26 +1213,26 @@ public class gui_gui implements gui_gap {
       err_str = "ERROR " + err  + " " + svc_phase;
 
     if (err_str.toLowerCase ().contains ("daemon")) {
-    //if (m_com_api.service_phase.equalsIgnoreCase ("ERROR Starting Daemon") || m_com_api.service_phase.equalsIgnoreCase ("TIMEOUT Starting Daemon")) {
+    //if (m_com_api.chass_phase.equals ("ERROR Starting Daemon") || m_com_api.chass_phase.equals ("TIMEOUT Starting Daemon")) {
       com_uti.loge ("ERROR Daemon /dev/s2d_running: " + com_uti.quiet_file_get ("/dev/s2d_running"));
       daemon_start_dialog_dismiss ();
       //if (! com_uti.quiet_file_get ("/dev/s2d_running"))
         m_gui_act.showDialog (DAEMON_ERROR_DIALOG);
     }
     else if (err_str.toLowerCase ().contains ("tuner api")) {
-    //else if (m_com_api.service_phase.equalsIgnoreCase ("ERROR Starting Tuner API")) {
+    //else if (m_com_api.chass_phase.equals ("ERROR Starting Tuner API")) {
       com_uti.loge ("ERROR Tuner API /dev/s2d_running: " + com_uti.quiet_file_get ("/dev/s2d_running"));
       daemon_start_dialog_dismiss ();
       m_gui_act.showDialog (TUNER_API_ERROR_DIALOG);
     }
     else if (err_str.toLowerCase ().contains ("tuner")) {
-    //else if (m_com_api.service_phase.equalsIgnoreCase ("ERROR Starting Tuner")) {
+    //else if (m_com_api.chass_phase.equals ("ERROR Starting Tuner")) {
       com_uti.loge ("ERROR Tuner /dev/s2d_running: " + com_uti.quiet_file_get ("/dev/s2d_running"));
       daemon_start_dialog_dismiss ();
       m_gui_act.showDialog (TUNER_ERROR_DIALOG);
     }
     else if (err_str.toLowerCase ().contains ("bluetooth")) {
-    //else if (m_com_api.service_phase.equalsIgnoreCase ("ERROR Broadcom Bluetooth Init")) {
+    //else if (m_com_api.chass_phase.equals ("ERROR Broadcom Bluetooth Init")) {
       com_uti.loge ("ERROR Broadcom Bluetooth /dev/s2d_running: " + com_uti.quiet_file_get ("/dev/s2d_running"));
       daemon_start_dialog_dismiss ();
     }
@@ -1270,7 +1268,7 @@ public class gui_gui implements gui_gap {
     }
 
     // Power:
-    if (m_com_api.tuner_state.equalsIgnoreCase ("start"))
+    if (m_com_api.tuner_state.equals ("Start"))
       gui_pwr_update (true);
     else
       gui_pwr_update (false);
@@ -1278,22 +1276,22 @@ public class gui_gui implements gui_gap {
 
     // Debug / Phase Info:
 
-    m_tv_svc_phase.setText  (m_com_api.service_phase);
-    m_tv_svc_cdown.setText  (m_com_api.service_cdown);
+    m_tv_svc_phase.setText  (m_com_api.chass_phase);
+    m_tv_svc_cdown.setText  (m_com_api.chass_phtmo);
 
-    if (! m_com_api.service_cdown.equals ("")) {
-      com_uti.logd ("Intent: " + intent + "  phase: " + m_com_api.service_phase +  "  cdown: " + m_com_api.service_cdown);
+    if (! m_com_api.chass_phtmo.equals ("")) {
+      com_uti.logd ("Intent: " + intent + "  phase: " + m_com_api.chass_phase +  "  cdown: " + m_com_api.chass_phtmo);
 
-      if (m_com_api.service_cdown.equals ("0")) {                       // If Success...
-        com_uti.logd ("Success m_com_api.service_cdown: " + m_com_api.service_cdown);
+      if (m_com_api.chass_phtmo.equals ("0")) {                       // If Success...
+        com_uti.logd ("Success m_com_api.chass_phtmo: " + m_com_api.chass_phtmo);
         cdown_timeout_stop ();
-        //m_com_api.service_cdown = "";   // Prevent future detections
+        //m_com_api.chass_phtmo = "";   // Prevent future detections
       }
       else {
-        int cdown = com_uti.int_get (m_com_api.service_cdown);
+        int cdown = com_uti.int_get (m_com_api.chass_phtmo);
         if (cdown > 0) {
           com_uti.logd ("cdown: " + cdown);
-          cdown_timeout_start (m_com_api.service_phase, cdown);
+          cdown_timeout_start (m_com_api.chass_phase, cdown);
         }
         else if (cdown == 0) {
           com_uti.loge ("cdown: " + cdown);
@@ -1320,13 +1318,13 @@ public class gui_gui implements gui_gap {
     // Mode Buttons at bottom:
 
     // Mute/Unmute:
-    if (m_com_api.audio_state.equalsIgnoreCase ("start"))
+    if (m_com_api.audio_state.equals ("Start"))
       m_iv_paupla.setImageResource (R.drawable.sel_pause);
     else
       m_iv_paupla.setImageResource (R.drawable.btn_play);
 
     // Speaker/Headset:
-    if (m_com_api.audio_output.equalsIgnoreCase ("speaker")) {                                  // Else if speaker..., Pressing button goes to headset
+    if (m_com_api.audio_output.equals ("Speaker")) {                                  // Else if speaker..., Pressing button goes to headset
       if (m_iv_output != null)
         m_iv_output.setImageResource (android.R.drawable.stat_sys_headset);//ic_volume_bluetooth_ad2p);
       cb_speaker.setChecked (true);
@@ -1338,7 +1336,7 @@ public class gui_gui implements gui_gap {
     }
 
     // Record Start/Stop:
-    if (m_com_api.audio_record_state.equalsIgnoreCase ("start")) {
+    if (m_com_api.audio_record_state.equals ("Start")) {
       m_iv_record.setImageResource (R.drawable.btn_record_press);
     }
     else {
@@ -1360,9 +1358,9 @@ public class gui_gui implements gui_gap {
 
     m_tv_rssi.setText (m_com_api.tuner_rssi);
 
-    if (m_com_api.tuner_pilot.equalsIgnoreCase ("Mono"))
+    if (m_com_api.tuner_pilot.equals ("Mono"))
       m_tv_pilot.setText ("M");
-    else if (m_com_api.tuner_pilot.equalsIgnoreCase ("Stereo"))
+    else if (m_com_api.tuner_pilot.equals ("Stereo"))
       m_tv_pilot.setText ("S");
     else
       m_tv_pilot.setText ("");
@@ -1375,7 +1373,7 @@ public class gui_gui implements gui_gap {
 
     m_tv_ptyn.setText (m_com_api.tuner_rds_ptyn);
 
-    if (! last_rt.equalsIgnoreCase (m_com_api.tuner_rds_rt)) {
+    if (! last_rt.equals (m_com_api.tuner_rds_rt)) {
       last_rt = m_com_api.tuner_rds_rt;
       m_tv_rt.setText (m_com_api.tuner_rds_rt);
       m_tv_rt.setSelected (true);
@@ -1395,30 +1393,30 @@ public class gui_gui implements gui_gap {
     m_preset_freq [idx] = "";
     m_preset_name [idx] = "";
     m_preset_ib [idx].setImageResource (R.drawable.btn_preset);
-    m_com_api.key_set ("service_preset_name_" + idx, "delete", "service_preset_freq_" + idx, "delete");   // !! Current implementation requires simultaneous
+    m_com_api.key_set ("chass_preset_name_" + idx, "delete", "chass_preset_freq_" + idx, "delete");   // !! Current implementation requires simultaneous
   }
 
   private void preset_rename (int idx, String name) {
     com_uti.logd ("idx: " + idx);
     m_preset_tv [idx].setText (name);
     m_preset_name [idx] = name;
-    m_com_api.key_set ("service_preset_name_" + idx, name, "service_preset_freq_" + idx, m_preset_freq [idx]);   // !! Current implementation requires simultaneous
+    m_com_api.key_set ("chass_preset_name_" + idx, name, "chass_preset_freq_" + idx, m_preset_freq [idx]);   // !! Current implementation requires simultaneous
   }
 
   private void preset_set (int idx) {
-    if (idx >= com_api.max_presets) {
-      com_uti.loge ("idx: " + idx + "  com_api.max_presets: " + com_api.max_presets + "  m_presets_curr: " + m_presets_curr);
+    if (idx >= com_api.chass_preset_max) {
+      com_uti.loge ("idx: " + idx + "  com_api.chass_preset_max: " + com_api.chass_preset_max + "  m_presets_curr: " + m_presets_curr);
       return;
     }
     else if (idx > m_presets_curr) {
-      com_uti.loge ("idx: " + idx + "  com_api.max_presets: " + com_api.max_presets + "  m_presets_curr: " + m_presets_curr);
+      com_uti.loge ("idx: " + idx + "  com_api.chass_preset_max: " + com_api.chass_preset_max + "  m_presets_curr: " + m_presets_curr);
       idx = m_presets_curr;
     }      
     else
-      com_uti.logd ("idx: " + idx + "  com_api.max_presets: " + com_api.max_presets + "  m_presets_curr: " + m_presets_curr);
+      com_uti.logd ("idx: " + idx + "  com_api.chass_preset_max: " + com_api.chass_preset_max + "  m_presets_curr: " + m_presets_curr);
 
     String freq_text = m_com_api.tuner_freq;
-    if (m_com_api.tuner_band.equalsIgnoreCase ("US")) {
+    if (m_com_api.tuner_band.equals ("US")) {
       if (! m_com_api.tuner_rds_picl.equals (""))
         freq_text = m_com_api.tuner_rds_picl;
     }
@@ -1433,7 +1431,7 @@ public class gui_gui implements gui_gap {
     m_preset_tv [idx].setText ("" + freq_text);
     m_preset_name [idx] = freq_text;
     m_preset_freq [idx] = m_com_api.tuner_freq;
-    m_com_api.key_set ("service_preset_name_" + idx, "" + freq_text, "service_preset_freq_" + idx, m_com_api.tuner_freq);   // !! Current implementation requires simultaneous
+    m_com_api.key_set ("chass_preset_name_" + idx, "" + freq_text, "chass_preset_freq_" + idx, m_com_api.tuner_freq);   // !! Current implementation requires simultaneous
     m_preset_ib [idx].setImageResource (R.drawable.transparent);  // R.drawable.btn_preset
   }
 
@@ -1443,7 +1441,7 @@ public class gui_gui implements gui_gap {
       ani (v);
       com_uti.logd ("view: " + v);
 
-      for (int idx = 0; idx < com_api.max_presets; idx ++) {            // For all presets...
+      for (int idx = 0; idx < com_api.chass_preset_max; idx ++) {            // For all presets...
         if (v == m_preset_ib [idx]) {                                   // If this preset...
           com_uti.logd ("idx: " + idx);
           try {
@@ -1469,7 +1467,7 @@ public class gui_gui implements gui_gap {
     public boolean onLongClick (View v) {
       ani (v);
       com_uti.logd ("view: " + v);
-      for (int idx = 0; idx < com_api.max_presets; idx ++) {            // For all presets...
+      for (int idx = 0; idx < com_api.chass_preset_max; idx ++) {            // For all presets...
         if (v == m_preset_ib [idx]) {                                   // If this preset...
           cur_preset_idx = idx;
           com_uti.logd ("idx: " + idx);
@@ -1522,23 +1520,23 @@ public class gui_gui implements gui_gap {
 
       else if (v == m_iv_stop) {
         m_com_api.key_set ("tuner_state", "Toggle");
-        //if (m_com_api.tuner_state.equalsIgnoreCase ("Start"))
+        //if (m_com_api.tuner_state.equals ("Start"))
         //  m_com_api.key_set ("tuner_state", "Stop");                      // Full power down/up
         //else
         //  m_com_api.key_set ("tuner_state", "Start");                     // Tuner only start, no audio
       }
 
       else if (v == m_iv_record)
-        m_com_api.key_set ("audio_record_state", "toggle");
+        m_com_api.key_set ("audio_record_state", "Toggle");
 
       else if (v == m_tv_freq)                                          // Frequency direct entry
         m_gui_act.showDialog (FREQ_SET_DIALOG);
 
       else if (v == m_iv_prev)
-        m_com_api.key_set ("tuner_freq", "down");
+        m_com_api.key_set ("tuner_freq", "Down");
 
       else if (v ==  m_iv_next)
-        m_com_api.key_set ("tuner_freq", "up");
+        m_com_api.key_set ("tuner_freq", "Up");
 
       else if (v == m_iv_volume) {
         AudioManager m_am = (AudioManager) m_context.getSystemService (Context.AUDIO_SERVICE);
@@ -1550,7 +1548,7 @@ public class gui_gui implements gui_gap {
       }
 
       else if (v == m_iv_output) {
-        if (m_com_api.audio_output.equalsIgnoreCase ("Speaker"))        // If speaker..., Pressing button goes to headset
+        if (m_com_api.audio_output.equals ("Speaker"))        // If speaker..., Pressing button goes to headset
           m_com_api.key_set ("audio_output", "Headset");
         else
           m_com_api.key_set ("audio_output", "Speaker");
@@ -1558,16 +1556,16 @@ public class gui_gui implements gui_gap {
 
       else if (v == m_iv_seekdn) {                                      // Seek down
         if (com_uti.s2_tx_get ())                                       // Transmit navigates presets instead of seeking
-          m_com_api.key_set ("service_seek_state", "down");
+          m_com_api.key_set ("service_seek_state", "Down");
         else
-          m_com_api.key_set ("tuner_seek_state", "down");
+          m_com_api.key_set ("tuner_seek_state", "Down");
       }
 
       else if (v == m_iv_seekup) {                                      // Seek up
         if (com_uti.s2_tx_get ())                                       // Transmit navigates presets instead of seeking
-          m_com_api.key_set ("service_seek_state", "up");
+          m_com_api.key_set ("service_seek_state", "Up");
         else
-          m_com_api.key_set ("tuner_seek_state", "up");
+          m_com_api.key_set ("tuner_seek_state", "Up");
       }
 
     }
@@ -1627,19 +1625,19 @@ public class gui_gui implements gui_gap {
   private void load_prefs () { 
     String value = "";
     value = com_uti.prefs_get (m_context, "audio_output", "");
-    if (value.equalsIgnoreCase ("Speaker"))
+    if (value.equals ("Speaker"))
       cb_speaker.setChecked (true);
     else
       cb_speaker.setChecked (false);
 
     value = com_uti.prefs_get (m_context, "tuner_stereo", "");
-    if (value.equalsIgnoreCase ("Mono"))
+    if (value.equals ("Mono"))
       ((CheckBox) m_gui_act.findViewById (R.id.cb_tuner_stereo)).setChecked (false);
     else
       ((CheckBox) m_gui_act.findViewById (R.id.cb_tuner_stereo)).setChecked (true);
 
     value = com_uti.prefs_get (m_context, "audio_stereo", "");
-    if (value.equalsIgnoreCase ("Mono"))
+    if (value.equals ("Mono"))
       ((CheckBox) m_gui_act.findViewById (R.id.cb_audio_stereo)).setChecked (false);
     else
       ((CheckBox) m_gui_act.findViewById (R.id.cb_audio_stereo)).setChecked (true);
@@ -1649,7 +1647,7 @@ public class gui_gui implements gui_gap {
 
   private String visualizer_state_set (String state) {
     com_uti.logd ("state: " + state);
-    if (state.equalsIgnoreCase ("Start")) {
+    if (state.equals ("Start")) {
       ((LinearLayout) m_gui_act.findViewById (R.id.vis)).setVisibility (View.VISIBLE);  //dial_init
 
       m_dial.setVisibility (View.INVISIBLE);

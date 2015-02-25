@@ -18,6 +18,7 @@ import android.media.MediaPlayer;
 import android.media.MediaPlayer.OnCompletionListener;
 import android.media.MediaPlayer.OnErrorListener;
 import android.media.MediaPlayer.OnPreparedListener;
+import android.os.Build.VERSION_CODES;
 import android.os.Environment;
 import android.os.PowerManager;
 import android.provider.Settings;
@@ -42,8 +43,6 @@ public class svc_aud implements svc_aap, AudioManager.OnAudioFocusChangeListener
   private Context       m_context   = null;
   private svc_acb       m_svc_acb   = null;
   private com_api       m_com_api   = null;
-
-  private boolean       old_htc     = false;
 
   private int           audiotrack_sessid_int = 0;
 
@@ -143,11 +142,6 @@ public class svc_aud implements svc_aap, AudioManager.OnAudioFocusChangeListener
     s2_tx = com_uti.s2_tx_get ();
     com_uti.logd ("s2_tx: " + s2_tx);
 
-    old_htc = false;
-    if (com_uti.m_device.startsWith ("EVITA") || com_uti.m_device.startsWith ("VILLE") || com_uti.m_device.startsWith ("JEWEL")) {// || com_uti.m_device.startsWith ("M7C")) {
-      old_htc = true;
-    }
-
     m_AM = (AudioManager) c.getSystemService (Context.AUDIO_SERVICE);
 
     max_stream_vol = m_AM.getStreamMaxVolume  (audio_stream);           // Get maximum Android volume. Only need to update if stream changes
@@ -168,7 +162,7 @@ public class svc_aud implements svc_aap, AudioManager.OnAudioFocusChangeListener
 
     m_channels = 2;
     String audio_stereo = com_uti.prefs_get (m_context, "audio_stereo", "Stereo");
-    if (audio_stereo.equalsIgnoreCase ("Mono"))
+    if (audio_stereo.equals ("Mono"))
       m_channels = 1;
     com_uti.logd ("m_channels final: " + m_channels);
 
@@ -205,26 +199,26 @@ public class svc_aud implements svc_aap, AudioManager.OnAudioFocusChangeListener
       m_samplerate = 44100;
     com_uti.logd ("m_samplerate 2: " + m_samplerate);
 
-    if (com_uti.devnum == com_uti.DEV_GEN)
+    if (m_com_api.chass_plug_aud.equals ("GEN"))
       m_samplerate = 48000;
-    else if (com_uti.devnum == com_uti.DEV_QCV)
+    else if (m_com_api.chass_plug_aud.equals ("QCV"))
       m_samplerate = 48000;
-    else if (com_uti.devnum == com_uti.DEV_OM7)
+    else if (m_com_api.chass_plug_aud.equals ("OM7"))
       m_samplerate = 48000;
-    else if (com_uti.devnum == com_uti.DEV_XZ2)
+    else if (m_com_api.chass_plug_aud.equals ("XZ2"))
       m_samplerate = 48000;
-    else if (com_uti.devnum == com_uti.DEV_LG2 && com_uti.android_version >= 21)
+    else if (m_com_api.chass_plug_aud.equals ("LG2") && com_uti.android_version >= VERSION_CODES.LOLLIPOP)
       m_samplerate = 48000;
-    else if (com_uti.devnum == com_uti.DEV_LG2)
+    else if (m_com_api.chass_plug_aud.equals ("LG2"))
       m_samplerate = 44100;
-    else if (com_uti.devnum == com_uti.DEV_GS1)
+    else if (m_com_api.chass_plug_aud.equals ("GS1"))
       m_samplerate = 44100;
-    else if (com_uti.devnum == com_uti.DEV_GS2)
+    else if (m_com_api.chass_plug_aud.equals ("GS2"))
       m_samplerate = 44100;
-    else if (com_uti.devnum == com_uti.DEV_GS3)
+    else if (m_com_api.chass_plug_aud.equals ("GS3"))
       m_samplerate = 44100;
 
-    if (android.os.Build.MANUFACTURER.toUpperCase (Locale.getDefault ()).equals ("SONY") && com_uti.android_version < 21)
+    if (com_uti.sony_get () && com_uti.android_version < VERSION_CODES.LOLLIPOP)
       m_samplerate = 44100;
     com_uti.logd ("m_samplerate 3: " + m_samplerate);
 
@@ -238,23 +232,23 @@ public class svc_aud implements svc_aap, AudioManager.OnAudioFocusChangeListener
     m_audio_bufsize = 32768;//5120 * 16;//65536;//                                        // 80 KBytes about 0.5 seconds of stereo audio data at 44K        Default
             // QCV: 11288, 12288 (12 * 2^10) = 6144 samples = 128 milliseconds, 24576
 
-    if (com_uti.devnum == com_uti.DEV_QCV)
+    if (m_com_api.chass_plug_aud.equals ("QCV"))
       m_audio_bufsize = 30720;
-    else if (com_uti.devnum == com_uti.DEV_OM7)       // 22050
+    else if (m_com_api.chass_plug_aud.equals ("OM7"))       // 22050
       m_audio_bufsize = 30720;//32000;//768;//24576;//30720;//38400; // ??
-    else if (com_uti.devnum == com_uti.DEV_XZ2)
+    else if (m_com_api.chass_plug_aud.equals ("XZ2"))
       m_audio_bufsize = 30720;
-    else if (com_uti.devnum == com_uti.DEV_LG2) {
-      if (com_uti.lg2_stock_get ())
+    else if (m_com_api.chass_plug_aud.equals ("LG2")) {
+      if (com_uti.stock_lg2_get ())
         m_audio_bufsize = 32768;
       else
         m_audio_bufsize = 30720;
     }
-    else if (com_uti.devnum == com_uti.DEV_GS1)
+    else if (m_com_api.chass_plug_aud.equals ("GS1"))
       m_audio_bufsize = 12672;
-    else if (com_uti.devnum == com_uti.DEV_GS2)
+    else if (m_com_api.chass_plug_aud.equals ("GS2"))
       m_audio_bufsize = 16384;
-    else if (com_uti.devnum == com_uti.DEV_GS3)
+    else if (m_com_api.chass_plug_aud.equals ("GS3"))
       m_audio_bufsize = 25344;
 
     com_uti.logd ("m_audio_bufsize 2: " + m_audio_bufsize);
@@ -297,9 +291,9 @@ public class svc_aud implements svc_aap, AudioManager.OnAudioFocusChangeListener
       m_alsa_bufsize = 3840;
     com_uti.logd ("m_alsa_bufsize 2: " + m_alsa_bufsize);
 
-    if (com_uti.devnum == com_uti.DEV_QCV && old_htc)
+    if (m_com_api.chass_plug_aud.equals ("QCV") && com_uti.old_qcv_get ())
       m_alsa_bufsize = 5120 * 2;
-    else if (com_uti.devnum == com_uti.DEV_OM7)
+    else if (m_com_api.chass_plug_aud.equals ("OM7"))
       m_alsa_bufsize = 5120 * 2;
     else
       m_alsa_bufsize = AudioRecord.getMinBufferSize (m_samplerate, chan_in_get (m_channels), AudioFormat.ENCODING_PCM_16BIT);
@@ -400,7 +394,7 @@ public class svc_aud implements svc_aap, AudioManager.OnAudioFocusChangeListener
     m_com_api.audio_state = "Pausing";
 
     pcm_audio_pause ();                                                 // Stop reading, then writing audio:    AudioRecorder, AudioTrack & threads
-    audio_output_set ("headset", false);                                // Set Audio Output to headset (if needed) with no restart (in preperation for audio stop)
+    audio_output_set ("Headset", false);                                // Set Audio Output to headset (if needed) with no restart (in preperation for audio stop)
     return (0);
   }
 
@@ -411,7 +405,7 @@ public class svc_aud implements svc_aap, AudioManager.OnAudioFocusChangeListener
     focus_set (false);
 
     pcm_audio_stop ();                                                  // Pause and release Audiotrack resources
-    audio_output_set ("headset", false);                                // Set Audio Output to headset (if needed) with no restart (in preperation for audio stop)
+    audio_output_set ("Headset", false);                                // Set Audio Output to headset (if needed) with no restart (in preperation for audio stop)
     //stopSelf ();                                                      // DISABLED: Don't need. WAS: Service is no longer necessary. Will be started again if needed.
     return (0);
   }
@@ -423,7 +417,7 @@ public class svc_aud implements svc_aap, AudioManager.OnAudioFocusChangeListener
     headset_plgd_lstnr_start ();                                        // Register for headset plugged/unplugged events
     focus_set (true);                                                   // Get audio focus
 
-    String audio_output = com_uti.prefs_get (m_context, "audio_output", "headset");
+    String audio_output = com_uti.prefs_get (m_context, "audio_output", "Headset");
     audio_output_set (audio_output, false);                             // Set Audio Output from prefs with no restart
 
     pcm_audio_start ();                                                 // Start input & output
@@ -440,33 +434,33 @@ public class svc_aud implements svc_aap, AudioManager.OnAudioFocusChangeListener
     com_uti.logd ("s2_tx: " + s2_tx + "  desired_state: " + desired_state + "  last_audio_state: " + last_audio_state);
     boolean success = true;                                             // Default = success
 
-    if (desired_state.equalsIgnoreCase ("start")) {                     // START:
+    if (desired_state.equals ("Start")) {                     // START:
       m_com_api.service_update_send (null, "Starting Audio", "6");      // Send Phase Update
       if (s2_tx)                                                        // If Transmit... !! Don't check state, see audio re-kicking requirement in svc_rcc:rds_update_do() !!!
         transmit_audio_start ();
-      else if (m_com_api.audio_state.equalsIgnoreCase ("stop") || m_com_api.audio_state.equalsIgnoreCase ("pause"))
+      else if (m_com_api.audio_state.equals ("Stop") || m_com_api.audio_state.equals ("Pause"))
         receive_audio_start ();                                         // If receive and Audio State = Stop or Pause (If Start or Starting then do nothing)
       else {
         com_uti.loge ("desired_state: " + desired_state + "  m_com_api.audio_state: " + m_com_api.audio_state);
         return (m_com_api.audio_state);
       }
     }
-    else if (desired_state.equalsIgnoreCase ("stop")) {                 // STOP:
+    else if (desired_state.equals ("Stop")) {                 // STOP:
       m_com_api.service_update_send (null, "Stopping Audio", "6");      // Send Phase Update
       if (s2_tx)                                                        // If Transmit...
         transmit_audio_stop ();
-      else if (m_com_api.audio_state.equalsIgnoreCase ("start") || m_com_api.audio_state.equalsIgnoreCase ("pause"))
+      else if (m_com_api.audio_state.equals ("Start") || m_com_api.audio_state.equals ("Pause"))
         receive_audio_stop ();                                          // If receive and Audio State = Start or Pause (If Stop or Starting then do nothing)
       else {
         com_uti.loge ("desired_state: " + desired_state + "  m_com_api.audio_state: " + m_com_api.audio_state);
         return (m_com_api.audio_state);
       }
     }
-    else if (desired_state.equalsIgnoreCase ("pause")) {                // PAUSE:
+    else if (desired_state.equals ("Pause")) {                // PAUSE:
       m_com_api.service_update_send (null, "Pausing Audio", "6");       // Send Phase Update
       if (s2_tx)                                                        // If Transmit...
         transmit_audio_pause ();
-      else if (m_com_api.audio_state.equalsIgnoreCase ("start"))
+      else if (m_com_api.audio_state.equals ("Start"))
         receive_audio_pause ();                                         // If receive and Audio State = Start (If Pause or Stop or Starting then do nothing)
       else {
         com_uti.loge ("desired_state: " + desired_state + "  m_com_api.audio_state: " + m_com_api.audio_state);
@@ -478,7 +472,7 @@ public class svc_aud implements svc_aap, AudioManager.OnAudioFocusChangeListener
       return (m_com_api.audio_state);
     }
 
-    m_com_api.service_update_send (null, "Success " + m_com_api.service_phase, "0");
+    m_com_api.service_update_send (null, "Success " + m_com_api.chass_phase, "0");
 
     m_com_api.audio_state = desired_state;
     if (m_svc_acb != null)
@@ -618,21 +612,21 @@ public class svc_aud implements svc_aap, AudioManager.OnAudioFocusChangeListener
     switch (focusChange) {
       case AudioManager.AUDIOFOCUS_GAIN:                                // Gain
         com_uti.logd ("focusChange: GAIN");
-        audio_state_set ("start");                                      // Start/Restart audio
+        audio_state_set ("Start");                                      // Start/Restart audio
         break;
       case AudioManager.AUDIOFOCUS_LOSS:                                // Permanent loss
         //com_uti.logd ("focusChange: LOSS");
-        audio_state_set ("stop");                                       // Stop audio       Loss of/stopping audio could/should stop tuner (& Tuner API ?)
+        audio_state_set ("Stop");                                       // Stop audio       Loss of/stopping audio could/should stop tuner (& Tuner API ?)
         com_uti.logd ("DONE focusChange: LOSS");
         break;
       case AudioManager.AUDIOFOCUS_LOSS_TRANSIENT:                      // Transient loss
         //com_uti.logd ("focusChange: ...LOSS_TRANSIENT");
-        audio_state_set ("pause");                                      // Pause audio
+        audio_state_set ("Pause");                                      // Pause audio
         com_uti.logd ("DONE focusChange: ...LOSS_TRANSIENT");
         break;
       case AudioManager.AUDIOFOCUS_LOSS_TRANSIENT_CAN_DUCK:             // Transient loss we can ignore if we want
         //com_uti.logd ("focusChange: LOSS_TRANSIENT_CAN_DUCK");
-        audio_state_set ("pause");                                      // Pause audio
+        audio_state_set ("Pause");                                      // Pause audio
         com_uti.logd ("DONE focusChange: LOSS_TRANSIENT_CAN_DUCK");
         break;
        default:
@@ -789,7 +783,7 @@ public class svc_aud implements svc_aap, AudioManager.OnAudioFocusChangeListener
 
   private boolean is_analog_audio_mode () {
     //return (m_com_api.audio_mode.toUpperCase (Locale.getDefault ()).startsWith ("A"));
-    return (m_com_api.audio_mode.equalsIgnoreCase ("Analog"));
+    return (m_com_api.audio_mode.equals ("Analog"));
   }
 
   private final Runnable pcm_read_run = new Runnable () {               // Read/Input thread
@@ -944,7 +938,7 @@ public class svc_aud implements svc_aap, AudioManager.OnAudioFocusChangeListener
     if (s2_tx)
       return (new_audio_mode);
 
-    if (! m_com_api.audio_state.equalsIgnoreCase ("start")) {           // If Audio is not started we do not need to do anything except store mode for next audio start
+    if (! m_com_api.audio_state.equals ("Start")) {           // If Audio is not started we do not need to do anything except store mode for next audio start
       m_com_api.audio_mode = new_audio_mode;                            // Set new audio mode
       return (m_com_api.audio_mode);                                    // Done for now
     }
@@ -1023,7 +1017,7 @@ public class svc_aud implements svc_aap, AudioManager.OnAudioFocusChangeListener
     }
 
 // SETUP audio_mode:
-    if (m_com_api.tuner_state.equalsIgnoreCase ("start")) {             // If Tuner is started  IE, if the daemon is running and can be communicated with
+    if (m_com_api.tuner_state.equals ("Start")) {             // If Tuner is started  IE, if the daemon is running and can be communicated with
                                                                             // Could use tuner_api_state or a new daemon_state, but audio depends on tuner running anyway
       if (is_analog_audio_mode ())                                      // If Analog...
         com_uti.daemon_set ("audio_mode", "Analog");
@@ -1113,20 +1107,20 @@ public class svc_aud implements svc_aap, AudioManager.OnAudioFocusChangeListener
                                                 // Headset unavailable: This fools Android into thinking that the headset is unplugged (which is needed because
                                                 // Android doesn't like apps controlling audio routing, and FM reception is better wired with headset plugged in as an antenna, even in speaker mode
       com_uti.setDeviceConnectionState (com_uti.DEVICE_OUT_WIRED_HEADSET, com_uti.DEVICE_STATE_UNAVAILABLE, "");
-      //if (com_uti.devnum == com_uti.DEV_GS1)                            // On GS1 "Headphone" also unavailable
+      //if (m_com_api.chass_plug_aud.equals ("GS1"))                            // On GS1 "Headphone" also unavailable
       //  com_uti.setDeviceConnectionState (com_uti.DEVICE_OUT_WIRED_HEADPHONE, com_uti.DEVICE_STATE_UNAVAILABLE, "");
     }
     else {
                                                                        // Headset available
       com_uti.setDeviceConnectionState (com_uti.DEVICE_OUT_WIRED_HEADSET, com_uti.DEVICE_STATE_AVAILABLE, "");
-      //if (com_uti.devnum == com_uti.DEV_GS1)                            // On GS1 "Headphone" also available
+      //if (m_com_api.chass_plug_aud.equals ("GS1"))                            // On GS1 "Headphone" also available
       //  com_uti.setDeviceConnectionState (com_uti.DEVICE_OUT_WIRED_HEADPHONE, com_uti.DEVICE_STATE_AVAILABLE, "");
     }
   }
 
     // CAN_DUCK ?                                                   // Called by:
                                                                         // prefsval  & no restart:         audio_start()
-                                                                        // "headset" & no restart:         audio_pause()    (for audio_state=pause or stop), after pcm read & write stopped
+                                                                        // "Headset" & no restart:         audio_pause()    (for audio_state=pause or stop), after pcm read & write stopped
                                                                         // newval    &    restart: svc_svc:onStartCommand() (change from UI/Widget)
   public String audio_output_set (String new_audio_output, boolean restart_param) {
     com_uti.logd ("s2_tx: " + s2_tx + "  m_hdst_plgd: " + m_hdst_plgd + "  restart_param: " + restart_param + "  api audio_state: " + m_com_api.audio_state + "  api audio_output: " + m_com_api.audio_output + "  new_audio_output: " + new_audio_output + "  audio_output_get: " + audio_output_get ());
@@ -1134,11 +1128,11 @@ public class svc_aud implements svc_aap, AudioManager.OnAudioFocusChangeListener
       return (m_com_api.audio_output = new_audio_output);
 
     boolean lg2_restart = restart_param;
-    if (com_uti.devnum != com_uti.DEV_LG2 || new_audio_output.equalsIgnoreCase ("headset"))
+    if (! m_com_api.chass_plug_aud.equals ("LG2") || new_audio_output.equals ("Headset"))
       lg2_restart = false;
 
     boolean restart_enable = restart_param;
-    if (com_uti.devnum != com_uti.DEV_GS1 && com_uti.devnum != com_uti.DEV_GS2 && ! lg2_restart)
+    if (! m_com_api.chass_plug_aud.equals ("GS1") && ! m_com_api.chass_plug_aud.equals ("GS2") && ! lg2_restart)
       restart_enable = false;                                            // Only GS1 and GS2 (and LG2 going to speaker) need restart. GS3 may need restart on OmniROM only ?
 
     if (restart_enable)
@@ -1147,17 +1141,17 @@ public class svc_aud implements svc_aap, AudioManager.OnAudioFocusChangeListener
     if (lg2_restart)                                                    // Without lg2_restart, speaker audio is really messed up
       com_uti.ms_sleep (3000);                                          // 2500 too small
 
-    if (new_audio_output.equalsIgnoreCase ("speaker")) {                // If speaker is desired...
+    if (new_audio_output.equals ("Speaker")) {                // If speaker is desired...
       if (m_hdst_plgd)                                                  // If headset is plugged (if unplugged, audio is already going to speaker)
-        //if (m_com_api.audio_output.equalsIgnoreCase ("headset"))      // DISABLED: so we don't check for change, in case we are re-starting audio after an output switch to speaker that was delayed
+        //if (m_com_api.audio_output.equals ("Headset"))      // DISABLED: so we don't check for change, in case we are re-starting audio after an output switch to speaker that was delayed
         speaker_set (true);                                             // Switch to Speaker
       else
         com_uti.logd ("Speaker switch do nothing: m_hdst_plgd == false");
     }
-    else if (new_audio_output.equalsIgnoreCase ("headset")) {           // Else if headset is desired...
+    else if (new_audio_output.equals ("Headset")) {           // Else if headset is desired...
       //if (m_hdst_plgd)                                                // DISABLED: setDEviceConnectionState() makes this unusable. WAS: If headset is plugged (if unplugged, audio is already going to speaker and can't be switched to unplugged headset)
         if (restart_param) {                                            // WAS DISABLED ?: but should only need to switch to headset when we are restarting due to a UI/Widget output change request
-          if (m_com_api.audio_output.equalsIgnoreCase ("speaker"))      // Only need to switch if coming from speaker  
+          if (m_com_api.audio_output.equals ("Speaker"))      // Only need to switch if coming from speaker  
             speaker_set (false);                                        // Switch to Headset
           else
             com_uti.logd ("Headset switch do nothing: m_com_api.audio_output != Speaker");
@@ -1244,20 +1238,19 @@ VOICE_COMMUNICATION 7       11  (Microphone audio source tuned for voice communi
 
     int default_src = MediaRecorder.AudioSource.MIC;//MediaRecorder.AudioSource.CAMCORDER;  // 5
 
-    if (com_uti.devnum == com_uti.DEV_LG2)
+    if (m_com_api.chass_plug_aud.equals ("LG2"))
       default_src = MediaRecorder.AudioSource.MIC;                      // 1
 
-    else if (com_uti.devnum == com_uti.DEV_QCV && (com_uti.m_device.startsWith ("M8") || com_uti.m_device.startsWith ("HTC_M8")))
+    else if (m_com_api.chass_plug_aud.equals ("QCV") && com_uti.om8_get ())
       default_src = MediaRecorder.AudioSource.CAMCORDER;                // 5      This avoids a 10 second delay resuming paused state when wired headset not plugged in.
 
-    else if (com_uti.devnum == com_uti.DEV_QCV)
+    else if (m_com_api.chass_plug_aud.equals ("QCV"))
       default_src = MediaRecorder.AudioSource.CAMCORDER;                // MotoG & Xperia Z lose audio (input 0's) after an hour or 2. Does this work better on some ROMs ?
 
     m_srcs = m_mic_srcs;
-    if (com_uti.m_manufacturer.startsWith ("SONY") ||                   // Doesn't work with Xperia Z w/ AOSP, which ends up selecting 5/Camcorder because 9 & 10 don't work.
-        com_uti.motorola_stock_get ()              ||
-       (com_uti.m_device.startsWith ("SERRANO"))                        // GS4 Mini
-            ) { 
+
+                                                                        // Doesn't work with Xperia Z w/ AOSP, which ends up selecting 5/Camcorder because 9 & 10 don't work.
+    if (com_uti.sony_get () || com_uti.stock_mot_get () || com_uti.gs4_mini_get ()) {
       if (support_direct_sources)
         m_srcs = m_dir_srcs;
     }
@@ -1267,7 +1260,7 @@ VOICE_COMMUNICATION 7       11  (Microphone audio source tuned for voice communi
       src = cnt_src;
       if (src == 11) {                                                  // If special first entry...
         String audio_pseudo_source = com_uti.prefs_get (m_context, "audio_pseudo_source", "");
-        if (audio_pseudo_source != null && ! audio_pseudo_source.equalsIgnoreCase ("")) {
+        if (audio_pseudo_source != null && ! audio_pseudo_source.equals ("")) {
           String arr [] = audio_pseudo_source.split (" ", 2);
           String src_num  = arr [0];
           String src_desc = arr [1];
@@ -1345,7 +1338,7 @@ VOICE_COMMUNICATION 7       11  (Microphone audio source tuned for voice communi
     }
 
     double default_audio_digital_amp = 1;
-    if (com_uti.devnum == com_uti.DEV_GS1)
+    if (m_com_api.chass_plug_aud.equals ("GS1"))
       default_audio_digital_amp = 3;//2;//4;    // Amplify by 1 = Don't amplify. 4 is good for GS1 but takes up too much CPU on poor old single core GT-I9000; at least with the horribly inefficient Java code at present
 
     audio_digital_amp = com_uti.prefs_get (m_context, "audio_digital_amp", default_audio_digital_amp);
@@ -1365,7 +1358,7 @@ VOICE_COMMUNICATION 7       11  (Microphone audio source tuned for voice communi
     @Override
     public void onChange (boolean selfChange) {                         // Faster before super ? !
 
-      if (m_com_api.audio_state.equalsIgnoreCase ("start"))
+      if (m_com_api.audio_state.equals ("Start"))
         volume_set ();                                                  // Set chip tuner volume as needed for analog mode
       else
         super.onChange (selfChange);

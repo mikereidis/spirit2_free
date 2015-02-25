@@ -222,7 +222,11 @@ al  /system/lib/libbt-hci*
   }
 
   static int init (const bt_hc_callbacks_t * p_cb, unsigned char * local_bdaddr) {
+
     logd ("init p_cb: %p  local_bdaddr: %2.2x %2.2x %2.2x %2.2x %2.2x %2.2x", p_cb, local_bdaddr [0], local_bdaddr [1], local_bdaddr [2], local_bdaddr [3], local_bdaddr [4], local_bdaddr [5] );
+
+    utils_init ();
+
     if (p_cb == NULL) {
       loge ("init no user callbacks");
       return (BT_HC_STATUS_FAIL);

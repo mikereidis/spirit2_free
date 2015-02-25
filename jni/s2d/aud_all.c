@@ -13,28 +13,28 @@
     if (mute == 0) {
       curr_tuner_mute_int = tnr_funcs->tnr_tuner_mute_sg (curr_tuner_mute_int = 0);                           // UnMute
       if (curr_tuner_mute_int == 0)
-        strncpy (curr_tuner_mute, "Unmute",  sizeof (curr_tuner_mute));
+        strlcpy (curr_tuner_mute, "Unmute",  sizeof (curr_tuner_mute));
     }
     else {
       curr_tuner_mute_int = tnr_funcs->tnr_tuner_mute_sg (curr_tuner_mute_int = 1);                           // Mute
       if (curr_tuner_mute_int == 1)
-        strncpy (curr_tuner_mute, "Mute",  sizeof (curr_tuner_mute));
+        strlcpy (curr_tuner_mute, "Mute",  sizeof (curr_tuner_mute));
     }
   }
 
   int audio_state_start () {
     int ret = -1;
     tuner_mute_set (1);                                                 // Mute to avoid noise
-    switch (curr_service_device_int) {
-      case DEV_UNK: ret = -1;               break;
-      case DEV_GEN: ret = -1;               break;
-      case DEV_GS1: if (analog_output_mode) ret = gs1_ana_audio_state_start ();  if (analog_output_mode == 0 || analog_and_digital != 0) ret = gs1_dig_audio_state_start ();  break;
-      case DEV_GS2: if (analog_output_mode) ret = gs2_ana_audio_state_start ();  if (analog_output_mode == 0 || analog_and_digital != 0) ret = gs2_dig_audio_state_start ();  break;
-      case DEV_GS3: if (analog_output_mode) ret = gs3_ana_audio_state_start ();  if (analog_output_mode == 0 || analog_and_digital != 0) ret = gs3_dig_audio_state_start ();  break;
-      case DEV_QCV: if (analog_output_mode) ret = qcv_ana_audio_state_start ();  if (analog_output_mode == 0 || analog_and_digital != 0) ret = qcv_dig_audio_state_start ();  break;
-      case DEV_OM7: if (analog_output_mode) ret = om7_ana_audio_state_start ();  if (analog_output_mode == 0 || analog_and_digital != 0) ret = om7_dig_audio_state_start ();  break;
-      case DEV_LG2: if (analog_output_mode) ret = lg2_ana_audio_state_start ();  if (analog_output_mode == 0 || analog_and_digital != 0) ret = lg2_dig_audio_state_start ();  break;
-      case DEV_XZ2: if (analog_output_mode) ret = xz2_ana_audio_state_start ();  if (analog_output_mode == 0 || analog_and_digital != 0) ret = xz2_dig_audio_state_start ();  break;
+    switch (curr_chass_plug_aud_int) {
+      case PLUG_AUD_UNK: ret = -1;               break;
+      case PLUG_AUD_GEN: ret = -1;               break;
+      case PLUG_AUD_GS1: if (analog_output_mode) ret = gs1_ana_audio_state_start ();  if (analog_output_mode == 0 || analog_and_digital != 0) ret = gs1_dig_audio_state_start ();  break;
+      case PLUG_AUD_GS2: if (analog_output_mode) ret = gs2_ana_audio_state_start ();  if (analog_output_mode == 0 || analog_and_digital != 0) ret = gs2_dig_audio_state_start ();  break;
+      case PLUG_AUD_GS3: if (analog_output_mode) ret = gs3_ana_audio_state_start ();  if (analog_output_mode == 0 || analog_and_digital != 0) ret = gs3_dig_audio_state_start ();  break;
+      case PLUG_AUD_QCV: if (analog_output_mode) ret = qcv_ana_audio_state_start ();  if (analog_output_mode == 0 || analog_and_digital != 0) ret = qcv_dig_audio_state_start ();  break;
+      case PLUG_AUD_OM7: if (analog_output_mode) ret = om7_ana_audio_state_start ();  if (analog_output_mode == 0 || analog_and_digital != 0) ret = om7_dig_audio_state_start ();  break;
+      case PLUG_AUD_LG2: if (analog_output_mode) ret = lg2_ana_audio_state_start ();  if (analog_output_mode == 0 || analog_and_digital != 0) ret = lg2_dig_audio_state_start ();  break;
+      case PLUG_AUD_XZ2: if (analog_output_mode) ret = xz2_ana_audio_state_start ();  if (analog_output_mode == 0 || analog_and_digital != 0) ret = xz2_dig_audio_state_start ();  break;
     }
     tuner_mute_set (0);                                                 // Unmute to play audio
     return (ret);
@@ -43,32 +43,32 @@
   int audio_state_stop () {
     tuner_mute_set (1);                                                 // Mute to avoid noise
     int ret = -1;
-    switch (curr_service_device_int) {
-      case DEV_UNK: ret = -1;               break;
-      case DEV_GEN: ret = -1;               break;
-      case DEV_GS1: if (analog_output_mode) ret = gs1_ana_audio_state_stop ();  if (analog_output_mode == 0 || analog_and_digital != 0) ret = gs1_dig_audio_state_stop ();  break;
-      case DEV_GS2: if (analog_output_mode) ret = gs2_ana_audio_state_stop ();  if (analog_output_mode == 0 || analog_and_digital != 0) ret = gs2_dig_audio_state_stop ();  break;
-      case DEV_GS3: if (analog_output_mode) ret = gs3_ana_audio_state_stop ();  if (analog_output_mode == 0 || analog_and_digital != 0) ret = gs3_dig_audio_state_stop ();  break;
-      case DEV_QCV: if (analog_output_mode) ret = qcv_ana_audio_state_stop ();  if (analog_output_mode == 0 || analog_and_digital != 0) ret = qcv_dig_audio_state_stop ();  break;
-      case DEV_OM7: if (analog_output_mode) ret = om7_ana_audio_state_stop ();  if (analog_output_mode == 0 || analog_and_digital != 0) ret = om7_dig_audio_state_stop ();  break;
-      case DEV_LG2: if (analog_output_mode) ret = lg2_ana_audio_state_stop ();  if (analog_output_mode == 0 || analog_and_digital != 0) ret = lg2_dig_audio_state_stop ();  break;
-      case DEV_XZ2: if (analog_output_mode) ret = xz2_ana_audio_state_stop ();  if (analog_output_mode == 0 || analog_and_digital != 0) ret = xz2_dig_audio_state_stop ();  break;
+    switch (curr_chass_plug_aud_int) {
+      case PLUG_AUD_UNK: ret = -1;               break;
+      case PLUG_AUD_GEN: ret = -1;               break;
+      case PLUG_AUD_GS1: if (analog_output_mode) ret = gs1_ana_audio_state_stop ();  if (analog_output_mode == 0 || analog_and_digital != 0) ret = gs1_dig_audio_state_stop ();  break;
+      case PLUG_AUD_GS2: if (analog_output_mode) ret = gs2_ana_audio_state_stop ();  if (analog_output_mode == 0 || analog_and_digital != 0) ret = gs2_dig_audio_state_stop ();  break;
+      case PLUG_AUD_GS3: if (analog_output_mode) ret = gs3_ana_audio_state_stop ();  if (analog_output_mode == 0 || analog_and_digital != 0) ret = gs3_dig_audio_state_stop ();  break;
+      case PLUG_AUD_QCV: if (analog_output_mode) ret = qcv_ana_audio_state_stop ();  if (analog_output_mode == 0 || analog_and_digital != 0) ret = qcv_dig_audio_state_stop ();  break;
+      case PLUG_AUD_OM7: if (analog_output_mode) ret = om7_ana_audio_state_stop ();  if (analog_output_mode == 0 || analog_and_digital != 0) ret = om7_dig_audio_state_stop ();  break;
+      case PLUG_AUD_LG2: if (analog_output_mode) ret = lg2_ana_audio_state_stop ();  if (analog_output_mode == 0 || analog_and_digital != 0) ret = lg2_dig_audio_state_stop ();  break;
+      case PLUG_AUD_XZ2: if (analog_output_mode) ret = xz2_ana_audio_state_stop ();  if (analog_output_mode == 0 || analog_and_digital != 0) ret = xz2_dig_audio_state_stop ();  break;
     }
     //tuner_mute_set (0);                                                 // DISABLE: Audio stopped so leave muted      WAS: Unmute to play audio
     return (ret);
   }
 
   char * audio_state_set (char * audio_state) {
-    if (! strncasecmp (audio_state, "Start", 5))                        // Start
+    if (! strcmp (audio_state, "Start"))                            // Start
       logd ("audio_state Start: %d", audio_state_start ());
-    else if (! strncasecmp (audio_state, "Stop", 4))                    // Stop and Pause are the same
+    else if (! strcmp (audio_state, "Stop"))                        // Stop and Pause are the same
       logd ("audio_state Stop: %d", audio_state_stop ());
-    else if (! strncasecmp (audio_state, "Pause", 5))
+    else if (! strcmp (audio_state, "Pause"))
       logd ("audio_state Stop: %d", audio_state_stop ());
     else
       logd ("audio_state Unknown: %s", audio_state);
 
-    strncpy (curr_audio_state, audio_state, sizeof (curr_audio_state));
+    strlcpy (curr_audio_state, audio_state, sizeof (curr_audio_state));
     return (curr_audio_state);
   }
 
@@ -135,8 +135,8 @@
 
     char echo1 [DEF_BUF] = "0019 014";
     char echo2 [DEF_BUF] = "001b 014";
-    strncat (echo1, itoa_ret, sizeof (echo1));
-    strncat (echo2, itoa_ret, sizeof (echo1));
+    strlcat (echo1, itoa_ret, sizeof (echo1));
+    strlcat (echo2, itoa_ret, sizeof (echo1));
 
     logd ("Setting codec_reg alsa_vol: %d  echo1: %s  echo2: %s", alsa_vol, echo1, echo2);
 
@@ -241,7 +241,7 @@ alsa_bool_set ("Headphone Playback Switch", 1);
     char * codec_reg_sa44     = "/sys/devices/platform/soc-audio/WM8994 AIF1/codec_reg";        // Only access on stock, additional on CM11 unofficial for N7100    // Read-only on CM12
     char * codec_reg_sa44_esc = "/sys/devices/platform/soc-audio/WM8994\\ AIF1/codec_reg";      // Same, Space Escaped
 
-    //if (! is_note2 ())
+    //if (! no2_get ())
     //  return (0);
 
     int gs3_cdc_flags = O_RDWR;//O_WRONLY;
@@ -271,26 +271,6 @@ alsa_bool_set ("Headphone Playback Switch", 1);
     close (fd);                                                         // Close codec_reg file
 
   }
-
-/*
-  int is_note2_set = 0;
-  int is_note2_val = 0;
-  int is_note2 () {
-    if (is_note2_set)
-      return (is_note2_val);
-    is_note2_val = 0;
-    prop_buf_get ("ro.product.device",           product_device_prop_buf);
-    if (! strncasecmp (product_device_prop_buf, "T03G",     strlen ("T03G")))     // Galaxy Note2 3G
-      is_note2_val = 1;
-    else if (! strncasecmp (product_device_prop_buf, "GT-N71",   strlen ("GT-N71")))
-      is_note2_val = 1;
-    else if (! strncasecmp (product_device_prop_buf, "GALAXYN71",strlen ("GALAXYN71")))
-      is_note2_val = 1;
-    logd ("is_note2_val: %d", is_note2_val);
-    is_note2_set = 1;
-    return (is_note2_val);
-  }  
-*/
   #endif    // #ifdef NOTE2_1_CHANNEL_LOW_HACK
 
 
@@ -307,7 +287,7 @@ alsa_bool_set ("Headphone Playback Switch", 1);
     IN1RN   ->  SUB_MIC_P
 
     MICBIAS1    NC
-    MICBIAS2    -> EAR_MICBIAS_LDO_2.8V
+    MICBIAS2->  EAR_MICBIAS_LDO_2.8V
     MICDET  ->  EAR_ADC_3.5 
 
     IN2LP   ->  EAR_MIC_N                                               IN2L = External wired headset Ear microphone mono differential
@@ -667,13 +647,13 @@ alsa_bool_set ("Headphone Playback Switch", 1);
 
   char * audio_mode_set (char * audio_mode) {
     int new_analog_output_mode = -1;
-    if (! strncasecmp (audio_mode, "Digital", 1)) {
+    if (! strcmp (audio_mode, "Digital")) {
       logd ("audio_mode_set Digital curr_audio_state: %s", curr_audio_state);
       //if (! analog_output_mode)                                       // DISABLED: If unchanged
       //  return (0);
       new_analog_output_mode = 0;
     }
-    else if (! strncasecmp (audio_mode, "Analog", 1)) {
+    else if (! strcmp (audio_mode, "Analog")) {
       logd ("audio_mode_set Analog curr_audio_state: %s", curr_audio_state);
       new_analog_output_mode = 1;
     }
@@ -683,30 +663,31 @@ alsa_bool_set ("Headphone Playback Switch", 1);
     if (new_analog_output_mode < 0)
       return (curr_audio_mode);
 
-    if (! strncasecmp (curr_audio_state, "Start", sizeof (curr_audio_state)))
+    if (! strcmp (curr_audio_state, "Start"))
       audio_state_stop ();                                              // Turn off current
 
     analog_output_mode = new_analog_output_mode;                        // Set new mode
 
-    if (! strncasecmp (curr_audio_state, "Start", sizeof (curr_audio_state)))
+    if (! strcmp (curr_audio_state, "Start"))
       audio_state_start ();                                             // Turn on new
 
-    strncpy (curr_audio_mode, audio_mode, sizeof (curr_audio_mode));
+    strlcpy (curr_audio_mode, audio_mode, sizeof (curr_audio_mode));
     return (curr_audio_mode);
   }
 
   int audio_ana_vol_set (int vol) {
     int ret = -1;
-    switch (curr_service_device_int) {
-      case DEV_UNK: ret = -1;               break;
-      case DEV_GEN: ret = -1;               break;
-      case DEV_GS1: if (1) ret = gs1_ana_vol_set (vol);/*  if (   1 == 0 || analog_and_digital != 0) ret = gs1_dig_audio_state_stop ();*/  break;
-      case DEV_GS2: if (1) ret = gs2_ana_vol_set (vol);/*  if (   1 == 0 || analog_and_digital != 0) ret = gs2_dig_audio_state_stop ();*/  break;
-      case DEV_GS3: if (1) ret = gs3_ana_vol_set (vol);/*  if (true == 0 || analog_and_digital != 0) ret = gs3_dig_audio_state_stop ();*/  break;
-      case DEV_QCV: if (1) ret = qcv_ana_vol_set (vol);/*  if (true == 0 || analog_and_digital != 0) ret = qcv_dig_audio_state_stop ();*/  break;
-      case DEV_OM7: if (1) ret = om7_ana_vol_set (vol);/*  if (true == 0 || analog_and_digital != 0) ret = om7_dig_audio_state_stop ();*/  break;
-      case DEV_LG2: if (1) ret = lg2_ana_vol_set (vol);/*  if (true == 0 || analog_and_digital != 0) ret = lg2_dig_audio_state_stop ();*/  break;
-      case DEV_XZ2: if (1) ret = xz2_ana_vol_set (vol);/*  if (true == 0 || analog_and_digital != 0) ret = xz2_dig_audio_state_stop ();*/  break;
+    switch (curr_chass_plug_aud_int) {
+      case PLUG_AUD_GS1: if (1) ret = gs1_ana_vol_set (vol);break;
+      case PLUG_AUD_GS2: if (1) ret = gs2_ana_vol_set (vol);break;
+      case PLUG_AUD_GS3: if (1) ret = gs3_ana_vol_set (vol);break;
+      case PLUG_AUD_QCV: if (1) ret = qcv_ana_vol_set (vol);break;
+      case PLUG_AUD_OM7: if (1) ret = om7_ana_vol_set (vol);break;
+      case PLUG_AUD_LG2: if (1) ret = lg2_ana_vol_set (vol);break;
+      case PLUG_AUD_XZ2: if (1) ret = xz2_ana_vol_set (vol);break;
+      case PLUG_AUD_UNK: ret = -1;                          break;
+      case PLUG_AUD_GEN: ret = -1;                          break;
+      default:           ret = -1;                          break;
     }
     return (ret);
   }

@@ -28,6 +28,9 @@ static void *offload_thread_loop(void *context)
 
   jint Java_fm_a2d_sf_com_1uti_native_1priority_1set (JNIEnv * env, jobject thiz, jint new_priority) {
     logd ("native_priority_set new_priority: %d", new_priority);
+
+    utils_init ();
+
     int priority = 0;
     priority = getpriority (PRIO_PROCESS, 0);
     logd ("native_priority_set priority: %d  errno: %d", priority, errno);
@@ -42,12 +45,16 @@ static void *offload_thread_loop(void *context)
 
   char prop_buf    [DEF_BUF] = "";
 
-  jint Java_fm_a2d_sf_com_1uti_native_1prop_1get (JNIEnv * env, jobject thiz, jint prop) {
-    __system_property_get ("ro.modversion", prop_buf);
-    logd ("native_prop_get %d: %s", prop, prop_buf);
-    if (! strncasecmp (prop_buf, "omni", 4))                            // If OmniROM
+  jint Java_fm_a2d_sf_com_1uti_native_1omni_1get (JNIEnv * env, jobject thiz) {
+
+    utils_init ();
+
+    logd ("native_omni_get sys_prop_modversion: %s", sys_prop_modversion);
+
+    if (! strncasecmp (sys_prop_modversion, "OMNI", strlen ("OMNI")))   // If OmniROM
       return (1);                                                       // Return 1 / true
-    return (0);
+
+    return (0);                                                         // Else false
   }
 
 
@@ -71,6 +78,8 @@ static void *offload_thread_loop(void *context)
   jbyte     fake_res_buf [8192] = {0};
 
   jint Java_fm_a2d_sf_com_1uti_native_1daemon_1cmd (JNIEnv * env, jobject thiz, jint cmd_len, jbyteArray cmd_buf, jint res_len, jbyteArray res_buf, jint net_port, jint rx_tmo) {
+
+    utils_init ();
 
     if (cmd_buf == NULL) {
       loge ("native_daemon_cmd cmd_buf == NULL");

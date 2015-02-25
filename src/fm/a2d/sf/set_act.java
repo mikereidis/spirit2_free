@@ -47,7 +47,7 @@ public class set_act extends PreferenceActivity implements OnSharedPreferenceCha
     com_uti.logd ("savedInstanceState: " + savedInstanceState);     // Results in huge output with many prefs
 /*
     if (fm_apln.m_theme != 0) {
-      if (fm_apln.m_theme != android.R.style.Theme_Light || android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.HONEYCOMB) { // Can't be theme light on GB and earlier
+      if (fm_apln.m_theme != android.R.style.Theme_Light || com_uti.android_version >= android.os.Build.VERSION_CODES.HONEYCOMB) { // Can't be theme light on GB and earlier
         if (fm_apln.m_theme != android.R.style.Theme_Translucent) {
           com_uti.logd ("onCreate setting theme to: " + fm_apln.m_theme);
           //if (fm_srvc.is_li)
@@ -206,7 +206,7 @@ public class set_act extends PreferenceActivity implements OnSharedPreferenceCha
       return;
 
     String val = sp.getString (key, "");
-    if (val == null || val.equalsIgnoreCase (""))
+    if (val == null || val.equals (""))
       return;
 
     String lo_key = key.toLowerCase (Locale.getDefault ());
@@ -217,21 +217,21 @@ public class set_act extends PreferenceActivity implements OnSharedPreferenceCha
       gui_act.m_com_api.key_set (key, val);
 
 /*
-    if (key.equalsIgnoreCase ("audio_output"))
+    if (key.equals ("audio_output"))
       gui_act.m_com_api.key_set ("audio_output", val);
-    else if (key.equalsIgnoreCase ("audio_stereo"))
+    else if (key.equals ("audio_stereo"))
       gui_act.m_com_api.key_set ("audio_stereo", val);
-    else if (key.equalsIgnoreCase ("tuner_band"))
+    else if (key.equals ("tuner_band"))
       gui_act.m_com_api.key_set ("tuner_band", val);
-    else if (key.equalsIgnoreCase ("tuner_stereo"))
+    else if (key.equals ("tuner_stereo"))
       gui_act.m_com_api.key_set ("tuner_stereo", val);
-    else if (key.equalsIgnoreCase ("tuner_rds_state"))
+    else if (key.equals ("tuner_rds_state"))
       gui_act.m_com_api.key_set ("tuner_rds_state", val);
-    else if (key.equalsIgnoreCase ("tuner_rds_af_state"))
+    else if (key.equals ("tuner_rds_af_state"))
       gui_act.m_com_api.key_set ("tuner_rds_af_state", val);
-    //else if (key.equalsIgnoreCase ("tuner_"))
+    //else if (key.equals ("tuner_"))
     //  gui_act.m_com_api.key_set ("tuner_", val);
-    else if (key.equalsIgnoreCase ("audio_digital_amp"))
+    else if (key.equals ("audio_digital_amp"))
       gui_act.m_com_api.key_set ("audio_digital_amp", val);
 */
 

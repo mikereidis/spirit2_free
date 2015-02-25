@@ -16,28 +16,39 @@ public class com_api {
   public int            num_key_set             = 0;
 
 
-    // Data that forms the Common API:
+    // Data / Status / Command that form the Common API:
 
-    // Service:
-  public String     service_phase       = "Pre Init";
-  public String     service_cdown       = "0";//999";
+    // Chassis:   Virtual chassis/box/frame that encloses Tuner and Audio functions and brings them together:
+        // Tuner:   Radio Frequency Tuner Service & Chip, including audio functions like mute, volume and stereo that are on the FM chip
+        // Audio:   Sound Frequency Audio Service & Chip(s), SOC audio and other audio
 
-  public static final int max_presets   = 16;
-  public String []  service_preset_freq =  {"","","","","","","","","","","","","","","","",};
-  public String []  service_preset_name =  {"","","","","","","","","","","","","","","","",};
 
-  public String     service_device      = com_uti.DEV_UNK_STR;          // Device ID
-    public int      service_device_int  = com_uti.DEV_UNK;              // ""        Integer form
+    // Chassis:
 
-    // Audio:
-  public String     audio_state         = "Stop";
-  public String     audio_mode          = "Digital";
-  public String     audio_output        = "Headset";
-  public String     audio_stereo        = "Stereo";
-  public String     audio_record_state  = "Stop";                       // Stop, Start
-  public String     audio_sessid        = "0";
+  public  String chass_phase        = "Pre Init";                       // Phase of startup/shutdown for tuner, audio and related components    "Starting", "Stopping" and "ERROR" and "Success" messages
+  public  String chass_phtmo        = "0";                              // Phase Timeout seconds if positive, Success if 0, Error code if negative
 
-    // Tuner:                                                           // !!!! Need to update these descriptions:
+  public static final int chass_preset_max  = 16;                       // Maximum presets, preset frequencies and names
+  public String[]chass_preset_freq  =  {"","","","","","","","","","","","","","","","",};
+  public String[]chass_preset_name  =  {"","","","","","","","","","","","","","","","",};
+
+  public  String chass_plug_aud     = "UNK";                            // Audio Plugin
+  public  String chass_plug_tnr     = "UNK";                            // Tuner Plugin
+
+
+    // Audio: Sound Frequency Audio Service & Chip(s)
+
+  public String  audio_state        = "Stop";
+  public String  audio_mode         = "Digital";
+  public String  audio_output       = "Headset";
+  public String  audio_stereo       = "Stereo";
+  public String  audio_record_state = "Stop";                       // Stop, Start
+  public String  audio_sessid       = "0";
+
+
+    // Tuner: Radio Frequency Tuner Service & Chip(s)
+
+                                                                        // !!!! Need to update these descriptions:
                                                                         //    CFG = Saved in config
                                                                         //    ... = ephemeral non-volatile
                                                                         //        api = get from FM API
@@ -54,7 +65,7 @@ public class com_api {
 
   public  String tuner_band         = "";                               // RW CFG set Values:   US, EU, JAPAN, CHINA, EU_50K_OFFSET     (Set before Tuner Start)
   public  String tuner_freq         = "";                               // RW CFG api Values:   String  form: 50.000 - 499.999  (76-108 MHz)
-    public int   tuner_freq_int     = 0;                                // ""                 Integer form in kilohertz
+  public int     tuner_freq_int     = 0;                                // ""                 Integer form in kilohertz
 
   public  String tuner_stereo       = "";                               // RW CFG set Values:   mono, stereo, switch, blend, ... ?
   public  String tuner_thresh       = "";                               // RW CFG api Values:   Seek/scan RSSI threshold
@@ -152,14 +163,14 @@ public class com_api {
     if (intent == null)                                                 // If for svc_svc and not for phase/cdown/count
       com_uti.logd ("phase: " + phase +  "  cdown: " + cdown);
 
-    service_phase = phase;
-    service_cdown = cdown;
+    chass_phase = phase;
+    chass_phtmo = cdown;
 
     if (intent == null)                                                 // If no Intent (with more info) passed...
       intent = new Intent (com_uti.api_result_id);                      // Create a new broadcast result Intent
 
-    intent.putExtra ("service_phase",  service_phase);
-    intent.putExtra ("service_cdown",  service_cdown);
+    intent.putExtra ("chass_phase",  chass_phase);
+    intent.putExtra ("chass_phtmo",  chass_phtmo);
 
     try {
       m_context.sendStickyBroadcast (intent);                           // Send Sticky Broadcast w/ all info
@@ -179,21 +190,21 @@ public class com_api {
 
     Bundle extras = intent.getExtras ();
 
-    String  new_service_phase         = extras.getString  ("service_phase",         "");//"extra_detect");
-    //if (! new_service_phase.equalsIgnoreCase ("extra_detect"))
-      service_phase                     = new_service_phase;
+    String  new_chass_phase         = extras.getString  ("chass_phase",         "");//"extra_detect");
+    //if (! new_chass_phase.equals ("extra_detect"))
+      chass_phase                     = new_chass_phase;
 
-    String  new_service_cdown         = extras.getString  ("service_cdown",         "");//"extra_detect");
-    //if (! new_service_cdown.equalsIgnoreCase ("extra_detect"))
-      service_cdown                     = new_service_cdown;
+    String  new_chass_phtmo         = extras.getString  ("chass_phtmo",         "");//"extra_detect");
+    //if (! new_chass_phtmo.equals ("extra_detect"))
+      chass_phtmo                     = new_chass_phtmo;
 
-    for (int ctr = 0; ctr < max_presets; ctr ++) {
-      String  new_service_preset_freq = extras.getString  ("service_preset_freq_" + ctr,   "extra_detect");//88500");
-      String  new_service_preset_name = extras.getString  ("service_preset_name_" + ctr,   "extra_detect");//885");
-      if (! new_service_preset_freq.equalsIgnoreCase ("extra_detect"))
-        service_preset_freq [ctr]               = new_service_preset_freq;
-      if (! new_service_preset_name.equalsIgnoreCase ("extra_detect"))
-        service_preset_name [ctr]               = new_service_preset_name;
+    for (int ctr = 0; ctr < com_api.chass_preset_max; ctr ++) {
+      String  new_chass_preset_freq = extras.getString  ("chass_preset_freq_" + ctr,   "extra_detect");//88500");
+      String  new_chass_preset_name = extras.getString  ("chass_preset_name_" + ctr,   "extra_detect");//885");
+      if (! new_chass_preset_freq.equals ("extra_detect"))
+        chass_preset_freq [ctr]               = new_chass_preset_freq;
+      if (! new_chass_preset_name.equals ("extra_detect"))
+        chass_preset_name [ctr]               = new_chass_preset_name;
     }
 
     String  new_audio_state         = extras.getString  ("audio_state",         "extra_detect");//stop");
@@ -201,19 +212,19 @@ public class com_api {
     String  new_audio_stereo        = extras.getString  ("audio_stereo",        "extra_detect");//Stereo");
     String  new_audio_record_state  = extras.getString  ("audio_record_state",  "extra_detect");//stop");
     String  new_audio_sessid        = extras.getString  ("audio_sessid",        "extra_detect");
-    if (! new_audio_state.equalsIgnoreCase ("extra_detect"))
+    if (! new_audio_state.equals ("extra_detect"))
       audio_state                     = new_audio_state;
-    if (! new_audio_output.equalsIgnoreCase ("extra_detect"))
+    if (! new_audio_output.equals ("extra_detect"))
       audio_output                    = new_audio_output;
-    if (! new_audio_stereo.equalsIgnoreCase ("extra_detect"))
+    if (! new_audio_stereo.equals ("extra_detect"))
       audio_stereo                    = new_audio_stereo;
-    if (! new_audio_record_state.equalsIgnoreCase ("extra_detect"))
+    if (! new_audio_record_state.equals ("extra_detect"))
       audio_record_state              = new_audio_record_state;
-    if (! new_audio_sessid.equalsIgnoreCase ("extra_detect"))
+    if (! new_audio_sessid.equals ("extra_detect"))
       audio_sessid                    = new_audio_sessid;
 
     String  new_tuner_state         = extras.getString  ("tuner_state",         "extra_detect");
-    if (! new_tuner_state.equalsIgnoreCase ("extra_detect"))
+    if (! new_tuner_state.equals ("extra_detect"))
       tuner_state                     = new_tuner_state;
 
     String  new_tuner_band          = extras.getString  ("tuner_band",          "extra_detect");
@@ -222,39 +233,39 @@ public class com_api {
     String  new_tuner_thresh        = extras.getString  ("tuner_thresh",        "extra_detect");
     String  new_tuner_seek_state    = extras.getString  ("tuner_seek_state",    "extra_detect");
 
-    if (! new_tuner_band.equalsIgnoreCase ("extra_detect"))
+    if (! new_tuner_band.equals ("extra_detect"))
       tuner_band                      = new_tuner_band;
-    if (! new_tuner_freq.equalsIgnoreCase ("extra_detect"))
+    if (! new_tuner_freq.equals ("extra_detect"))
       tuner_freq                      = new_tuner_freq;
-    if (! new_tuner_stereo.equalsIgnoreCase ("extra_detect"))
+    if (! new_tuner_stereo.equals ("extra_detect"))
       tuner_stereo                    = new_tuner_stereo;
-    if (! new_tuner_thresh.equalsIgnoreCase ("extra_detect"))
+    if (! new_tuner_thresh.equals ("extra_detect"))
       tuner_thresh                    = new_tuner_thresh;
-    if (! new_tuner_seek_state.equalsIgnoreCase ("extra_detect"))
+    if (! new_tuner_seek_state.equals ("extra_detect"))
       tuner_seek_state                = new_tuner_seek_state;
 
     String  new_tuner_rds_state     = extras.getString  ("tuner_rds_state",     "extra_detect");
     String  new_tuner_rds_af_state  = extras.getString  ("tuner_rds_af_state",  "extra_detect");
     String  new_tuner_rds_ta_state  = extras.getString  ("tuner_rds_ta_state",  "extra_detect");
-    if (! new_tuner_rds_state.equalsIgnoreCase ("extra_detect"))
+    if (! new_tuner_rds_state.equals ("extra_detect"))
       tuner_rds_state                 = new_tuner_rds_state;
-    if (! new_tuner_rds_af_state.equalsIgnoreCase ("extra_detect"))
+    if (! new_tuner_rds_af_state.equals ("extra_detect"))
       tuner_rds_af_state              = new_tuner_rds_af_state;
-    if (! new_tuner_rds_ta_state.equalsIgnoreCase ("extra_detect"))
+    if (! new_tuner_rds_ta_state.equals ("extra_detect"))
       tuner_rds_ta_state              = new_tuner_rds_ta_state;
 
     String  new_tuner_extension           = extras.getString  ("tuner_extension",           "extra_detect");
-    if (! new_tuner_extension.equalsIgnoreCase ("extra_detect"))
+    if (! new_tuner_extension.equals ("extra_detect"))
       tuner_extension                       = new_tuner_extension;
 
     String  new_tuner_rssi          = extras.getString  ("tuner_rssi",          "extra_detect");
     String  new_tuner_qual          = extras.getString  ("tuner_qual",          "extra_detect");
     String  new_tuner_pilot         = extras.getString  ("tuner_pilot ",          "extra_detect");
-    if (! new_tuner_rssi.equalsIgnoreCase ("extra_detect"))
+    if (! new_tuner_rssi.equals ("extra_detect"))
       tuner_rssi                      = new_tuner_rssi;
-    if (! new_tuner_qual.equalsIgnoreCase ("extra_detect"))
+    if (! new_tuner_qual.equals ("extra_detect"))
       tuner_qual                      = new_tuner_qual;
-    if (! new_tuner_pilot.equalsIgnoreCase ("extra_detect"))
+    if (! new_tuner_pilot.equals ("extra_detect"))
       tuner_pilot                     = new_tuner_pilot ;
 
     String  new_tuner_rds_pi        = extras.getString  ("tuner_rds_pi",        "extra_detect");
@@ -263,17 +274,17 @@ public class com_api {
     String  new_tuner_rds_ptyn      = extras.getString  ("tuner_rds_ptyn",      "extra_detect");
     String  new_tuner_rds_ps        = extras.getString  ("tuner_rds_ps",        "extra_detect");
     String  new_tuner_rds_rt        = extras.getString  ("tuner_rds_rt",        "extra_detect");
-    if (! new_tuner_rds_pi.equalsIgnoreCase ("extra_detect"))
+    if (! new_tuner_rds_pi.equals ("extra_detect"))
       tuner_rds_pi                    = new_tuner_rds_pi;
-    if (! new_tuner_rds_picl.equalsIgnoreCase ("extra_detect"))
+    if (! new_tuner_rds_picl.equals ("extra_detect"))
       tuner_rds_picl                  = new_tuner_rds_picl;
-    if (! new_tuner_rds_pt.equalsIgnoreCase ("extra_detect"))
+    if (! new_tuner_rds_pt.equals ("extra_detect"))
       tuner_rds_pt                    = new_tuner_rds_pt;
-    if (! new_tuner_rds_ptyn.equalsIgnoreCase ("extra_detect"))
+    if (! new_tuner_rds_ptyn.equals ("extra_detect"))
       tuner_rds_ptyn                  = new_tuner_rds_ptyn;
-    if (! new_tuner_rds_ps.equalsIgnoreCase ("extra_detect"))
+    if (! new_tuner_rds_ps.equals ("extra_detect"))
       tuner_rds_ps                    = new_tuner_rds_ps;
-    if (! new_tuner_rds_rt.equalsIgnoreCase ("extra_detect"))
+    if (! new_tuner_rds_rt.equals ("extra_detect"))
       tuner_rds_rt                    = new_tuner_rds_rt;
 
     String  new_tuner_rds_af        = extras.getString  ("tuner_rds_af",        "extra_detect");
@@ -283,19 +294,19 @@ public class com_api {
     String  new_tuner_rds_tp        = extras.getString  ("tuner_rds_tp",        "extra_detect");
     String  new_tuner_rds_ta        = extras.getString  ("tuner_rds_ta",        "extra_detect");
     String  new_tuner_rds_taf       = extras.getString  ("tuner_rds_taf",       "extra_detect");
-    if (! new_tuner_rds_af.equalsIgnoreCase ("extra_detect"))
+    if (! new_tuner_rds_af.equals ("extra_detect"))
       tuner_rds_af                    = new_tuner_rds_af;
-    if (! new_tuner_rds_ms.equalsIgnoreCase ("extra_detect"))
+    if (! new_tuner_rds_ms.equals ("extra_detect"))
       tuner_rds_ms                    = new_tuner_rds_ms;
-    if (! new_tuner_rds_ct.equalsIgnoreCase ("extra_detect"))
+    if (! new_tuner_rds_ct.equals ("extra_detect"))
       tuner_rds_ct                    = new_tuner_rds_ct;
-    if (! new_tuner_rds_tmc.equalsIgnoreCase ("extra_detect"))
+    if (! new_tuner_rds_tmc.equals ("extra_detect"))
       tuner_rds_tmc                   = new_tuner_rds_tmc;
-    if (! new_tuner_rds_tp.equalsIgnoreCase ("extra_detect"))
+    if (! new_tuner_rds_tp.equals ("extra_detect"))
       tuner_rds_tp                    = new_tuner_rds_tp;
-    if (! new_tuner_rds_ta.equalsIgnoreCase ("extra_detect"))
+    if (! new_tuner_rds_ta.equals ("extra_detect"))
       tuner_rds_ta                    = new_tuner_rds_ta;
-    if (! new_tuner_rds_taf.equalsIgnoreCase ("extra_detect"))
+    if (! new_tuner_rds_taf.equals ("extra_detect"))
       tuner_rds_taf                   = new_tuner_rds_taf;
 
   }

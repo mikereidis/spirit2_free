@@ -1,4 +1,8 @@
 
+    // Spirit2 Tuner Plugin for "Qualcomm V4L" API:
+
+    // See https://android.googlesource.com/kernel/msm/+/android-msm-dory-3.10-lollipop-wear-release/drivers/media/radio/radio-iris.c   radio-iris-transport.c 
+
   #define LOGTAG "sftnrqcv"
 
   #include <stdio.h>
@@ -1053,22 +1057,9 @@ hd
 
     ret = chip_ctrl_get (V4L2_CID_PRIVATE_IRIS_ANTENNA);
 
-    curr_antenna = 0;
-
-    //if (! strncasecmp (prop_get ("ro.product.device"), "LT29", 4))      // 29i = TX
-    //if (! strncasecmp (prop_get ("ro.product.device"), "LT30", 4))      // 30p/30at/30a = T
-    //if (! strncasecmp (prop_get ("ro.product.device"), "MINT", 4))      // FreeXperia T
-    //if (! strncasecmp (prop_get ("ro.product.device"), "HAYA", 4))      // FreeXperia TX "HAYABUSA"
-
-    if (! strncasecmp (prop_get ("ro.product.manufacturer"), "SONY", 4)) {
-      if (! strncasecmp (prop_get ("ro.product.device"), "C2",    2) || ! strncasecmp (prop_get ("ro.product.device"), "S39",     3) || ! strncasecmp (prop_get ("ro.product.device"), "C19", 3) ||
-          //! strncasecmp (prop_get ("ro.product.device"), "C53",   3) || ! strncasecmp (prop_get ("ro.product.device"), "M35",     3) || //! strncasecmp (prop_get ("ro.product.device"), "C19", 3) ||
-          ! strncasecmp (prop_get ("ro.product.device"), "NICKI", 5) || ! strncasecmp (prop_get ("ro.product.device"), "TAOSHAN", 7)// || ! strncasecmp (prop_get ("ro.product.device"), "HUASHAN", 7)
-        )
-        curr_antenna = 2;
-      else
-        curr_antenna = 3;
-    }
+    curr_antenna = 2;
+    if (qcv_internal_antenna_get ())
+      curr_antenna = 3;
 
     if (curr_antenna >= 2) {
       ret = chip_ctrl_set (V4L2_CID_PRIVATE_IRIS_ANTENNA, curr_antenna - 2);                     // 0 = External/headset antenna for OneS/XL/Evo 4G/All others, 1 = internal for Xperia T - Z1
@@ -1355,7 +1346,7 @@ hd
       return (curr_rds_ps);
     int ret = -1;
     ret = rds_ps_set (rds_ps);
-    strncpy (curr_rds_ps, rds_ps, sizeof (curr_rds_ps));
+    strlcpy (curr_rds_ps, rds_ps, sizeof (curr_rds_ps));
     return (curr_rds_ps);
   }
   char * chip_imp_rds_rt_sg (char * rds_rt) {
@@ -1363,7 +1354,7 @@ hd
       return (curr_rds_rt);
     int ret = -1;
     ret = rds_rt_set (rds_rt);
-    strncpy (curr_rds_rt, rds_rt, sizeof (curr_rds_rt));
+    strlcpy (curr_rds_rt, rds_rt, sizeof (curr_rds_rt));
     return (curr_rds_rt);
   }
 
@@ -1377,7 +1368,7 @@ hd
 
     int ret = -1;
     //ret = reg_set (reg);
-    strncpy (curr_extension, reg, sizeof (curr_extension));
+    strlcpy (curr_extension, reg, sizeof (curr_extension));
 
     int full_val = atoi (reg);              // full_val = -2^31 ... +2^31 - 1       = Over 9 digits
     int ctrl = (full_val / 1000) - 200;         // ctrl = hi 3 digits - 200     (control to write to)

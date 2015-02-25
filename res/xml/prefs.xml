@@ -46,18 +46,24 @@ dialogTitle not needed if same as title
     android:entries="@array/tuner_stereo"
     android:entryValues="@array/tuner_stereo"
     />
+    <ListPreference
+    android:key="tuner_softmute"
+    android:title="Soft Mute"
+    android:entries="@array/enable_disable"
+    android:entryValues="@array/enable_disable"
+    />
    </PreferenceCategory>
    <PreferenceCategory
    android:title="RDS">
     <ListPreference
     android:key="tuner_rds_state"
-    android:title="RDS State"
+    android:title="RDS"
     android:entries="@array/state_2"
     android:entryValues="@array/state_2"
     />
     <ListPreference
     android:key="tuner_rds_af_state"
-    android:title="RDS AF State"
+    android:title="RDS AF"
     android:entries="@array/state_2"
     android:entryValues="@array/state_2"
     />
@@ -80,18 +86,17 @@ dialogTitle not needed if same as title
     android:key="tuner_rds_rt"
     android:title="Transmit RDS RT"
     />
-<!--
     <ListPreference
-    android:key="tuner_qcv_antenna"
+    android:key="tuner_antenna"
     android:title="QCom Antenna"
-    android:entries="@array/tuner_qcv_antenna"
-    android:entryValues="@array/tuner_qcv_antenna"
+    android:entries="@array/tuner_antenna"
+    android:entryValues="@array/tuner_antenna"
     />
     <ListPreference
-    android:key="tuner_qcv_transmit"
-    android:title="QCom Transmit"
-    android:entries="@array/state_2"
-    android:entryValues="@array/state_2"
+    android:key="tuner_mode"
+    android:title="Mode"
+    android:entries="@array/tuner_mode"
+    android:entryValues="@array/tuner_mode"
     />
 -->
    </PreferenceCategory>
@@ -183,10 +188,10 @@ dialogTitle not needed if same as title
 -->
 <!--
     <ListPreference
-    android:key="service_action_antenna"
+    android:key="chass_action_antenna"
     android:title="Antenna/Headset Unplug"
-    android:entries="@array/service_action"
-    android:entryValues="@array/service_action"
+    android:entries="@array/chass_action"
+    android:entryValues="@array/chass_action"
     />
 -->
 
@@ -195,7 +200,7 @@ dialogTitle not needed if same as title
    <PreferenceCategory
    android:title="General">
     <ListPreference
-    android:key="service_preset_list"
+    android:key="chass_preset_list"
     android:title="Preset List"
     android:entries="@array/values_4"
     android:entryValues="@array/values_4"
@@ -205,73 +210,67 @@ dialogTitle not needed if same as title
    <PreferenceCategory
    android:title="Media Button Actions">
     <ListPreference
-    android:key="service_action_media_pauseplay"
+    android:key="chass_action_media_pauseplay"
     android:title="Media Button Pause/Play"
-    android:entries="@array/service_action"
-    android:entryValues="@array/service_action"
+    android:entries="@array/chass_action"
+    android:entryValues="@array/chass_action"
     />
     <ListPreference
-    android:key="service_action_media_previous"
+    android:key="chass_action_media_previous"
     android:title="Media Button Previous"
-    android:entries="@array/service_action"
-    android:entryValues="@array/service_action"
+    android:entries="@array/chass_action"
+    android:entryValues="@array/chass_action"
     />
     <ListPreference
-    android:key="service_action_media_next"
+    android:key="chass_action_media_next"
     android:title="Media Button Next"
-    android:entries="@array/service_action"
-    android:entryValues="@array/service_action"
+    android:entries="@array/chass_action"
+    android:entryValues="@array/chass_action"
     />
    </PreferenceCategory>
    <PreferenceCategory
    android:title="Updates">
     <ListPreference
-    android:key="service_update_notification"
+    android:key="chass_update_notification"
     android:title="Update Notification"
-    android:entries="@array/service_update"
-    android:entryValues="@array/service_update"/>
+    android:entries="@array/enable_disable"
+    android:entryValues="@array/enable_disable"/>
     <ListPreference
-    android:key="service_notifremote_title"
+    android:key="chass_notifremote_title"
     android:title="Notif/Remote Title"
     android:entries="@array/dynamic_metadata"
     android:entryValues="@array/dynamic_metadata"
     />
     <ListPreference
-    android:key="service_notifremote_text"
+    android:key="chass_notifremote_text"
     android:title="Notif/Remote Text"
     android:entries="@array/dynamic_metadata"
     android:entryValues="@array/dynamic_metadata"
     />
     <ListPreference
-    android:key="service_update_gui"
+    android:key="chass_update_gui"
     android:title="Update GUI Intents"
-    android:entries="@array/service_update"
-    android:entryValues="@array/service_update"/>
+    android:entries="@array/enable_disable"
+    android:entryValues="@array/enable_disable"/>
     <ListPreference
-    android:key="service_update_remote"
+    android:key="chass_update_remote"
     android:title="Update Remote RCC:AVRCP/4.4Lockscr"
-    android:entries="@array/service_update"
-    android:entryValues="@array/service_update"/>
+    android:entries="@array/enable_disable"
+    android:entryValues="@array/enable_disable"/>
    </PreferenceCategory>
    <PreferenceCategory
    android:title="Debug">
     <ListPreference
-    android:key="service_plugin_device"
-    android:title="Device"
-    android:entries="@array/service_plugin_device"
-    android:entryValues="@array/service_plugin_device"
+    android:key="chass_plug_aud"
+    android:title="Audio Plugin"
+    android:entries="@array/chass_plug_aud"
+    android:entryValues="@array/chass_plug_aud"
     />
     <ListPreference
-    android:key="service_plugin_tuner"
-    android:title="Tuner"
-    android:entries="@array/service_plugin_tuner"
-    android:entryValues="@array/service_plugin_tuner"
-    />
-    <ListPreference
-    android:key="service_plugin_audio"
-    android:title="Audio"
-    android:entries="@array/service_plugin_audio"
-    android:entryValues="@array/service_plugin_audio"
+    android:key="chass_plug_tnr"
+    android:title="Tuner Plugin"
+    android:entries="@array/chass_plug_tnr"
+    android:entryValues="@array/chass_plug_tnr"
     />
    </PreferenceCategory>
   </PreferenceScreen>

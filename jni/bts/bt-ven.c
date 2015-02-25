@@ -212,7 +212,11 @@ void * res_ptr = bfm_send (& hci_g2 [5], hci_len + 3);    // 5 + 3 = 8
 
     // Open interface
   static int ven_init (const bt_vendor_callbacks_t * p_cb, unsigned char * local_bdaddr) {
+
     logd ("ven_init p_cb: %p  local_bdaddr: %2.2x %2.2x %2.2x %2.2x %2.2x %2.2x", p_cb, local_bdaddr [0], local_bdaddr [1], local_bdaddr [2], local_bdaddr [3], local_bdaddr [4], local_bdaddr [5] );
+
+    utils_init ();
+
     if (p_cb == NULL) {
       loge ("ven_init no user callbacks");
       return (BT_HC_STATUS_FAIL);

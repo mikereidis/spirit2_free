@@ -69,10 +69,8 @@ acdb_loader_get_calibration_t acdb_loader_get_calibration;
     //sys_run ("touch /dev/msm_acdb_s2");
     file_write (acdb_disable_flag, "", 0, O_CREAT | O_RDWR);                   // Signal acdb disabled
 
-    prop_buf_get ("ro.build.version.sdk",    version_sdk_prop_buf); // Android 4.4 KitKat = 19
-    version_sdk = atoi (version_sdk_prop_buf);
-    if (version_sdk < 21) {                                   // For pre-Lollipop
-      loge ("!!!!!!!!!!!!!!!!!!! version_sdk: %d", version_sdk);
+    if (android_version < 21) {                                   // For pre-Lollipop
+      loge ("!!!!!!!!!!!!!!!!!!! android_version: %d", android_version);
       return (-1);
     }
 

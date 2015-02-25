@@ -48,23 +48,23 @@ public class svc_bcr extends BroadcastReceiver {                        // !! Op
       if (action == null)
         return;
 
-      if (gui_act.m_com_api.tuner_state.equalsIgnoreCase ("stop")) {
-        com_uti.logd ("tuner_state == stop so ignore");
+      if (! gui_act.m_com_api.tuner_state.equals ("Start")) {
+        com_uti.logd ("tuner_state != Start so ignore");
         return;
       }
 
                                                                         // Get this at bootup
-      if (action.equalsIgnoreCase (android.media.AudioManager.ACTION_AUDIO_BECOMING_NOISY)) {
+      if (action.equals (android.media.AudioManager.ACTION_AUDIO_BECOMING_NOISY)) {
         com_uti.logd ("Wired Headset/Antenna Unplugged");               // Note duplication in svc_svc w/ m_hdst_plgd
-        gui_act.m_com_api.key_set ("audio_state", "pause");
+        gui_act.m_com_api.key_set ("audio_state", "Pause");
       }
-      else if (action.equalsIgnoreCase (Intent.ACTION_MEDIA_BUTTON)) {
+      else if (action.equals (Intent.ACTION_MEDIA_BUTTON)) {
         handle_key_event (context, (KeyEvent) intent.getExtras ().get (Intent.EXTRA_KEY_EVENT));
       }
-      else if (action.equalsIgnoreCase ("android.media.MASTER_VOLUME_CHANGED_ACTION")) {
+      else if (action.equals ("android.media.MASTER_VOLUME_CHANGED_ACTION")) {
         com_uti.loge ("Action android.media.MASTER_VOLUME_CHANGED_ACTION");
       }
-      else if (action.equalsIgnoreCase ("android.media.VOLUME_CHANGED_ACTION")) {
+      else if (action.equals ("android.media.VOLUME_CHANGED_ACTION")) {
         com_uti.loge ("Action android.media.VOLUME_CHANGED_ACTION");
       }
       else {
@@ -92,23 +92,23 @@ public class svc_bcr extends BroadcastReceiver {                        // !! Op
 
       case KeyEvent.KEYCODE_HEADSETHOOK:
       case KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE:
-        gui_act.m_com_api.key_set ("audio_state", "toggle");
+        gui_act.m_com_api.key_set ("audio_state", "Toggle");
         break;
       case KeyEvent.KEYCODE_MEDIA_PLAY:
-        gui_act.m_com_api.key_set ("audio_state", "start");
+        gui_act.m_com_api.key_set ("audio_state", "Start");
         break;
       case KeyEvent.KEYCODE_MEDIA_PAUSE:
-        gui_act.m_com_api.key_set ("audio_state", "pause");
+        gui_act.m_com_api.key_set ("audio_state", "Pause");
         break;
       case KeyEvent.KEYCODE_MEDIA_STOP:
-        gui_act.m_com_api.key_set ("audio_state", "stop");             // Shut down FM entirely (could pause)
+        gui_act.m_com_api.key_set ("audio_state", "Stop");             // Shut down FM entirely (could pause)
         break;
 
       case KeyEvent.KEYCODE_MEDIA_PREVIOUS:
-        gui_act.m_com_api.key_set ("service_seek_state", "down");
+        gui_act.m_com_api.key_set ("service_seek_state", "Down");
         break;
       case KeyEvent.KEYCODE_MEDIA_NEXT:
-        gui_act.m_com_api.key_set ("service_seek_state", "up");
+        gui_act.m_com_api.key_set ("service_seek_state", "Up");
         break;
     }
   }

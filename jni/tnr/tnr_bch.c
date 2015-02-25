@@ -1,4 +1,6 @@
 
+    // Spirit2 Tuner Plugin for "Broadcom HCI" API:
+
     // See https://github.com/ljalves/linux_media/blob/36eb6c41ce499c88719702be2dd86869eae5264d/drivers/staging/media/bcm2048/radio-bcm2048.c
 
   #define LOGTAG "sftnrbch"
@@ -18,19 +20,12 @@
   int bc_reg_ctl       = 0;                                             // BC_REG_CTL       // 0x01  Band select, mono/stereo blend, mono/stereo select
   int bc_reg_aud_ctl0  = 0;                                             // BC_REG_AUD_CTL0  // 0x05  Mute, volume, de-emphasis, route parameters, BW select
 
-  int version_sdk;
-  char version_sdk_prop_buf       [DEF_BUF];
-
   #define bc_freq_lo    64000 // 0x6720        For BC chip calculations. Constant regardless of band.
 
   #define MAX_RDS_BLOCKS 20 //40//41//40 //42
 
-  int is_lg2 = 0;
-  int is_m7  = 0;
-
   int hci_cmd_tmo = 1000;
   int reg_verify = 0;
-
 
 
     // UART Layer:                                                      // UART HCI functions
@@ -375,8 +370,8 @@
 
     char type_path [64] = {0};
     char type_buf  [64] = {0};
+    int type_len = 0;
     int fd = -1;
-    int len = 0;
     int id = 0;
 
     #define MAX_RFKILL 16 //4  // 1 was OK, but Nexus9 needs at least 3
@@ -388,24 +383,24 @@
         loge ("rfkill_state_file_get open %s errno: %s (%d)", type_path, strerror (errno), errno);
         return;
       }
-      len = read (fd, & type_buf, sizeof (type_buf));                   // Get contents of type file
-      if (len <= 0) {
+      type_len = read (fd, & type_buf, sizeof (type_buf));              // Get contents of type file
+      if (type_len <= 0) {
         loge ("rfkill_state_file_get read %s errno: %s (%d)", type_path, strerror (errno), errno);
         close (fd);
         return;
       }
       close (fd);
-      if (len > sizeof (type_buf) - 1)
-        len = sizeof (type_buf) - 1;
-      type_buf [len] = 0;                                               // ASCIIZ terminate for C string
+      if (type_len > sizeof (type_buf) - 1)
+        type_len = sizeof (type_buf) - 1;
+      type_buf [type_len] = 0;                                          // ASCIIZ terminate for C string
       int ctr = 0;
-      for (ctr = 0; ctr < len ; ctr ++)
+      for (ctr = 0; ctr < type_len ; ctr ++)
         if (type_buf [ctr] == '\r' || type_buf [ctr] == '\n')
           type_buf [ctr] = 0;                                           // Replace newlines w/ 0
 
       logd ("rfkill_state_file_get for type_path: \"%s\"  type_buf: \"%s\"", type_path, type_buf );
 
-      if (! strncmp (type_buf, type, len)) {                            // If type starts with passed type, eg "bluetooth" or "fm"
+      if (! strncmp (type_buf, type, type_len)) {                       // If type starts with passed type, eg "bluetooth" or "fm"
         snprintf (rfkill_state_file, rsf_size, "/sys/class/rfkill/rfkill%d/state", id);
         return;
       }
@@ -812,14 +807,13 @@
     baudrate_reset (high_baudrate);                                     // Set to high baudrate (Already set ?)
 */
 
-    strncpy (uart_orig, uart, sizeof (uart_orig));
-
+    strlcpy (uart_orig, uart, sizeof (uart_orig));
 
     errno = 0;
     int ret = 0;
-    if (! strncmp ("/dev/ttyHS0", uart, sizeof ("/dev/ttyHS0")))
+    if (! strcmp ("/dev/ttyHS0", uart))
       ret = rename (uart, "/dev/ttyHSs20");
-    else if (! strncmp ("/dev/ttyHS99", uart, sizeof ("/dev/ttyHS99")))
+    else if (! strcmp ("/dev/ttyHS99", uart))
       ret = rename (uart, "/dev/ttyHSs299");
     if (ret == 0)
       logd ("uart_hci_start rename ret: %d", ret);
@@ -1664,33 +1658,11 @@ void bc_reg_dump (int lo, int hi, int bytes) {
 
     chip_imp_mute_sg (0);                                               // Unmute
 
-    prop_buf_get ("ro.product.board",            product_board_prop_buf);
-    if (! strncasecmp (product_board_prop_buf, "GALBI", strlen ("GALBI")))      is_lg2 = 1;
-
-    prop_buf_get ("ro.product.device",           product_device_prop_buf);
-    if (! strncasecmp (product_device_prop_buf, "G2", strlen ("G2")))           is_lg2 = 1;
-    if (! strncasecmp (product_device_prop_buf, "LS980", strlen ("LS980")))     is_lg2 = 1;
-    if (! strncasecmp (product_device_prop_buf, "VS980", strlen ("VS980")))     is_lg2 = 1;
-    if (! strncasecmp (product_device_prop_buf,  "D800", strlen ( "D800")))     is_lg2 = 1;
-    if (! strncasecmp (product_device_prop_buf,  "D801", strlen ( "D801")))     is_lg2 = 1;
-    if (! strncasecmp (product_device_prop_buf,  "D802", strlen ( "D802")))     is_lg2 = 1;
-    if (! strncasecmp (product_device_prop_buf,  "D803", strlen ( "D803")))     is_lg2 = 1;
-    if (! strncasecmp (product_device_prop_buf,   "D80", strlen (  "D80")))     is_lg2 = 1;
-
-    prop_buf_get ("ro.product.manufacturer", product_manuf_prop_buf);
-    if (! strncasecmp (product_manuf_prop_buf,   "LG", strlen (   "LG")))       is_lg2 = 1;     // LG or LGE
-
-    if (! strncasecmp (product_manuf_prop_buf,  "HTC", strlen (  "HTC")))       is_m7  = 1;
-
-    prop_buf_get ("ro.build.version.sdk",    version_sdk_prop_buf); // Android 4.4 KitKat = 19
-    version_sdk = atoi (version_sdk_prop_buf);
-
-
     reg_set (0xfb | 0x20000,  0x00000000);                              // Audio PCM ????       fb 00 00 00 00 00 
     int inc = 100;
     reg_set (0xfd | 0x10000, inc);
 
-    if (is_lg2) {                                                       // If LG G2 and SHIM:   Special LG G2 stuff needed, or no audio
+    if (lg_get ()) {                                                       // If LG G2 and SHIM:   Special LG G2 stuff needed, or no audio
       if (curr_api_mode == 0) {                                         // If LG G2 and UART:   See bt-ven.c not yet in bt-hci.c
         unsigned char res_buf [MAX_HCI];
         int res_len;
@@ -1708,7 +1680,7 @@ void bc_reg_dump (int lo, int hi, int bytes) {
 
 /*
     int vol_val = 0x00ff;                                               // Target audio level max about 27,000
-    if (is_m7 && version_sdk >= 21) {                                   // For HTC One M7 Lollipop
+    if (htc_get () && android_version >= 21) {                                   // For HTC One M7 Lollipop
       vol_val = 0x0040;                                                 // Target max about 27,000
       if (file_get ("/system/framework/htcirlibs.jar"))                 // If HTC One M7 GPE       (Stock Android 5 too ????)
         vol_val = 0x0060;
@@ -1945,7 +1917,7 @@ void bc_reg_dump (int lo, int hi, int bytes) {
       return (curr_rds_ps);
     int ret = -1;
     //ret = rds_ps_set (rds_ps);
-    strncpy (curr_rds_ps, rds_ps, sizeof (curr_rds_ps));
+    strlcpy (curr_rds_ps, rds_ps, sizeof (curr_rds_ps));
     return (curr_rds_ps);
   }
   char * chip_imp_rds_rt_sg (char * rds_rt) {
@@ -1953,7 +1925,7 @@ void bc_reg_dump (int lo, int hi, int bytes) {
       return (curr_rds_rt);
     int ret = -1;
     //ret = rds_rt_set (rds_rt);
-    strncpy (curr_rds_rt, rds_rt, sizeof (curr_rds_rt));
+    strlcpy (curr_rds_rt, rds_rt, sizeof (curr_rds_rt));
     return (curr_rds_rt);
   }
 
@@ -1962,7 +1934,7 @@ void bc_reg_dump (int lo, int hi, int bytes) {
       return (curr_extension);
     int ret = -1;
     //ret = reg_set (reg);
-    strncpy (curr_extension, reg, sizeof (curr_extension));
+    strlcpy (curr_extension, reg, sizeof (curr_extension));
     return (curr_extension);
   }
 

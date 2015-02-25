@@ -448,8 +448,12 @@
   };
 
 
-  int plugin_reg (unsigned int * sig, plugin_funcs_t * funcs, plugin_cbs_t * cbs) {    // Initial C level registration function each plugin must implement
+    // Initial C level registration function each plugin library must implement:
+
+  int plugin_reg (unsigned int * sig, plugin_funcs_t * funcs, plugin_cbs_t * cbs) {
     logd ("plugin_reg sig: %p  funcs: %p  cbs: %p", sig, funcs, cbs);
+
+    utils_init ();
 
     //logd ("plugin_reg sizeof (rds_struct_t): %d",  sizeof (rds_struct_t));  // plugin_reg sizeof (rds_struct_t): 216
 

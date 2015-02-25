@@ -52,72 +52,72 @@ public class svc_tnr implements svc_tap {
     if (key == null)
       return ("");
 /*
-    else if (key.equalsIgnoreCase ("test"))
+    else if (key.equals ("test"))
       return (com_uti.daemon_get (key));
 
-    else if (key.equalsIgnoreCase ("tuner_state"))
+    else if (key.equals ("tuner_state"))
       return (m_com_api.tuner_state);
 
 */
 
-    else if (m_com_api.tuner_state.equalsIgnoreCase ("start"))          // If tuner started...
+    else if (m_com_api.tuner_state.equals ("Start"))          // If tuner started...
       return (com_uti.daemon_get (key));                                // Get value from daemon
 
         // Else if not on, use cached info:
-    else if (key.equalsIgnoreCase ("tuner_band"))
+    else if (key.equals ("tuner_band"))
       return (m_com_api.tuner_band);
-    else if (key.equalsIgnoreCase ("tuner_freq"))
+    else if (key.equals ("tuner_freq"))
       return (m_com_api.tuner_freq);
-    else if (key.equalsIgnoreCase ("tuner_stereo"))
+    else if (key.equals ("tuner_stereo"))
       return (m_com_api.tuner_stereo);
-    else if (key.equalsIgnoreCase ("tuner_thresh"))
+    else if (key.equals ("tuner_thresh"))
       return (m_com_api.tuner_thresh);
-    else if (key.equalsIgnoreCase ("tuner_seek_state"))
+    else if (key.equals ("tuner_seek_state"))
       return (m_com_api.tuner_seek_state);
 
-    else if (key.equalsIgnoreCase ("tuner_rds_state"))
+    else if (key.equals ("tuner_rds_state"))
       return (m_com_api.tuner_rds_state);
-    else if (key.equalsIgnoreCase ("tuner_rds_af_state"))
+    else if (key.equals ("tuner_rds_af_state"))
       return (m_com_api.tuner_rds_af_state);
-    else if (key.equalsIgnoreCase ("tuner_rds_ta_state"))
+    else if (key.equals ("tuner_rds_ta_state"))
       return (m_com_api.tuner_rds_ta_state);
 
-    else if (key.equalsIgnoreCase ("tuner_extension"))
+    else if (key.equals ("tuner_extension"))
       return (m_com_api.tuner_extension);
 
-    else if (key.equalsIgnoreCase ("tuner_rssi"))
+    else if (key.equals ("tuner_rssi"))
       return (m_com_api.tuner_rssi);
-    else if (key.equalsIgnoreCase ("tuner_qual"))
+    else if (key.equals ("tuner_qual"))
       return (m_com_api.tuner_qual);
-    else if (key.equalsIgnoreCase ("tuner_pilot "))
+    else if (key.equals ("tuner_pilot "))
       return (m_com_api.tuner_pilot);
 
-    else if (key.equalsIgnoreCase ("tuner_rds_pi"))
+    else if (key.equals ("tuner_rds_pi"))
       return (m_com_api.tuner_rds_pi);
-    else if (key.equalsIgnoreCase ("tuner_rds_picl"))
+    else if (key.equals ("tuner_rds_picl"))
       return (m_com_api.tuner_rds_picl);
-    else if (key.equalsIgnoreCase ("tuner_rds_pt"))
+    else if (key.equals ("tuner_rds_pt"))
       return (m_com_api.tuner_rds_pt);
-    else if (key.equalsIgnoreCase ("tuner_rds_ptyn"))
+    else if (key.equals ("tuner_rds_ptyn"))
       return (m_com_api.tuner_rds_ptyn);
-    else if (key.equalsIgnoreCase ("tuner_rds_ps"))
+    else if (key.equals ("tuner_rds_ps"))
       return (m_com_api.tuner_rds_ps);
-    else if (key.equalsIgnoreCase ("tuner_rds_rt"))
+    else if (key.equals ("tuner_rds_rt"))
       return (m_com_api.tuner_rds_rt);
 
-    else if (key.equalsIgnoreCase ("tuner_rds_af"))
+    else if (key.equals ("tuner_rds_af"))
       return (m_com_api.tuner_rds_af);
-    else if (key.equalsIgnoreCase ("tuner_rds_ms"))
+    else if (key.equals ("tuner_rds_ms"))
       return (m_com_api.tuner_rds_ms);
-    else if (key.equalsIgnoreCase ("tuner_rds_ct"))
+    else if (key.equals ("tuner_rds_ct"))
       return (m_com_api.tuner_rds_ct);
-    else if (key.equalsIgnoreCase ("tuner_rds_tmc"))
+    else if (key.equals ("tuner_rds_tmc"))
       return (m_com_api.tuner_rds_tmc);
-    else if (key.equalsIgnoreCase ("tuner_rds_tp"))
+    else if (key.equals ("tuner_rds_tp"))
       return (m_com_api.tuner_rds_tp);
-    else if (key.equalsIgnoreCase ("tuner_rds_ta"))
+    else if (key.equals ("tuner_rds_ta"))
       return (m_com_api.tuner_rds_ta);
-    else if (key.equalsIgnoreCase ("tuner_rds_taf"))
+    else if (key.equals ("tuner_rds_taf"))
       return (m_com_api.tuner_rds_taf);
 
     else
@@ -129,32 +129,32 @@ public class svc_tnr implements svc_tap {
     if (key == null)
       return ("");
 
-    else if (key.equalsIgnoreCase ("tuner_state"))                      // If tuner_state...
+    else if (key.equals ("tuner_state"))                      // If tuner_state...
       return (tuner_state_set (val));                                   // Set Tuner State in local function
 
-    else if (m_com_api.tuner_state.equalsIgnoreCase ("start"))          // If tuner_state = Start (If s2d tuner daemon is running)...
+    else if (m_com_api.tuner_state.equals ("Start"))          // If tuner_state = Start (If s2d tuner daemon is running)...
       return (com_uti.daemon_set (key, val));                           // Send key and value to s2d daemon
 
                                                                         // Else if s2d daemon is not running: just set the local variable
-    else if (key.equalsIgnoreCase ("tuner_band"))
+    else if (key.equals ("tuner_band"))
       return (m_com_api.tuner_band = val);
-    else if (key.equalsIgnoreCase ("tuner_freq"))
+    else if (key.equals ("tuner_freq"))
       return (m_com_api.tuner_freq = val);
-    else if (key.equalsIgnoreCase ("tuner_stereo"))
+    else if (key.equals ("tuner_stereo"))
       return (m_com_api.tuner_stereo = val);
-    else if (key.equalsIgnoreCase ("tuner_thresh"))
+    else if (key.equals ("tuner_thresh"))
       return (m_com_api.tuner_thresh = val);
-    else if (key.equalsIgnoreCase ("tuner_seek_state"))
+    else if (key.equals ("tuner_seek_state"))
       return (m_com_api.tuner_seek_state = val);
 
-    else if (key.equalsIgnoreCase ("tuner_rds_state"))
+    else if (key.equals ("tuner_rds_state"))
       return (m_com_api.tuner_rds_state = val);
-    else if (key.equalsIgnoreCase ("tuner_rds_af_state"))
+    else if (key.equals ("tuner_rds_af_state"))
       return (m_com_api.tuner_rds_af_state = val);
-    else if (key.equalsIgnoreCase ("tuner_rds_ta_state"))
+    else if (key.equals ("tuner_rds_ta_state"))
       return (m_com_api.tuner_rds_ta_state = val);
 
-    else if (key.equalsIgnoreCase ("tuner_extension"))
+    else if (key.equals ("tuner_extension"))
       return (m_com_api.tuner_extension = val);
 
     else
@@ -214,15 +214,15 @@ com_uti.logd ("FREQ CODE freq: " + freq + "  hci: " + hci + "  port: " + port);
     com_uti.logd ("desired_state: " + desired_state + "  m_com_api.tuner_state: " + m_com_api.tuner_state);
 
     // START:
-    if (desired_state.equalsIgnoreCase ("start")) {                     // START:
+    if (desired_state.equals ("Start")) {                     // START:
 
-      if (m_com_api.tuner_state.equalsIgnoreCase ("stop")) {            // If tuner is stopped
+      if (m_com_api.tuner_state.equals ("Stop")) {            // If tuner is stopped
         m_com_api.tuner_state = "Starting";                             // Starting...
 
-        if (com_uti.file_get (s2d_running_file)) {                              // If "s2d daemon running" file already exists (if still running or was unexpectedly killed)
+        if (com_uti.file_get (s2d_running_file)) {                      // If "s2d daemon running" file already exists (if still running or was unexpectedly killed)
           com_uti.file_delete (s2d_running_file);
           com_uti.loge ("HAVE s2d_running_file: " + s2d_running_file);
-          if (com_uti.file_get (s2d_running_file))                              // If we can't delete the "s2d daemon running" file
+          if (com_uti.file_get (s2d_running_file))                      // If we can't delete the "s2d daemon running" file
             com_uti.loge ("STILL HAVE after file_delete s2d_running_file: " + s2d_running_file);
         }
         else {
@@ -232,11 +232,12 @@ com_uti.logd ("FREQ CODE freq: " + freq + "  hci: " + hci + "  port: " + port);
         m_com_api.service_update_send (null, "Starting Daemon", "" + daemon_start_timout_s);
 
                                                                         // Start libs2d.so daemon
-        String cmd_line = "/data/data/fm.a2d.sf/lib/libs2d.so server_mode_argv1 1>/dev/null 2>/dev/null";
+        String cmd_line = "/data/data/fm.a2d.sf/lib/libs2d.so server_mode_via_argv1 1>/dev/null 2>/dev/null";
         int ret = com_uti.sys_run (cmd_line, true);                     // Start s2d daemon
         com_uti.logd ("daemon kill/start ret: " + ret);
 
-        boolean started = s2d_running_wait (true, daemon_start_timout_s * 1000);    // Wait for daemon to start
+                                                                        // Wait for daemon to start
+        boolean started = s2d_running_wait (true, daemon_start_timout_s * 1000);
 
         if (! started) {                                                // If s2d daemon NOT started... Send Error Update
           m_com_api.service_update_send (null, "ERROR Starting Daemon", "-1");    
@@ -244,59 +245,60 @@ com_uti.logd ("FREQ CODE freq: " + freq + "  hci: " + hci + "  port: " + port);
         }
         else if (started) {                                             // Else if s2d daemon started successfully...
 
-                                                                        // Send Phase Update to dismiss SU / daemon startup dialog, and update phase/cdown/error info
-          m_com_api.service_update_send (null, "Setting Service Device", "2");
+                                                                        // Set Chassis Plugin Audio:
+          m_com_api.service_update_send (null, "Setting Chassis Plugin Audio", "2");
+          String new_chass_plug_aud = com_uti.daemon_set ("chass_plug_aud", m_com_api.chass_plug_aud);
+          com_uti.logd ("m_com_api.chass_plug_aud: " + m_com_api.chass_plug_aud + "  new_chass_plug_aud: " + new_chass_plug_aud);
 
-                                                                        // Set Radio Device:
-          if (m_com_api.service_device_int != com_uti.devnum) {         // Error message for when we fully support setting device by settings
-            com_uti.logd ("Forcing devnum because m_com_api.service_device_int (" + m_com_api.service_device_int + ") != com_uti.devnum: " + com_uti.devnum);
-            m_com_api.service_device_int = com_uti.devnum;
-          }
-          String new_service_device_int = com_uti.daemon_set ("service_device", "" + m_com_api.service_device_int);
-          com_uti.logd ("m_com_api.service_device_int: " + m_com_api.service_device_int + "  new_service_device_int: " + new_service_device_int);
-
-          m_com_api.service_update_send (null, "Setting Tuner API Mode", "2");// Send Phase Update
-
+/*                                                                        // Set Chassis Plugin Tuner:
+          m_com_api.service_update_send (null, "Setting Chassis Plugin Tuner", "2");
+          String new_chass_plug_tnr = com_uti.daemon_set ("chass_plug_tnr", m_com_api.chass_plug_tnr);
+          com_uti.logd ("m_com_api.chass_plug_tnr: " + m_com_api.chass_plug_tnr + "  new_chass_plug_tnr: " + new_chass_plug_tnr);
+*/
                                                                         // Set Tuner API Mode: UART, SHIM
+          m_com_api.service_update_send (null, "Setting Tuner API Mode", "2");
           String new_tuner_api_mode = com_uti.daemon_set ("tuner_api_mode", m_com_api.tuner_api_mode);
           com_uti.logd ("m_com_api.tuner_api_mode: " + m_com_api.tuner_api_mode + "  new_tuner_api_mode: " + new_tuner_api_mode);
 
-          m_com_api.service_update_send (null, "Starting Tuner API", "" + tuner_api_start_timout_s);   // Send Phase Update
-
                                                                         // Start Tuner API
+          m_com_api.service_update_send (null, "Starting Tuner API", "" + tuner_api_start_timout_s);
           String new_tuner_api_state = com_uti.daemon_set ("tuner_api_state", "Start");
           com_uti.logd ("m_com_api.tuner_api_state: " + m_com_api.tuner_api_state + "  new_tuner_api_state: " + new_tuner_api_state);
-          if (! new_tuner_api_state.equalsIgnoreCase ("start")) {       // If error starting Tuner API...
-            m_com_api.service_update_send (null, "ERROR Starting Tuner API", "-1");  // Send Error update
+
+          if (! new_tuner_api_state.equals ("Start")) {       // If error starting Tuner API...
+                                                                        // Send Error update
+            m_com_api.service_update_send (null, "ERROR Starting Tuner API", "-1");
             m_com_api.tuner_api_state = "Stop";
             m_com_api.tuner_state = "Stop";
           }
           else {                                                        // Else if Tuner API started successfully...
             m_com_api.tuner_api_state = "Start";
 
-            m_com_api.service_update_send (null, "Setting Tuner Mode", "2");  // Send Phase Update
             m_com_api.tuner_mode = "Receive";
             if (com_uti.s2_tx_get ()) {                                 // If Transmit
               m_com_api.tuner_mode = "Transmit";
             }                                                           // Set Tuner Mode: Rx or Tx
+            m_com_api.service_update_send (null, "Setting Tuner Mode", "2");
             String new_tuner_mode = com_uti.daemon_set ("tuner_mode", m_com_api.tuner_mode);
             com_uti.logd ("m_com_api.tuner_mode: " + m_com_api.tuner_mode + "  new_tuner_mode: " + new_tuner_mode);
 
 
-            m_com_api.service_update_send (null, "Starting Tuner", "6");  // Send Phase Update
                                                                         // Start Tuner
+            m_com_api.service_update_send (null, "Starting Tuner", "6");
             String new_tuner_state = com_uti.daemon_set ("tuner_state", "Start");
             com_uti.logd ("m_com_api.tuner_state: " + m_com_api.tuner_state + "  new_tuner_state: " + new_tuner_state);
 
 
-            if (! new_tuner_state.equalsIgnoreCase ("start")) {         // If error starting tuner...
-              m_com_api.service_update_send (null, "ERROR Starting Tuner", "-1");// Send Error Update
+            if (! new_tuner_state.equals ("Start")) {         // If error starting tuner...
+                                                                        // Send Error Update
+              m_com_api.service_update_send (null, "ERROR Starting Tuner", "-1");
               m_com_api.tuner_state = "Stop";
             }
             else {                                                      // Else if Tuner started successfully...
-              m_com_api.service_update_send (null, "Success Starting Tuner", "0");  // Send Success Update
+                                                                        // Send Success Update
+              m_com_api.service_update_send (null, "Success Starting Tuner", "0");
 
-                ///* Not working yet: ????
+                /* Not working yet: ????
               if (com_uti.s2_tx_get ()) {                               // If Transmit
                 //m_com_api.key_set ("tuner_rds_pi", "" + com_uti.prefs_get (m_context, "tuner_rds_pi", 34357));
                 com_uti.daemon_set ("tuner_rds_pi", "" + com_uti.prefs_get (m_context, "tuner_rds_pi", 34357));
@@ -317,8 +319,8 @@ com_uti.logd ("FREQ CODE freq: " + freq + "  hci: " + hci + "  port: " + port);
     }
 
     // STOP:
-    else if (desired_state.equalsIgnoreCase ("stop")) {                 // STOP:
-      if (m_com_api.tuner_state.equalsIgnoreCase ("start")) {           // If tuner is started...
+    else if (desired_state.equals ("Stop")) {                 // STOP:
+      if (m_com_api.tuner_state.equals ("Start")) {           // If tuner is started...
         poll_stop ();                                                   // Stop polling for changes
         m_com_api.tuner_state = "Stopping";
 
@@ -327,7 +329,7 @@ com_uti.logd ("FREQ CODE freq: " + freq + "  hci: " + hci + "  port: " + port);
         String new_tuner_state = com_uti.daemon_set ("tuner_state", "Stop");// Stop Tuner
         com_uti.logd ("new_tuner_state: " + new_tuner_state);
 
-        if (new_tuner_state.equalsIgnoreCase ("stop")) {                // If Tuner stopped successfully...
+        if (new_tuner_state.equals ("Stop")) {                // If Tuner stopped successfully...
           m_com_api.service_update_send (null, "Success Stopping Tuner", "0"); // Send Phase Update
           com_uti.logd ("Success Stopping Tuner");
         }
@@ -344,7 +346,7 @@ com_uti.logd ("FREQ CODE freq: " + freq + "  hci: " + hci + "  port: " + port);
 
         boolean stopped = s2d_running_wait (false, 2000);               // Wait up to 2 seconds for daemon to stop
 
-        if (stopped && new_tuner_api_state.equalsIgnoreCase ("Stop")) { // If Tuner API stopped successfully...
+        if (stopped && new_tuner_api_state.equals ("Stop")) { // If Tuner API stopped successfully...
           m_com_api.service_update_send (null, "Success Stopping Tuner API / Daemon", "0");  // Send Phase update
           com_uti.logd ("Success Stopping Tuner API / Daemon");
         }
@@ -362,7 +364,7 @@ com_uti.logd ("FREQ CODE freq: " + freq + "  hci: " + hci + "  port: " + port);
       return (m_com_api.tuner_state);
     }
 
-    if (desired_state.equalsIgnoreCase (m_com_api.tuner_state)) {
+    if (desired_state.equals (m_com_api.tuner_state)) {
       com_uti.logd ("Success setting m_com_api.tuner_state: " + m_com_api.tuner_state + "  to desired_state: " + desired_state);
       m_svc_tcb.cb_tuner_key ("tuner_state", m_com_api.tuner_state);
     }
@@ -413,7 +415,7 @@ com_uti.logd ("FREQ CODE freq: " + freq + "  hci: " + hci + "  port: " + port);
           m_svc_tcb.cb_tuner_key ("tuner_state", last_poll_state = m_com_api.tuner_state);
       }
 */
-      if (! m_com_api.tuner_state.equalsIgnoreCase ("start"))                                             // Done if state not started
+      if (! m_com_api.tuner_state.equals ("Start"))                                             // Done if state not started
         return;
 
       try {
