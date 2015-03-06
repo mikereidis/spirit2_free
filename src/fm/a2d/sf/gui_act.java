@@ -56,8 +56,8 @@ public class gui_act extends Activity {                                 // publi
         com_uti.logd ("m_com_api: " + m_com_api);
     }
 
-    m_com_api.chass_plug_aud = com_uti.chass_plug_aud_get (m_context);  // Setup Tuner Plugin, and Audio Plugin
-    m_com_api.chass_plug_tnr = com_uti.chass_plug_tnr;
+    m_com_api.chass_plug_aud = com_uti.chass_plug_aud_get (m_context);  // Setup Audio Plugin
+    m_com_api.chass_plug_tnr = com_uti.chass_plug_tnr_get (m_context);  // Setup Tuner Plugin
   }
 
   @Override

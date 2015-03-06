@@ -50,7 +50,7 @@ import java.util.Timer;
 import java.util.TimerTask;
 import java.util.ArrayList;
 
-public class gui_gui implements gui_gap {
+public class gui_gui implements gui_gap {//, gui_dlg.gui_dlg_lstnr {
 
   private static int    m_obinits = 1;
 
@@ -151,6 +151,64 @@ public class gui_gui implements gui_gap {
     m_gui_act = (Activity) c;
     m_com_api = the_com_api;
   }
+
+  public void on_pos () {
+    com_uti.logd ("");
+  }
+  public void on_neu () {
+    com_uti.logd ("");
+  }
+  public void on_neg () {
+    com_uti.logd ("");
+  }
+/*
+  private gui_dlg start_dlg_frag = null;
+  private gui_dlg stop_dlg_frag  = null;
+  private boolean start_gui_dlg_active = false;
+  private boolean stop_gui_dlg_active = false;
+
+  private void start_gui_dlg_show (boolean start) {
+    //start_dlg_frag.dismiss ();    // Dismiss previous
+
+    // DialogFragment.show() will take care of adding the fragment in a transaction.  We also want to remove any currently showing dialog, so make our own transaction and take care of that here.
+    FragmentTransaction ft = m_gui_act.getFragmentManager ().beginTransaction ();
+    Fragment prev = m_gui_act.getFragmentManager ().findFragmentByTag ("start_stop_dialog");
+    if (prev != null) {
+        ft.remove (prev);
+    }
+    ft.addToBackStack (null);
+
+    if (start) {
+      start_dlg_frag = gui_dlg.init (R.drawable.img_icon_128, m_com_api.chass_phase, m_com_api.chass_phtmo, null, null, m_context.getString (android.R.string.cancel));//"", m_context.getString (android.R.string.ok), "", null);//"");
+      start_dlg_frag.setgui_dlg_lstnr (this);//m_gui_act);
+      start_gui_dlg_active = true;
+      start_dlg_frag.show (m_gui_act.getFragmentManager (), "start_stop_dialog");
+      start_dlg_frag.show (ft, "start_stop_dialog");
+    }
+    else
+      start_gui_dlg_active = false;
+  }
+
+  private void stop_gui_dlg_show (boolean start) {
+    // DialogFragment.show() will take care of adding the fragment in a transaction.  We also want to remove any currently showing dialog, so make our own transaction and take care of that here.
+    FragmentTransaction ft = m_gui_act.getFragmentManager ().beginTransaction ();
+    Fragment prev = m_gui_act.getFragmentManager ().findFragmentByTag ("start_stop_dialog");
+    if (prev != null) {
+        ft.remove (prev);
+    }
+    ft.addToBackStack (null);
+
+    if (start) {
+      stop_dlg_frag = gui_dlg.init (android.R.drawable.stat_sys_headset, "Stop", null, null, null, null);//"", m_context.getString (android.R.string.ok), "", null);//"");
+      stop_dlg_frag.setgui_dlg_lstnr (this);//m_gui_act);
+      stop_gui_dlg_active = true;
+      //stop_dlg_frag.show (m_gui_act.getFragmentManager (), "start_stop_dialog");
+      stop_dlg_frag.show (ft, "start_stop_dialog");
+    }
+    else
+      stop_gui_dlg_active = false;
+  }
+*/
 
     // Lifecycle API
 
@@ -308,6 +366,7 @@ public class gui_gui implements gui_gap {
     }
 
         // Set preferences defaults:
+/* ?? Don't need ??
     com_uti.def_set (m_context, "tuner_band");
     com_uti.def_set (m_context, "tuner_freq");
     com_uti.def_set (m_context, "tuner_stereo");
@@ -344,6 +403,7 @@ public class gui_gui implements gui_gap {
     com_uti.def_set (m_context, "chass_plug_aud");
 
     com_uti.def_set (m_context, "debug_debug");
+*/
 
     int gui_start_count = com_uti.prefs_get (m_context, "gui_start_count", 0);
     gui_start_count ++;
@@ -617,8 +677,12 @@ public class gui_gui implements gui_gap {
   private static final int FREQ_SET_DIALOG        = 5;                    // Frequency set
   private static final int GUI_MENU_DIALOG        = 6;                    // Menu
   private static final int GUI_ABOUT_DIALOG       = 7;                    // About
-  private static final int PRESET_CHANGE_DIALOG   = 8;                    // Preset functions
-  private static final int PRESET_RENAME_DIALOG   = 9;                    // Preset rename
+  private static final int GUI_TEST_DIALOG        = 8;                    // Test
+  private static final int GUI_DEBUG_DIALOG       = 9;                    // Debug
+  private static final int GUI_SHIM_DIALOG        =10;                    // Shim
+  private static final int GUI_ACDB_DIALOG        =11;                    // ACDB Fix
+  private static final int PRESET_CHANGE_DIALOG   =12;                    // Preset functions
+  private static final int PRESET_RENAME_DIALOG   =14;                    // Preset rename
 
   public Dialog gap_dialog_create (int id, Bundle args) {               // Create a dialog by calling specific *_dialog_create function    ; Triggered by showDialog (int id);
         //public DialogFragment gap_dialog_create (int id, Bundle args) {
@@ -632,16 +696,28 @@ public class gui_gui implements gui_gap {
         ret = daemon_error_dialog_create    (id);
         break;
       case TUNER_API_ERROR_DIALOG:
-        ret = tuner_api_error_dialog_create    (id);
+        ret = tuner_api_error_dialog_create (id);
         break;
       case TUNER_ERROR_DIALOG:
-        ret = tuner_error_dialog_create    (id);
+        ret = tuner_error_dialog_create     (id);
         break;
       case GUI_MENU_DIALOG:
         ret = gui_menu_dialog_create        (id);
         break;
       case GUI_ABOUT_DIALOG:
         ret = gui_about_dialog_create       (id);
+        break;
+      case GUI_TEST_DIALOG:
+        ret = gui_test_dialog_create        (id);
+        break;
+      case GUI_DEBUG_DIALOG:
+        ret = gui_debug_dialog_create       (id);
+        break;
+      case GUI_SHIM_DIALOG:
+        ret = gui_shim_dialog_create        (id);
+        break;
+      case GUI_ACDB_DIALOG:
+        ret = gui_acdb_dialog_create        (id);
         break;
       case FREQ_SET_DIALOG:
         ret = freq_set_dialog_create        (id);
@@ -660,6 +736,18 @@ public class gui_gui implements gui_gap {
 
   boolean free = true;
 
+  private Dialog gui_test_dialog_create (final int id) {
+    com_uti.logd ("id: " + id);
+    AlertDialog.Builder dlg_bldr = new AlertDialog.Builder (m_context);
+    return (dlg_bldr.create ());
+  }
+
+  private Dialog gui_debug_dialog_create (final int id) {
+    com_uti.logd ("id: " + id);
+    AlertDialog.Builder dlg_bldr = new AlertDialog.Builder (m_context);
+    return (dlg_bldr.create ());
+  }
+
   private Dialog gui_about_dialog_create (final int id) {
     com_uti.logd ("id: " + id);
 
@@ -667,54 +755,60 @@ public class gui_gui implements gui_gap {
 
     dlg_bldr.setTitle ("SpiritF " + com_uti.app_version_get (m_context));
 
-    String menu_msg = "Select EQ (Equalizer) or Cancel.";
+    String menu_msg = "Select Google Play or Cancel";
     if (free)
-      menu_msg = "Select Go Pro or Cancel.";
-
-    if (m_com_api.chass_plug_tnr.equals ("BCH")) {
-      if (free)
-        menu_msg = "Select Go Pro, Install BT Shim, Remove BT Shim.";
-      else
-        menu_msg = "Select EQ (Equalizer), Install BT Shim, Remove BT Shim.";
-    }
+      menu_msg = "Select Google Play or Cancel";//Select Go Pro or Cancel.";
 
     dlg_bldr.setMessage (menu_msg);
 
-    if (free) {
-      dlg_bldr.setNegativeButton ("Go Pro", new DialogInterface.OnClickListener () {
-        public void onClick (DialogInterface dialog, int whichButton) {
-          purchase ("fm.a2d." + "s2");  // Avoid app name change
-        }
-      });
-    }
-    else {
-      dlg_bldr.setNegativeButton ("EQ", new DialogInterface.OnClickListener () {
-        public void onClick (DialogInterface dialog, int whichButton) {
-          eq_start ();
-        }
-      });
-    }
-
-    if (! m_com_api.chass_plug_tnr.equals ("BCH")) {
-      dlg_bldr.setPositiveButton ("Cancel", new DialogInterface.OnClickListener () {     //
-        public void onClick (DialogInterface dialog, int whichButton) {
-        }
-      });
-      return (dlg_bldr.create ());
-    }
-
-                                                                        // Install Bluetooth Shim
-    dlg_bldr.setNeutralButton ("IBTS", new DialogInterface.OnClickListener () {
+    dlg_bldr.setNegativeButton ("Cancel", new DialogInterface.OnClickListener () {
       public void onClick (DialogInterface dialog, int whichButton) {
-        if (com_uti.shim_files_operational_get ())
-          Toast.makeText (m_context, "Shim file already installed. Reinstalling...", Toast.LENGTH_LONG).show ();
-        else
-          Toast.makeText (m_context, "Shim file installing...", Toast.LENGTH_LONG).show ();
-        com_uti.shim_install ();
       }
     });
 
-                                                                        // Remove Bluetooth Shim
+    dlg_bldr.setPositiveButton ("Google Play", new DialogInterface.OnClickListener () {
+      public void onClick (DialogInterface dialog, int whichButton) {
+        purchase ("fm.a2d." + "s2");  // Avoid app name change
+      }
+    });
+
+    return (dlg_bldr.create ());
+  }
+
+  private Dialog gui_shim_dialog_create (final int id) {
+    com_uti.logd ("id: " + id);
+
+    AlertDialog.Builder dlg_bldr = new AlertDialog.Builder (m_context);
+
+    dlg_bldr.setTitle ("SpiritF " + com_uti.app_version_get (m_context));
+
+    String menu_msg = "Select Cancel, Install BT Shim, Remove BT Shim.";
+    dlg_bldr.setMessage (menu_msg);
+
+    dlg_bldr.setNegativeButton ("Cancel", new DialogInterface.OnClickListener () {
+      public void onClick (DialogInterface dialog, int whichButton) {
+      }
+    });
+
+    dlg_bldr.setNeutralButton ("IBTS", new DialogInterface.OnClickListener () {
+      public void onClick (DialogInterface dialog, int whichButton) {
+        if (com_uti.shim_files_operational_get ()) {
+          boolean reinstall_destroys_original = true;
+          if (reinstall_destroys_original) {
+            Toast.makeText (m_context, "Shim file already installed. Can't reinstall...", Toast.LENGTH_LONG).show ();
+          }
+          else {
+            Toast.makeText (m_context, "Shim file already installed. Reinstalling...", Toast.LENGTH_LONG).show ();
+            com_uti.shim_install ();
+          }
+        }
+        else {
+          Toast.makeText (m_context, "Shim file installing...", Toast.LENGTH_LONG).show ();
+          com_uti.shim_install ();
+        }
+      }
+    });
+
     dlg_bldr.setPositiveButton ("RBTS", new DialogInterface.OnClickListener () {
       public void onClick (DialogInterface dialog, int whichButton) {
         if (com_uti.shim_files_operational_get ()) {
@@ -728,6 +822,61 @@ public class gui_gui implements gui_gap {
 
     return (dlg_bldr.create ());
   }
+
+  private Dialog gui_acdb_dialog_create (final int id) {
+    com_uti.logd ("id: " + id);
+
+    AlertDialog.Builder dlg_bldr = new AlertDialog.Builder (m_context);
+
+    dlg_bldr.setTitle ("SpiritF " + com_uti.app_version_get (m_context));
+
+    String menu_msg = "Select Cancel, Install ACDB Fix, Remove ACDB Fix.";
+    dlg_bldr.setMessage (menu_msg);
+
+    dlg_bldr.setNegativeButton ("Cancel", new DialogInterface.OnClickListener () {     //
+      public void onClick (DialogInterface dialog, int whichButton) {
+      }
+    });
+
+    dlg_bldr.setNeutralButton ("IAF", new DialogInterface.OnClickListener () {
+      public void onClick (DialogInterface dialog, int whichButton) {
+        /*if (com_uti.acdbfix_files_operational_get ()) {
+          boolean reinstall_destroys_original = true;
+          if (reinstall_destroys_original) {
+            Toast.makeText (m_context, "ACDB Fix already installed. Can't reinstall...", Toast.LENGTH_LONG).show ();
+          }
+          else {
+            Toast.makeText (m_context, "ACDB Fix already installed. Reinstalling...", Toast.LENGTH_LONG).show ();
+            com_uti.acdbfix_install (m_context);
+          }
+        }
+        else {*/
+          Toast.makeText (m_context, "ACDB Fix installing...", Toast.LENGTH_LONG).show ();
+
+          m_com_api.key_set ("tuner_state", "Stop");
+          com_uti.ms_sleep (2000);
+          com_uti.acdbfix_install (m_context);
+        //}
+      }
+    });
+
+    dlg_bldr.setPositiveButton ("RAF", new DialogInterface.OnClickListener () {
+      public void onClick (DialogInterface dialog, int whichButton) {
+        //if (com_uti.acdbfix_files_operational_get ()) {
+          Toast.makeText (m_context, "ACDB Fix installed. Removing...", Toast.LENGTH_LONG).show ();
+
+          m_com_api.key_set ("tuner_state", "Stop");
+          com_uti.ms_sleep (2000);
+          com_uti.acdbfix_remove (m_context);
+        /*}
+        else
+          Toast.makeText (m_context, "ACDB Fix not installed !!!", Toast.LENGTH_LONG).show ();*/
+      }
+    });
+
+    return (dlg_bldr.create ());
+  }
+
 
 
   private Dialog gui_menu_dialog_create (final int id) {
@@ -743,6 +892,8 @@ public class gui_gui implements gui_gap {
       array_list.add ("EQ");
     array_list.add ("Test");
     array_list.add ("Debug");
+    array_list.add ("SHIM");
+    array_list.add ("ACDB");
     array_list.add ("About");
     array_list.add ("Digital");
     array_list.add ("Analog");
@@ -774,10 +925,12 @@ public class gui_gui implements gui_gap {
   private static final int MENU_EQ      = 1;
   private static final int MENU_TEST    = 2;
   private static final int MENU_DEBUG   = 3;
-  private static final int MENU_ABOUT   = 4;
-  private static final int MENU_DIG     = 5;
-  private static final int MENU_ANA     = 6;
-  //private static final int MENU_SLEEP   = 7;
+  private static final int MENU_SHIM    = 4;
+  private static final int MENU_ACDB    = 5;
+  private static final int MENU_ABOUT   = 6;
+  private static final int MENU_DIG     = 7;
+  private static final int MENU_ANA     = 8;
+  //private static final int MENU_SLEEP   = 9;
 
   public boolean gap_menu_create (Menu menu) {
     com_uti.logd ("menu: " + menu);
@@ -789,6 +942,8 @@ public class gui_gui implements gui_gap {
         menu.add (Menu.NONE, MENU_EQ,   Menu.NONE,          "EQ");
       menu.add (Menu.NONE, MENU_TEST,   Menu.NONE,         "Test");//.setIcon (R.drawable.ic_menu_view);
       menu.add (Menu.NONE, MENU_DEBUG,  Menu.NONE,        "Debug");//.setIcon (R.drawable.ic_menu_help);
+      menu.add (Menu.NONE, MENU_SHIM,   Menu.NONE,         "SHIM");//.setIcon (R.drawable.ic_menu_view);
+      menu.add (Menu.NONE, MENU_ACDB,   Menu.NONE,         "ACDB");//.setIcon (R.drawable.ic_menu_help);
       menu.add (Menu.NONE, MENU_ABOUT,  Menu.NONE,        "About");//.setIcon (R.drawable.ic_menu_info_details);
       menu.add (Menu.NONE, MENU_DIG,    Menu.NONE,      "Digital");
       menu.add (Menu.NONE, MENU_ANA,    Menu.NONE,       "Analog");
@@ -814,13 +969,19 @@ public class gui_gui implements gui_gap {
           eq_start ();
         return (true);
       case MENU_TEST:
-        m_gui_act.showDialog (FREQ_SET_DIALOG);
+        m_gui_act.showDialog (GUI_TEST_DIALOG);
         return (true);
       case MENU_DEBUG:
-        m_gui_act.showDialog (DAEMON_START_DIALOG);
+        m_gui_act.showDialog (GUI_DEBUG_DIALOG);
         return (true);
       case MENU_ABOUT:
         m_gui_act.showDialog (GUI_ABOUT_DIALOG);
+        return (true);
+      case MENU_SHIM:
+        m_gui_act.showDialog (GUI_SHIM_DIALOG);
+        return (true);
+      case MENU_ACDB:
+        m_gui_act.showDialog (GUI_ACDB_DIALOG);
         return (true);
       case MENU_DIG:
         m_com_api.key_set ("audio_mode", "Digital");
@@ -1070,51 +1231,53 @@ public class gui_gui implements gui_gap {
       com_uti.loge ("ffreq = Float.valueOf (nFreq); failed");
       //e.printStackTrace ();
     }
+
+// 40.000-399.999
+// 400.00-3999.99
+// 4000.0-39999.9
+// 40000.-399999.
+
+int f_freq_lo =  40000;
+int f_freq_hi = 399999;
+
     int freq = (int) (ffreq * 1000);
-    if (freq < 0.1) {
+
+    if (freq < f_freq_lo || freq > f_freq_hi  * 1000) {
+      com_uti.loge ("1 Frequency invalid ffreq: " + ffreq + "  freq: " + freq);
       return;
     }
-    else if (freq > 199999 && freq < 300000) {                          // Codes 200 000 - 2xx xxx - 299 999 = get/set private Broadcom/Qualcomm control
+    else if (freq >= f_freq_lo *    1 && freq <= f_freq_hi *    1) {    // For 40 - 399
+      freq /= 1;
+    }
+    else if (freq >= f_freq_lo *   10 && freq <= f_freq_hi *   10) {    // For 400 - 3999
+      freq /= 10;
+    }
+    else if (freq >= f_freq_lo *  100 && freq <= f_freq_hi *  100) {    // For 4000 - 39999
+      freq /= 100;
+    }
+    else if (freq >= f_freq_lo * 1000 && freq <= f_freq_hi * 1000) {    // For 40000 - 399999
+      freq /= 1000;
+    }
+
+    if (freq < 0) {
+      com_uti.loge ("2 Frequency invalid ffreq: " + ffreq + "  freq: " + freq);
+      return;
+    }
+    else if (freq > 199999 && freq < 400000) {                          // Codes 200.000 - 299.999 / 300.000 - 399.999 = get/set private Broadcom/Qualcomm control
       m_com_api.key_set ("tuner_extension", "" + freq);
       com_uti.logd ("get/set private Qualcomm/V4L control: " + freq);
       return;
     }
-    else if (freq < 46001 && freq > 45999) {                            // Code 46 = Remove libbt-hci.so BT shim
-      com_uti.shim_remove ();
-      return;
-    }
-    else if (freq < 47001 && freq > 46999) {                            // Code 47 = ?
-      return;
-    }
-    else if (freq < 48001 && freq > 47999) {                            // Code 48 = Enable transmit
-      com_uti.s2_tx_set (true);
-      if (! com_uti.sony_get ())
-        Toast.makeText (m_context, "!!! TRANSMIT likely on SONY ONLY !!!", Toast.LENGTH_LONG).show ();
-      return;
-    }
-    else if (freq < 49001 && freq > 48999) {                            // Code 49 = Disable transmit
-      com_uti.s2_tx_set (false);
-      return;
-    }
-    else if (freq < 7001 && freq > 6999) {                              // Code 7 = logs_email
+    else if (freq <= 40001 && freq >= 39999) {                          // Code 40 = logs_email
       logs_email ();
       return;
     }
-    else if (freq >= m_freq_lo * 10 && freq <= m_freq_hi * 10) {      // For 760 - 1080
-      freq /= 10;
-    }
-    else if (freq >= m_freq_lo * 100 && freq <= m_freq_hi * 100) {    // For 7600 - 10800
-      freq /= 100;
-    }
-    else if (freq >= m_freq_lo * 1000 && freq <= m_freq_hi * 1000) {  // For 76000 - 108000
-      freq /= 1000;
-    }
-    if (freq >= m_freq_lo && freq <= m_freq_hi) {
+    else if (freq >= m_freq_lo && freq <= m_freq_hi) {
       com_uti.logd ("Frequency changing to : " + freq + " KHz");
       m_com_api.key_set ("tuner_freq", "" + freq);
     }
     else {
-      com_uti.loge ("Frequency invalid: " + ffreq);
+      com_uti.loge ("3 Frequency invalid ffreq: " + ffreq + "  freq: " + freq);
     }
   }
 
@@ -1408,9 +1571,20 @@ public class gui_gui implements gui_gap {
       com_uti.loge ("idx: " + idx + "  com_api.chass_preset_max: " + com_api.chass_preset_max + "  m_presets_curr: " + m_presets_curr);
       return;
     }
-    else if (idx > m_presets_curr) {
-      com_uti.loge ("idx: " + idx + "  com_api.chass_preset_max: " + com_api.chass_preset_max + "  m_presets_curr: " + m_presets_curr);
-      idx = m_presets_curr;
+    else if (idx > m_presets_curr) {                                    // If trying to set a preset past the last current one (this avoid blank presets)
+      com_uti.logd ("idx: " + idx + "  com_api.chass_preset_max: " + com_api.chass_preset_max + "  m_presets_curr: " + m_presets_curr);
+      boolean set_past_end = true;
+      boolean ignore_past_end = true;
+      if (set_past_end)
+        com_uti.logd ("set_past_end");
+      else if (ignore_past_end) {
+        com_uti.logd ("ignore_past_end");
+        return;
+      }
+      else {
+        com_uti.logd ("set next available");
+        idx = m_presets_curr;                                           // Set index to last + 1 = next new one
+      }
     }      
     else
       com_uti.logd ("idx: " + idx + "  com_api.chass_preset_max: " + com_api.chass_preset_max + "  m_presets_curr: " + m_presets_curr);

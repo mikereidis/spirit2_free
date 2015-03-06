@@ -56,12 +56,14 @@
     int (* tnr_tuner_mode_sg)          (int mode);                    // Set/get curr_mode
     int (* tnr_tuner_state_sg)         (int state);
 
+    int (* tnr_tuner_antenna_sg)       (int antenna);
     int (* tnr_tuner_band_sg)          (int band);
     int (* tnr_tuner_freq_sg)          (int freq);
     int (* tnr_tuner_vol_sg)           (int vol);
     int (* tnr_tuner_thresh_sg)        (int thresh);                  // Set/get curr_thresh
 
     int (* tnr_tuner_mute_sg)          (int mute);
+    int (* tnr_tuner_softmute_sg)      (int softmute);
     int (* tnr_tuner_stereo_sg)        (int stereo);
     int (* tnr_tuner_seek_state_sg)    (int seek_state);
     int (* tnr_tuner_rds_state_sg)     (int rds_state);               // Set/get curr_pwr_rds
@@ -89,12 +91,14 @@
   int chip_imp_mode_sg         (int mode);                              // Set/get curr_mode
   int chip_imp_state_sg        (int state);
 
+  int chip_imp_antenna_sg      (int antenna);
   int chip_imp_band_sg         (int band);
   int chip_imp_freq_sg         (int freq);
   int chip_imp_vol_sg          (int vol);
   int chip_imp_thresh_sg       (int thresh);                            // Set/get curr_thresh
 
   int chip_imp_mute_sg         (int mute);
+  int chip_imp_softmute_sg     (int softmute);
   int chip_imp_stereo_sg       (int stereo);
   int chip_imp_seek_state_sg   (int seek_state);
   int chip_imp_rds_state_sg    (int rds_state);                         // Set/get curr_pwr_rds

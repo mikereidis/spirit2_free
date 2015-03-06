@@ -3,6 +3,11 @@
 
 package fm.a2d.sf;
 
+import android.media.AudioAttributes;
+import android.media.AudioAttributes.Builder;
+import android.media.AudioFormat;
+//import android.media.AudioFormat.Builder;
+
 import android.app.Service;
 import android.media.MediaRecorder;
 import android.media.AudioFormat;
@@ -49,7 +54,7 @@ public class svc_aud implements svc_aap, AudioManager.OnAudioFocusChangeListener
   private boolean       pcm_write_thread_active = false;
   private boolean       pcm_read_thread_active  = false;
 
-  private AudioRecord   m_audiorecorder = null;
+  private AudioRecord   m_audiorecord = null;
   private Thread        pcm_read_thread         = null;
 
   private AudioTrack    m_audiotrack            = null;
@@ -123,7 +128,6 @@ public class svc_aud implements svc_aap, AudioManager.OnAudioFocusChangeListener
   private int                   cur_stream_vol  = -1;
   private int                   max_stream_vol  = 15;
 
-  private boolean               aud_mic = true;
   private int                   m_aud_src = 0;
 
   private boolean               s2_tx = false;
@@ -199,7 +203,7 @@ public class svc_aud implements svc_aap, AudioManager.OnAudioFocusChangeListener
       m_samplerate = 44100;
     com_uti.logd ("m_samplerate 2: " + m_samplerate);
 
-    if (m_com_api.chass_plug_aud.equals ("GEN"))
+    if (m_com_api.chass_plug_aud.equals ("CUS"))
       m_samplerate = 48000;
     else if (m_com_api.chass_plug_aud.equals ("QCV"))
       m_samplerate = 48000;
@@ -239,9 +243,9 @@ public class svc_aud implements svc_aap, AudioManager.OnAudioFocusChangeListener
     else if (m_com_api.chass_plug_aud.equals ("XZ2"))
       m_audio_bufsize = 30720;
     else if (m_com_api.chass_plug_aud.equals ("LG2")) {
-      if (com_uti.stock_lg2_get ())
+      /*if (com_uti.stock_lg2_get ())
         m_audio_bufsize = 32768;
-      else
+      else*/
         m_audio_bufsize = 30720;
     }
     else if (m_com_api.chass_plug_aud.equals ("GS1"))
@@ -393,8 +397,8 @@ public class svc_aud implements svc_aap, AudioManager.OnAudioFocusChangeListener
   private int receive_audio_pause () {                                  // Pause FM receive audio
     m_com_api.audio_state = "Pausing";
 
-    pcm_audio_pause ();                                                 // Stop reading, then writing audio:    AudioRecorder, AudioTrack & threads
-    audio_output_set ("Headset", false);                                // Set Audio Output to headset (if needed) with no restart (in preperation for audio stop)
+    mode_audio_pause ();                                                // Pause Audio at hardware level based on mode.
+    audio_output_set ("Headset", false);                                // Set Audio Output to headset (if plugged and was set to speaker) with no restart
     return (0);
   }
 
@@ -404,9 +408,8 @@ public class svc_aud implements svc_aap, AudioManager.OnAudioFocusChangeListener
     headset_plgd_lstnr_stop ();                                         // Unregister for headset plugged/unplugged events
     focus_set (false);
 
-    pcm_audio_stop ();                                                  // Pause and release Audiotrack resources
-    audio_output_set ("Headset", false);                                // Set Audio Output to headset (if needed) with no restart (in preperation for audio stop)
-    //stopSelf ();                                                      // DISABLED: Don't need. WAS: Service is no longer necessary. Will be started again if needed.
+    mode_audio_stop ();                                                 // Stop Audio at hardware level based on mode.
+    audio_output_set ("Headset", false);                                // Set Audio Output to headset (if plugged and was set to speaker) with no restart
     return (0);
   }
 
@@ -420,7 +423,7 @@ public class svc_aud implements svc_aap, AudioManager.OnAudioFocusChangeListener
     String audio_output = com_uti.prefs_get (m_context, "audio_output", "Headset");
     audio_output_set (audio_output, false);                             // Set Audio Output from prefs with no restart
 
-    pcm_audio_start ();                                                 // Start input & output
+    mode_audio_start ();                                                // Start Audio at hardware level based on mode.
     return (0);
   }
 
@@ -596,38 +599,63 @@ public class svc_aud implements svc_aap, AudioManager.OnAudioFocusChangeListener
   private void focus_set (boolean focus_request) {
     com_uti.logd ("focus_request: " + focus_request);
     int ret = 0;
+    //restart_audio_on_focus_regain = false;
     if (focus_request)                                                  // If focus desired...
       ret = m_AM.requestAudioFocus (this, audio_stream, AudioManager.AUDIOFOCUS_GAIN);
       //ret = m_AM.requestAudioFocus (this, audio_stream, AudioManager.AUDIOFOCUS_GAIN);
-    else                                                                // If focus return...
+    else {                                                              // If focus return...
+      restart_audio_on_focus_regain = false;
       ret = m_AM.abandonAudioFocus (this);
+    }
     if (ret != AudioManager.AUDIOFOCUS_REQUEST_GRANTED)
       com_uti.loge ("ret: " + ret);
   }
+
+  private boolean restart_audio_on_focus_regain = false;
   public void onAudioFocusChange (int focusChange) {
     //com_uti.logd ("s2_tx: " + s2_tx);
     //if (s2_tx)
     //  return;
-    com_uti.logd ("focusChange: " + focusChange + "  audio_state: " + m_com_api.audio_state);
+    com_uti.logd ("focusChange: " + focusChange + "  audio_state: " + m_com_api.audio_state + "  restart_audio_on_focus_regain: " + restart_audio_on_focus_regain);
     switch (focusChange) {
       case AudioManager.AUDIOFOCUS_GAIN:                                // Gain
-        com_uti.logd ("focusChange: GAIN");
-        audio_state_set ("Start");                                      // Start/Restart audio
+        if (restart_audio_on_focus_regain && m_com_api.audio_state.equals ("Pause")) {
+          com_uti.logd ("focusChange: GAIN. Restarting...");
+          restart_audio_on_focus_regain = false;
+          audio_state_set ("Start");                                      // Start/Restart audio
+        }
+        else
+          com_uti.logd ("focusChange: GAIN. NOT Restarting...");
         break;
       case AudioManager.AUDIOFOCUS_LOSS:                                // Permanent loss
         //com_uti.logd ("focusChange: LOSS");
-        audio_state_set ("Stop");                                       // Stop audio       Loss of/stopping audio could/should stop tuner (& Tuner API ?)
-        com_uti.logd ("DONE focusChange: LOSS");
+        restart_audio_on_focus_regain = false;
+        if (m_com_api.audio_state.equals ("Pause") || m_com_api.audio_state.equals ("Start") || m_com_api.audio_state.equals ("Starting") || m_com_api.audio_state.equals ("Stopping")) {
+          audio_state_set ("Stop");                                       // Stop audio       Loss of/stopping audio could/should stop tuner (& Tuner API ?)
+          com_uti.logd ("DONE focusChange: LOSS");
+        }
+        else
+          com_uti.logd ("focusChange: LOSS. NOT Stopping...");
         break;
       case AudioManager.AUDIOFOCUS_LOSS_TRANSIENT:                      // Transient loss
         //com_uti.logd ("focusChange: ...LOSS_TRANSIENT");
-        audio_state_set ("Pause");                                      // Pause audio
-        com_uti.logd ("DONE focusChange: ...LOSS_TRANSIENT");
+        if (m_com_api.audio_state.equals ("Start") || m_com_api.audio_state.equals ("Starting") || m_com_api.audio_state.equals ("Stopping")) {
+          restart_audio_on_focus_regain = true;
+          audio_state_set ("Pause");                                      // Pause audio
+          com_uti.logd ("DONE focusChange: ...LOSS_TRANSIENT");
+        }
+        else
+          com_uti.logd ("focusChange: LOSS_TRANSIENT. NOT Pausing...");
         break;
       case AudioManager.AUDIOFOCUS_LOSS_TRANSIENT_CAN_DUCK:             // Transient loss we can ignore if we want
         //com_uti.logd ("focusChange: LOSS_TRANSIENT_CAN_DUCK");
-        audio_state_set ("Pause");                                      // Pause audio
-        com_uti.logd ("DONE focusChange: LOSS_TRANSIENT_CAN_DUCK");
+        if (m_com_api.audio_state.equals ("Start") || m_com_api.audio_state.equals ("Starting") || m_com_api.audio_state.equals ("Stopping")) {
+          restart_audio_on_focus_regain = true;
+          audio_state_set ("Pause");                                      // Pause audio
+          com_uti.logd ("DONE focusChange: LOSS_TRANSIENT_CAN_DUCK");
+        }
+        else
+          com_uti.logd ("focusChange: LOSS_TRANSIENT_CAN_DUCK. NOT Pausing...");
         break;
        default:
     }
@@ -754,7 +782,7 @@ public class svc_aud implements svc_aap, AudioManager.OnAudioFocusChangeListener
               len_written += new_len;                                   // If we wrote, update total length written
             total_ms_time = com_uti.tmr_ms_get () - total_ms_start;     // Calculate time taken for total write
             curr_ms_time  = com_uti.tmr_ms_get () - curr_ms_start;      // Calculate time taken for current write
-            if (curr_ms_time >= 400)                                    // If current write has taken too long...   GS1 sees 350 ms sometimes
+            if (curr_ms_time >= 500)                                    // If current write has taken too long...   GS1 sees 350 ms sometimes   ; Saw 431 on OM7
               com_uti.loge ("pcm_write_run m_audiotrack.write too long total_ms_time: " + total_ms_time + "  curr_ms_time: " + curr_ms_time + "  len: " + len + "  new_len: " + new_len + "  len_written: " + len_written + "  aud_buf: " + aud_buf);
           }
 
@@ -771,6 +799,8 @@ public class svc_aud implements svc_aap, AudioManager.OnAudioFocusChangeListener
 
                                                                         // Here when thread is finished...
         com_uti.logd ("pcm_write_run done writes_processed: " + writes_processed);
+
+          audio_record_state_set ("Stop");                              // Ensure we finish any recording in progress
       }
       catch (Throwable e) {
         com_uti.loge ("pcm_write_run throwable: " + e);
@@ -782,7 +812,6 @@ public class svc_aud implements svc_aap, AudioManager.OnAudioFocusChangeListener
 
 
   private boolean is_analog_audio_mode () {
-    //return (m_com_api.audio_mode.toUpperCase (Locale.getDefault ()).startsWith ("A"));
     return (m_com_api.audio_mode.equals ("Analog"));
   }
 
@@ -836,11 +865,11 @@ public class svc_aud implements svc_aap, AudioManager.OnAudioFocusChangeListener
 
           aud_buf = aud_buf_data [aud_buf_tail];
 
-          len = -555;                                                   // Default = error if no m_audiorecorder (shouldn't happen except at shutdown)
-          if (m_audiorecorder != null)
-            len = m_audiorecorder.read (aud_buf, 0, m_audio_bufsize);//m_alsa_bufsize);
+          len = -555;                                                   // Default = error if no m_audiorecord (shouldn't happen except at shutdown)
+          if (m_audiorecord != null)
+            len = m_audiorecord.read (aud_buf, 0, m_audio_bufsize);//m_alsa_bufsize);
 
-// m_audiorecorder = ???
+// m_audiorecord = ???
 
           if (len <= 0) {
             if (len == android.media.AudioRecord.ERROR_INVALID_OPERATION ) {  // -3
@@ -943,13 +972,13 @@ public class svc_aud implements svc_aap, AudioManager.OnAudioFocusChangeListener
       return (m_com_api.audio_mode);                                    // Done for now
     }
                                                                         // Else if Audio is started we need to stop and restart PCM...
-    pcm_audio_stop ();                                                  // Pause and release Audiotrack resources
+    mode_audio_stop ();                                                 // Stop Audio at hardware level based on mode.
 
     com_uti.logd ("Before set new_audio_mode: " + new_audio_mode + "  m_com_api.audio_mode: " + m_com_api.audio_mode + "  m_com_api.audio_state: " + m_com_api.audio_state);
     m_com_api.audio_mode = new_audio_mode;                              // Set new audio mode
     com_uti.logd ("After  set new_audio_mode: " + new_audio_mode + "  m_com_api.audio_mode: " + m_com_api.audio_mode + "  m_com_api.audio_state: " + m_com_api.audio_state);
 
-    pcm_audio_start ();                                                 // Restart PCM
+    mode_audio_start ();                                                // Restart Audio at hardware level based on mode.
 
     com_uti.logd ("Done   set new_audio_mode: " + new_audio_mode + "  m_com_api.audio_mode: " + m_com_api.audio_mode + "  m_com_api.audio_state: " + m_com_api.audio_state);
     return (m_com_api.audio_mode);
@@ -958,129 +987,242 @@ public class svc_aud implements svc_aap, AudioManager.OnAudioFocusChangeListener
 
     // ? Use stereo_set() for speaker mode ? HTC One has stereo speakers ?
 
-  private void pcm_audio_start () {                                     // Start input & output     Called only by audio_start() (for audio start) & audio_output_set() (for audio restart)
-    com_uti.logd ("m_com_api.tuner_state: " + m_com_api.tuner_state + "  m_audiotrack: " + m_audiotrack + "  m_com_api.audio_state: " + m_com_api.audio_state);
+  private boolean enable_pcmwrite       = true;
+  private boolean enable_pcmread        = true;
+  private boolean enable_daemonaudio    = true;
+  private boolean enable_daemonvolume   = true;
 
-// START pcm_write:
-    com_uti.logd ("m_samplerate: " + m_samplerate + "  m_channels: " + m_channels + "  m_audio_bufsize: " + m_audio_bufsize + "  m_audiotrack: " + m_audiotrack);
+  private boolean enable_stockmode      = true;
 
-    try {
-      m_audiotrack = new AudioTrack (audio_stream, m_samplerate, chan_out_get (m_channels), AudioFormat.ENCODING_PCM_16BIT, m_audio_bufsize, AudioTrack.MODE_STREAM);
-      if (m_audiotrack != null)
-        m_audiotrack.play ();                                           // java.lang.IllegalStateException: play() called on uninitialized AudioTrack.
-      if (! pcm_write_thread_active) {
-        pcm_write_thread = new Thread (pcm_write_run, "pcm_write");
-        com_uti.logd ("pcm_write_thread: " + pcm_write_thread);
-        if (pcm_write_thread == null)
-          com_uti.loge ("pcm_write_thread == null");
+  private int fm_device = 0x100000;
+
+                                                                        // Start audio at hardware level based on mode.
+  private void mode_audio_start () {                                    //     Called only by audio_start() (for audio start) & audio_output_set() (for audio restart)
+    com_uti.logd ("m_audiotrack: " + m_audiotrack + "  m_com_api.audio_state: " + m_com_api.audio_state);
+
+    if (com_uti.file_get ("/sdcard/spirit/pcm_stats")) {
+      write_stats_seconds = 6;
+       read_stats_seconds = 6;
+    }
+    else {
+      write_stats_seconds = 60;
+       read_stats_seconds = 60;
+    }
+
+    enable_pcmwrite     = ! com_uti.file_get ("/sdcard/spirit/no_pcmwrite");
+    enable_pcmread      = ! com_uti.file_get ("/sdcard/spirit/no_pcmread");
+    enable_daemonaudio  = ! com_uti.file_get ("/sdcard/spirit/no_daemonaudio");
+    enable_daemonvolume = ! com_uti.file_get ("/sdcard/spirit/no_daemonvolume");
+
+    enable_stockmode    =   com_uti.file_get ("/sdcard/spirit/enable_stockmode");
+
+//if (m_com_api.chass_plug_aud.equals ("QCV"))
+//  enable_stockmode = true;
+
+    if (enable_stockmode) {
+      com_uti.logd ("enable_stockmode");
+      enable_pcmwrite       = false;
+      enable_pcmread        = false;
+      enable_daemonaudio    = false;
+      enable_daemonvolume   = false;
+
+      com_uti.setDeviceConnectionState (fm_device, com_uti.DEVICE_STATE_AVAILABLE, "");   // Works on MOG only     com_uti.DEVICE_OUT_FM
+
+    //com_uti.setDeviceConnectionState (0x80000000 | 0x200000, com_uti.DEVICE_STATE_AVAILABLE, "");
+    //com_uti.setDeviceConnectionState (0x80000000 |   0x2000, com_uti.DEVICE_STATE_AVAILABLE, "");
+    //com_uti.setDeviceConnectionState (0x80000000 |   0x8000, com_uti.DEVICE_STATE_AVAILABLE, "");
+    }
+/*
+03-02 03:37:56.972 D/s2svcaud(11696): mode_audio_start: enable_stockmode
+03-02 03:37:56.982 D/s2comuti(11696): setDeviceConnectionState: device: 1048576  state: 1  address: ''
+03-02 03:37:56.982 D/s2comuti(11696): output_audio_routing_get: output getDeviceConnectionState: ---- --00 -000 0001 0000 0000 0000 0111   ret_bits hex: 00010007    decimal: 65543
+03-02 03:37:56.992 D/s2comuti(11696): input_audio_routing_get:   input getDeviceConnectionState: ---- ---- -000 -000 0000 0001 1101 0100   ret_bits hex: 000001D4    decimal: 468
+03-02 03:37:56.992 D/audio_hw_primary(  295): adev_set_parameters: enter: connect=1048576
+
+03-02 03:37:56.992 E/audio_a2dp_hw(  295): adev_set_parameters: ERROR: set param called even when stream out is null
+
+03-02 03:37:57.002 D/audio_hw_primary(  295): out_set_parameters: enter: usecase(1: low-latency-playback) kvpairs: handle_fm=1048580
+03-02 03:37:57.002 D/audio_hw_fm(  295): audio_extn_fm_set_parameters: FM usecase
+03-02 03:37:57.002 D/audio_hw_fm(  295): fm_start: enter
+03-02 03:37:57.002 D/audio_hw_primary(  295): select_devices: out_snd_device(4: headphones) in_snd_device(0: )
+03-02 03:37:57.002 W/msm8974_platform(  295): Codec backend bitwidth 16, samplerate 48000
+03-02 03:37:57.002 D/hardware_info(  295): hw_info_append_hw_type : device_name = headphones
+03-02 03:37:57.002 D/audio_hw_primary(  295): select_devices: done
+03-02 03:37:57.012 D/audio_hw_fm(  295): fm_set_volume: (0.004660)
+03-02 03:37:57.012 D/audio_hw_fm(  295): fm_set_volume: Setting FM volume to 39 
+03-02 03:37:57.012 D/audio_hw_fm(  295): fm_start: exit: status(0)
+03-02 03:37:57.022 D/audio_hw_primary(  295): out_set_parameters: enter: usecase(1: low-latency-playback) kvpairs: routing=4
+03-02 03:37:57.022 D/s2comuti(11696): setDeviceConnectionState: ret: 0
+03-02 03:37:57.032 D/s2comuti(11696): output_audio_routing_get: output getDeviceConnectionState: ---- --00 -001 0001 0000 0000 0000 0111   ret_bits hex: 00110007    decimal: 1114119
+03-02 03:37:57.032 D/s2comuti(11696): input_audio_routing_get:   input getDeviceConnectionState: ---- ---- -000 -000 0000 0001 1101 0100   ret_bits hex: 000001D4    decimal: 468
+03-02 03:37:57.032 D/s2comapi(11696): service_update_send: phase: Success Starting Audio  cdown: 0
+
+*/
+
+        // START pcm_write:
+    if (enable_pcmwrite) {
+      if (pcm_write_thread_active)
+        com_uti.loge ("pcm_write_thread_active");
+      com_uti.logd ("m_samplerate: " + m_samplerate + "  m_channels: " + m_channels + "  m_audio_bufsize: " + m_audio_bufsize + "  m_audiotrack: " + m_audiotrack + "  m_audiorecord: " + m_audiorecord);
+      try {
+        m_audiotrack = new AudioTrack (audio_stream, m_samplerate, chan_out_get (m_channels), AudioFormat.ENCODING_PCM_16BIT, m_audio_bufsize, AudioTrack.MODE_STREAM);
+        if (m_audiotrack == null)
+          com_uti.loge ("m_audiotrack == null");
         else {
-          pcm_write_thread_active = true;
-          if (pcm_write_thread.getState () == java.lang.Thread.State.NEW || pcm_write_thread.getState () == java.lang.Thread.State.TERMINATED) {
-            //com_uti.logd ("thread priority: " + pcm_write_thread.getPriority ());   // Get 5
-            pcm_write_thread.start ();
+          m_audiotrack.play ();                                         // Start output
+
+          pcm_write_thread = new Thread (pcm_write_run, "pcm_write");
+          com_uti.logd ("pcm_write_thread: " + pcm_write_thread);
+          if (pcm_write_thread == null)
+            com_uti.loge ("pcm_write_thread == null");
+          else {
+            pcm_write_thread_active = true;
+            java.lang.Thread.State thread_state = pcm_write_thread.getState ();
+            if (thread_state == java.lang.Thread.State.NEW || thread_state == java.lang.Thread.State.TERMINATED) {
+              //com_uti.logd ("thread priority: " + pcm_write_thread.getPriority ());   // Get 5
+              pcm_write_thread.start ();
+            }
+            else
+              com_uti.loge ("pcm_write_thread thread_state: " + thread_state);
           }
         }
       }
-    }
-    catch (Throwable e) {
-      com_uti.loge ("Throwable: " + e);
-      e.printStackTrace ();
+      catch (Throwable e) {
+        com_uti.loge ("Throwable: " + e);
+        e.printStackTrace ();
+      }
     }
 
-// START pcm_read:
-    com_uti.logd ("pcm_read_start pcm_read_thread_active: " + pcm_read_thread_active);
-    if (! pcm_read_thread_active) {
-      com_uti.logd ("m_audiorecorder: " + m_audiorecorder);
+        // START pcm_read:
+    if (enable_pcmread) {
+      if (pcm_read_thread_active)
+        com_uti.loge ("pcm_read_thread_active");
+      com_uti.logd ("m_samplerate: " + m_samplerate + "  m_channels: " + m_channels + "  m_audio_bufsize: " + m_audio_bufsize + "  m_audiotrack: " + m_audiotrack + "  m_audiorecord: " + m_audiorecord);
       try {
-        m_audiorecorder = audio_record_get ();
-        com_uti.logd ("m_audiorecorder: " + m_audiorecorder);
-        if (m_audiorecorder == null) {
-          com_uti.loge ("m_audiorecorder == null !!");
-          //return (false);
+        m_audiorecord = audio_record_get ();
+        if (m_audiorecord == null) {
+          com_uti.loge ("m_audiorecord == null");
         }
         else {
-          m_audiorecorder.startRecording ();    //java.lang.IllegalStateException: startRecording() called on an uninitialized AudioRecord.
-          com_uti.logd ("getChannelConfiguration: " + m_audiorecorder.getChannelConfiguration () + "   getChannelCount: " +  m_audiorecorder.getChannelCount ());
-          audiorecord_sessid_int = m_audiorecorder.getAudioSessionId ();
+          m_audiorecord.startRecording ();                            // Start input
+          com_uti.logd ("getChannelConfiguration: " + m_audiorecord.getChannelConfiguration () + "   getChannelCount: " +  m_audiorecord.getChannelCount ());
+          audiorecord_sessid_int = m_audiorecord.getAudioSessionId ();
           com_uti.logd ("audiorecord_sessid_int: " + audiorecord_sessid_int);
-          audiorecorder_info_log ();
+          audiorecord_info_log ();
+
+          pcm_read_thread = new Thread (pcm_read_run, "pcm_read");
+          com_uti.logd ("pcm_read_thread: " + pcm_read_thread);
+          if (pcm_read_thread == null)
+            com_uti.loge ("pcm_read_thread == null");
+          else {
+            pcm_read_thread_active = true;
+
+            java.lang.Thread.State thread_state = pcm_read_thread.getState ();
+            if (thread_state == java.lang.Thread.State.NEW || thread_state == java.lang.Thread.State.TERMINATED) {
+              //com_uti.logd ("thread priority: " + pcm_read_thread.getPriority ());   // Get 5
+              pcm_read_thread.start ();
+            }
+            else
+              com_uti.loge ("pcm_read_thread thread_state: " + thread_state);
+          }
         }
       }
       catch (Exception e) {
-        e.printStackTrace();
-        //return (false);
+        com_uti.loge ("Throwable: " + e);
+        e.printStackTrace ();
       }
-
-      pcm_read_thread_active = true;
-      pcm_read_thread = new Thread (pcm_read_run, "pcm_read");
-      pcm_read_thread.start ();
     }
 
-// SETUP audio_mode:
-    if (m_com_api.tuner_state.equals ("Start")) {             // If Tuner is started  IE, if the daemon is running and can be communicated with
-                                                                            // Could use tuner_api_state or a new daemon_state, but audio depends on tuner running anyway
-      if (is_analog_audio_mode ())                                      // If Analog...
-        com_uti.daemon_set ("audio_mode", "Analog");
-      else
-        com_uti.daemon_set ("audio_mode", "Digital");
-        // If mic selected & not FM & want FM & not mic...
-      if (is_analog_audio_mode () || (m_aud_src <= 8 && ! com_uti.file_get ("/sdcard/spirit/aud_mic")))
-        com_uti.daemon_set ("audio_state", "Start");                      // For digital: Establish FM instead of microphone, for analog, switch on
-    }
-    else
-      com_uti.loge ("!!!!!!!!!! Tuner not started ; can't send commands to daemon !!!!!!!!!!!");    // Shouldn't happen; pcm_audio_start() should only be called if tuner is started (except for errors)
+        // SETUP audio_mode in daemon and start audio from daemon:
+        // If analog mode or if digital mode with a pseudo-source (non-direct) and not microphone test mode...
+    if (enable_daemonaudio) {
+      if (is_analog_audio_mode () || (m_aud_src <= 8 && ! com_uti.file_get ("/sdcard/spirit/aud_mic"))) {
 
-// SETUP Volume and digital amp:
-    volume_set ();                                                      // Set chip tuner volume as needed for analog mode
+        if (is_analog_audio_mode ())                                    // If Analog, set daemon to analog...
+          com_uti.daemon_set ("audio_mode", "Analog");
+        else                                                            // Else if Digital, set daemon to digital...
+          com_uti.daemon_set ("audio_mode", "Digital");
+
+        com_uti.daemon_set ("audio_state", "Start");                    // Analog: Enable audio directly to output. Digital: Switch from microphone to FM
+      }
+    }
+
+        // SETUP Volume and digital amp:
+    if (enable_daemonvolume)
+      volume_set ();                                                    // Set chip tuner volume as needed for analog or digital mode
   }
 
-  private void pcm_audio_pause () {                                     // Pause input & output     Called only by audio_pause() and pcm_audio_stop()
-    com_uti.logd ("m_com_api.tuner_state: " + m_com_api.tuner_state + "  m_audiotrack: " + m_audiotrack + "  m_com_api.audio_state: " + m_com_api.audio_state);
-    //if (m_audiotrack != null)                                         // DISABLED: Now after stop PCM Write, at least avoids write errors
-    //  m_audiotrack.pause ();
+/*-26 23:20:12.815 D/FMService( 1732): In startFM
+02-26 23:20:12.815 I/MediaFocusControl(  688):  AudioFocus  requestAudioFocus() from android.media.AudioManager@26b4e035com.caf.fmradio.FMRadioService$19@3551ccca
+02-26 23:20:12.825 D/FMService( 1732): FM registering for registerMediaButtonEventReceiver
+02-26 23:20:12.825 D/FMService( 1732): FMRadio: Requesting to start FM
 
-// STOP pcm_read:
+02-26 23:20:12.825 D/FMService( 1732): Audio source set it as headset
+02-26 23:20:12.825 D/audio_hw_primary(  300): adev_set_parameters: enter: connect=1048576
+02-26 23:20:12.825 E/audio_a2dp_hw(  300): adev_set_parameters: ERROR: set param called even when stream out is null    */
+
+
+  private void mode_audio_pause () {                                    // Pause audio at hardware level based on mode.   Called only by audio_pause() and mode_audio_stop()
+    com_uti.logd ("m_audiotrack: " + m_audiotrack + "  m_audiorecord: " + "  m_com_api.audio_state: " + m_com_api.audio_state);
+
+        // STOP pcm_read:
     com_uti.logd ("pcm_read_thread: " + pcm_read_thread + "  pcm_read_thread_active: " + pcm_read_thread_active);
     if (pcm_read_thread_active) {
       pcm_read_thread_active = false;
       if (pcm_read_thread != null)
         pcm_read_thread.interrupt ();
 
-      if (m_audiorecorder != null) {
-        m_audiorecorder.stop ();
-        m_audiorecorder.release ();
-        m_audiorecorder = null;
+      if (m_audiorecord != null) {
+        m_audiorecord.stop ();                                        // No pause for audioRecord, only stop
+        //m_audiorecord.release ();
+        //m_audiorecord = null;
       }
     }
-                                                                        // DISABLED: Now after stop PCM Write
-        // If mic selected & not FM & want FM & not mic...
-    //if (is_analog_audio_mode () || (m_aud_src <= 8 && ! com_uti.file_get ("/sdcard/spirit/aud_mic")))
-    //  com_uti.daemon_set ("audio_state", "Stop");                     // For digital: De-establish FM instead of microphone, for analog, switch off
 
-// STOP pcm_write:
+        // STOP pcm_write:
     com_uti.logd ("pcm_write_thread: " + pcm_write_thread + "  pcm_write_thread_active: " + pcm_write_thread_active);
     if (pcm_write_thread_active) {
       pcm_write_thread_active = false;
       if (pcm_write_thread != null)
         pcm_write_thread.interrupt ();
     }
-    if (m_audiotrack != null)                                           // RELOCATED: Pause Audiotrack here
-      m_audiotrack.pause ();
-                                                                        // RELOCATED: STOP audio via daemon audio plugin
-        // If mic selected & not FM & want FM & not mic...
-    if (is_analog_audio_mode () || (m_aud_src <= 8 && ! com_uti.file_get ("/sdcard/spirit/aud_mic")))
-      com_uti.daemon_set ("audio_state", "Stop");                       // For digital: De-establish FM instead of microphone, for analog, switch off
+    if (m_audiotrack != null)
+      m_audiotrack.pause ();                                            // Pause Audiotrack
+
+
+    if (enable_stockmode)                                               // For stock mode:
+       com_uti.setDeviceConnectionState (fm_device, com_uti.DEVICE_STATE_UNAVAILABLE, "");
+
+    if (enable_daemonaudio) {
+        // If analog mode or...
+        // If digital mode with a pseudo-source and not in the special microphone test mode...
+      if (is_analog_audio_mode () || (m_aud_src <= 8 && ! com_uti.file_get ("/sdcard/spirit/aud_mic")))
+        com_uti.daemon_set ("audio_state", "Stop");                     // Analog: Disable audio directly to output. Digital: Switch from FM to microphone (or at least turn FM path off, if needed)
+    }
+
+    //if (enable_daemonvolume)
+    //  com_uti.logd ("Could/should restore volume here: " + volume_restore ());  // Restore system and chip tuner volume as needed
 
     com_uti.logd ("reads_processed: " + reads_processed + " writes_processed: " + writes_processed);
   }
 
-  private void pcm_audio_stop () {                                      // Stop input & output      Called only by audio_stop() & audio_output_set() (for restart)
-    com_uti.logd ("m_com_api.tuner_state: " + m_com_api.tuner_state + "  m_audiotrack: " + m_audiotrack + "  m_com_api.audio_state: " + m_com_api.audio_state);
-    pcm_audio_pause ();                                                 // First, pause the audio
-    if (m_audiotrack != null)
-      m_audiotrack.release ();                                          // Release Audiotrack resources
-    m_audiotrack = null;
-    com_uti.logd ("reads_processed: " + reads_processed + " writes_processed: " + writes_processed);
+  private void mode_audio_stop () {                                     // Stop audio at hardware level based on mode.    Called only by audio_stop() & audio_output_set() (for restart)
+    com_uti.logd ("m_audiotrack: " + m_audiotrack + "  m_com_api.audio_state: " + m_com_api.audio_state);
+
+    mode_audio_pause ();                                                // First, pause the audio
+
+    if (m_audiotrack != null) {
+      m_audiotrack.stop ();
+      m_audiotrack.release ();                                          // Release AudioTrack resources
+      m_audiotrack = null;
+    }
+
+    if (m_audiorecord != null) {                                        // Release AudioRecord resources
+      //m_audiorecord.stop ();                                          // DISABLE: already stopped
+      m_audiorecord.release ();
+      m_audiorecord = null;
+    }
+
   }
 
 
@@ -1100,90 +1242,127 @@ public class svc_aud implements svc_aap, AudioManager.OnAudioFocusChangeListener
     return (ret);
   }
 
+/* FMRadioService.java:
+   private void startFM(){
+...
 
-  private void speaker_set (boolean new_speaker) {
-    com_uti.logd ("new_speaker: " + new_speaker);
-    if (new_speaker) {
-                                                // Headset unavailable: This fools Android into thinking that the headset is unplugged (which is needed because
-                                                // Android doesn't like apps controlling audio routing, and FM reception is better wired with headset plugged in as an antenna, even in speaker mode
-      com_uti.setDeviceConnectionState (com_uti.DEVICE_OUT_WIRED_HEADSET, com_uti.DEVICE_STATE_UNAVAILABLE, "");
-      //if (m_com_api.chass_plug_aud.equals ("GS1"))                            // On GS1 "Headphone" also unavailable
-      //  com_uti.setDeviceConnectionState (com_uti.DEVICE_OUT_WIRED_HEADPHONE, com_uti.DEVICE_STATE_UNAVAILABLE, "");
-    }
-    else {
-                                                                       // Headset available
-      com_uti.setDeviceConnectionState (com_uti.DEVICE_OUT_WIRED_HEADSET, com_uti.DEVICE_STATE_AVAILABLE, "");
-      //if (m_com_api.chass_plug_aud.equals ("GS1"))                            // On GS1 "Headphone" also available
-      //  com_uti.setDeviceConnectionState (com_uti.DEVICE_OUT_WIRED_HEADPHONE, com_uti.DEVICE_STATE_AVAILABLE, "");
-    }
-  }
+       if (!isSpeakerEnabled() && !mA2dpDeviceSupportInHal &&  (true == mA2dpDeviceState.isDeviceAvailable()) &&
+           !isAnalogModeEnabled()
+            && (true == startA2dpPlayback())) {
+            mOverA2DP=true;
+            Log.d(LOGTAG, "Audio source set it as A2DP");
+            AudioSystem.setForceUse(AudioSystem.FOR_MEDIA, AudioSystem.FORCE_BT_A2DP);
+       } else {
+           Log.d(LOGTAG, "FMRadio: Requesting to start FM");
+           //reason for resending the Speaker option is we are sending
+           //ACTION_FM=1 to AudioManager, the previous state of Speaker we set
+           //need not be retained by the Audio Manager.
+           if (isSpeakerEnabled()) {
+               mSpeakerPhoneOn = true;
+               Log.d(LOGTAG, "Audio source set it as speaker");
+               AudioSystem.setForceUse(AudioSystem.FOR_MEDIA, AudioSystem.FORCE_SPEAKER);
+           } else {
+               Log.d(LOGTAG, "Audio source set it as headset");
+               AudioSystem.setForceUse(AudioSystem.FOR_MEDIA, AudioSystem.FORCE_NONE);
+           }
+           AudioSystem.setDeviceConnectionState(AudioSystem.DEVICE_OUT_FM,
+                               AudioSystem.DEVICE_STATE_AVAILABLE, "");
 
+       }
+       sendRecordServiceIntent(RECORD_START);
+       mPlaybackInProgress = true;
+   }
+
+   private void stopFM(){
+       Log.d(LOGTAG, "In stopFM");
+       if (mOverA2DP==true){
+           mOverA2DP=false;
+           stopA2dpPlayback();
+       }else{
+           Log.d(LOGTAG, "FMRadio: Requesting to stop FM");
+           AudioSystem.setDeviceConnectionState(AudioSystem.DEVICE_OUT_FM,
+                                     AudioSystem.DEVICE_STATE_UNAVAILABLE, "");
+
+
+
+
+*/
     // CAN_DUCK ?                                                   // Called by:
                                                                         // prefsval  & no restart:         audio_start()
                                                                         // "Headset" & no restart:         audio_pause()    (for audio_state=pause or stop), after pcm read & write stopped
                                                                         // newval    &    restart: svc_svc:onStartCommand() (change from UI/Widget)
+
   public String audio_output_set (String new_audio_output, boolean restart_param) {
-    com_uti.logd ("s2_tx: " + s2_tx + "  m_hdst_plgd: " + m_hdst_plgd + "  restart_param: " + restart_param + "  api audio_state: " + m_com_api.audio_state + "  api audio_output: " + m_com_api.audio_output + "  new_audio_output: " + new_audio_output + "  audio_output_get: " + audio_output_get ());
+
+    com_uti.logd ("s2_tx: " + s2_tx + "  m_hdst_plgd: " + m_hdst_plgd + "  restart_param: " + restart_param + "  api audio_state: " + m_com_api.audio_state + "  api audio_output: " + m_com_api.audio_output + "  new_audio_output: " + new_audio_output
+              + "  audio_output_get: " + audio_output_get ());
+
     if (s2_tx)                                                          // Do nothing if transmit mode...
       return (m_com_api.audio_output = new_audio_output);
 
-    boolean lg2_restart = restart_param;
+    boolean lg2_restart = restart_param;                                // If param restart, then LG2 restart...
     if (! m_com_api.chass_plug_aud.equals ("LG2") || new_audio_output.equals ("Headset"))
-      lg2_restart = false;
+      lg2_restart = false;                                              // Unless not LG2 or switching to headset
 
     boolean restart_enable = restart_param;
     if (! m_com_api.chass_plug_aud.equals ("GS1") && ! m_com_api.chass_plug_aud.equals ("GS2") && ! lg2_restart)
       restart_enable = false;                                            // Only GS1 and GS2 (and LG2 going to speaker) need restart. GS3 may need restart on OmniROM only ?
 
     if (restart_enable)
-      pcm_audio_stop ();                                                // Stop input & output
+      mode_audio_stop ();                                               // Stop Audio at hardware level based on mode.
 
-    if (lg2_restart)                                                    // Without lg2_restart, speaker audio is really messed up
+    if (lg2_restart)                                                    // Without lg2_restart, speaker audio is really messed up   See below at function end; doesn't matter where sleep happens
       com_uti.ms_sleep (3000);                                          // 2500 too small
 
-    if (new_audio_output.equals ("Speaker")) {                // If speaker is desired...
-      if (m_hdst_plgd)                                                  // If headset is plugged (if unplugged, audio is already going to speaker)
-        //if (m_com_api.audio_output.equals ("Headset"))      // DISABLED: so we don't check for change, in case we are re-starting audio after an output switch to speaker that was delayed
-        speaker_set (true);                                             // Switch to Speaker
+    if (new_audio_output.equals ("Speaker")) {                          // If speaker is desired...
+      if (m_hdst_plgd) {                                                // If headset is plugged (if unplugged, audio is already going to speaker)
+        //if (m_com_api.audio_output.equals ("Headset"))                // DISABLED: So we don't check for change, in case we are re-starting audio after an output switch to speaker that was delayed
+
+                                                                        // Headset unavailable: Fool Android that headset unplugged (Android doesn't like apps controlling audio routing,
+                                                                        //  and FM reception is better with wired headset plugged in as antenna, even in speaker mode.)
+                                                                        // This works better than setForceUse() ??
+        com_uti.setDeviceConnectionState (com_uti.DEVICE_OUT_WIRED_HEADSET, com_uti.DEVICE_STATE_UNAVAILABLE, "");
+
+        //if (m_com_api.chass_plug_aud.equals ("GS1"))                  // DISABLED: Don't need anymore ?   WAS: On GS1 "Headphone" also unavailable
+        //  com_uti.setDeviceConnectionState (com_uti.DEVICE_OUT_WIRED_HEADPHONE, com_uti.DEVICE_STATE_UNAVAILABLE, "");
+      }
       else
         com_uti.logd ("Speaker switch do nothing: m_hdst_plgd == false");
     }
-    else if (new_audio_output.equals ("Headset")) {           // Else if headset is desired...
-      //if (m_hdst_plgd)                                                // DISABLED: setDEviceConnectionState() makes this unusable. WAS: If headset is plugged (if unplugged, audio is already going to speaker and can't be switched to unplugged headset)
+
+    else if (new_audio_output.equals ("Headset")) {                     // Else if headset is desired...
+      //if (m_hdst_plgd)                                                // DISABLED: setDeviceConnectionState() makes this unusable. WAS: If headset is plugged (if unplugged, audio is already going to speaker and can't be switched to unplugged headset)
         if (restart_param) {                                            // WAS DISABLED ?: but should only need to switch to headset when we are restarting due to a UI/Widget output change request
-          if (m_com_api.audio_output.equals ("Speaker"))      // Only need to switch if coming from speaker  
-            speaker_set (false);                                        // Switch to Headset
+          if (m_com_api.audio_output.equals ("Speaker")) {              // Only need to switch if coming from speaker  
+
+                                                                        // Headset available
+            com_uti.setDeviceConnectionState (com_uti.DEVICE_OUT_WIRED_HEADSET, com_uti.DEVICE_STATE_AVAILABLE, "");
+
+            //if (m_com_api.chass_plug_aud.equals ("GS1"))              // DISABLED: Don't need anymore ?   WAS: On GS1 "Headphone" also available
+            //  com_uti.setDeviceConnectionState (com_uti.DEVICE_OUT_WIRED_HEADPHONE, com_uti.DEVICE_STATE_AVAILABLE, "");
+          }
           else
             com_uti.logd ("Headset switch do nothing: m_com_api.audio_output != Speaker");
         }
         else
           com_uti.logd ("Headset switch do nothing: restart_param == false");
     }
-    //if (lg2_restart)
+
+    //if (lg2_restart)                                                  // Without lg2_restart, speaker audio is really messed up   See above at function start; doesn't matter where sleep happens
     //  com_uti.ms_sleep (3000);
+
     if (restart_enable)
-      pcm_audio_start ();                                               // Start input & output
-    com_uti.audio_routing_get ();                                       // Log audio routing
-    return (m_com_api.audio_output = new_audio_output);
+      mode_audio_start ();                                              // Start audio at hardware level based on mode.
+
+    com_uti.output_audio_routing_get ();                                // Log audio routing
+
+    return (m_com_api.audio_output = new_audio_output);                 // Done w/ new output
   }
 
 
-    // Start:
+    // Audio Recorder:
 
-/* android.media.MediaRecorder.AudioSource :
-            Value   API Level
-DEFAULT             0       1
-MIC                 1       1
-VOICE_UPLINK        2       4   (Tx)
-VOICE_DOWNLINK      3       4   (Rx)
-VOICE_CALL          4       4   (uplink + downlink (! if supported !))
-CAMCORDER           5       7
-VOICE_RECOGNITION   6       7   (Microphone audio source tuned for voice recognition if available, behaves like DEFAULT otherwise. )
-VOICE_COMMUNICATION 7       11  (Microphone audio source tuned for voice communications such as VoIP. It will for instance take advantage of echo cancellation or automatic gain control if available. It otherwise behaves like DEFAULT if no voice processing is applied.)
-*/
-
-
-  private void audiorecorder_info_log () {
+  private void audiorecord_info_log () {
       android.media.audiofx.AutomaticGainControl agc = android.media.audiofx.AutomaticGainControl.create    (audiorecord_sessid_int);
       if (agc != null)
         com_uti.logd ("agc.isAvailable(): " + agc.isAvailable ());
@@ -1226,13 +1405,28 @@ VOICE_COMMUNICATION 7       11  (Microphone audio source tuned for voice communi
   }
 
 
+/* android.media.MediaRecorder.AudioSource :
+            Value   API Level
+DEFAULT             0       1
+MIC                 1       1
+VOICE_UPLINK        2       4   (Tx)
+VOICE_DOWNLINK      3       4   (Rx)
+VOICE_CALL          4       4   (uplink + downlink (! if supported !))
+CAMCORDER           5       7
+VOICE_RECOGNITION   6       7   (Microphone audio source tuned for voice recognition if available, behaves like DEFAULT otherwise. )
+VOICE_COMMUNICATION 7       11  (Microphone audio source tuned for voice communications such as VoIP. It will for instance take advantage of echo cancellation or automatic gain control if available. It otherwise behaves like DEFAULT if no voice processing is applied.)
+
+REMOTE
+*/
+
+
   private AudioRecord audio_record_get () {
 
-      // first entry "11" is replaced by aud_src if set, or 5 CAMCORDER
-    int [] m_mic_srcs = new int []   {11,  1, 0, 5, 10, 9, 6, 7};       // Microphone sources       MediaRecorder.AudioSource.DEFAULT ++
+      // first entry "16" is replaced by aud_src if set, or 5 CAMCORDER
+    int [] m_mic_srcs = new int []   {16,  1, 0, 5, 11, 10, 9, 6, 7};       // Microphone sources       MediaRecorder.AudioSource.DEFAULT ++
 
     boolean support_direct_sources = false;     // Disable for now; messes up switching analog and digital
-    int [] m_dir_srcs = new int []   {11, 10, 9, 5, 1,  0, 5, 6, 7};    // Direct sources           MediaRecorder.AudioSource.DEFAULT ++        !! Stock Xperia Z worked w/ 9/10, CM11 + Lollipop use 5
+    int [] m_dir_srcs = new int []   {16, 11, 10, 9, 5, 1,  0, 5, 6, 7};    // Direct sources           MediaRecorder.AudioSource.DEFAULT ++        !! Stock Xperia Z worked w/ 9/10, CM11 + Lollipop use 5
 
     int [] m_srcs = null;
 
@@ -1247,6 +1441,10 @@ VOICE_COMMUNICATION 7       11  (Microphone audio source tuned for voice communi
     else if (m_com_api.chass_plug_aud.equals ("QCV"))
       default_src = MediaRecorder.AudioSource.CAMCORDER;                // MotoG & Xperia Z lose audio (input 0's) after an hour or 2. Does this work better on some ROMs ?
 
+
+    else if (m_com_api.chass_plug_aud.equals ("XZ2") && com_uti.android_version >= VERSION_CODES.LOLLIPOP)
+      default_src = MediaRecorder.AudioSource.CAMCORDER;            // Camcorder for audio fix.
+
     m_srcs = m_mic_srcs;
 
                                                                         // Doesn't work with Xperia Z w/ AOSP, which ends up selecting 5/Camcorder because 9 & 10 don't work.
@@ -1255,10 +1453,18 @@ VOICE_COMMUNICATION 7       11  (Microphone audio source tuned for voice communi
         m_srcs = m_dir_srcs;
     }
 
+    if (com_uti.file_get ("/sdcard/spirit/dir_src")) {
+
+      //com_uti.setDeviceConnectionState (/*com_uti.DEVICE_OUT_FM*/0x100000, com_uti.DEVICE_STATE_AVAILABLE, "");
+
+      com_uti.loge ("Force direct source");
+      m_srcs = m_dir_srcs;
+    }
+
     int src = 0;
     for (int cnt_src : m_srcs) {                                        // For all sources...
       src = cnt_src;
-      if (src == 11) {                                                  // If special first entry...
+      if (src == 16) {                                                  // If special first entry...
         String audio_pseudo_source = com_uti.prefs_get (m_context, "audio_pseudo_source", "");
         if (audio_pseudo_source != null && ! audio_pseudo_source.equals ("")) {
           String arr [] = audio_pseudo_source.split (" ", 2);
@@ -1270,15 +1476,18 @@ VOICE_COMMUNICATION 7       11  (Microphone audio source tuned for voice communi
         }
       }
 
-      if (src < -1 || src > 15) {
+      if (src < -1 || (src > 15 && src != 1999) ) {
         src = default_src;
-        com_uti.logd ("From default_src final src: " + src);
+        com_uti.logd ("From default_src final src to try: " + src);
       }
       else
-        com_uti.logd ("Have final src: " + src);
+        com_uti.logd ("Have final src to try: " + src);
       try {
         AudioRecord recorder = new AudioRecord (src, m_samplerate, chan_in_get (m_channels), AudioFormat.ENCODING_PCM_16BIT, m_audio_bufsize);
-        if (recorder.getState() == AudioRecord.STATE_INITIALIZED) { // If works, then done
+        int rec_state = recorder.getState ();
+        com_uti.logd ("rec_state: " + rec_state);
+        if (rec_state == AudioRecord.STATE_INITIALIZED) {               // If works, then done, otherwise on to the next to try (Some devices throw exception, some return 0 = Not Initialize)
+          com_uti.logd ("Success with src: " + src);
           m_aud_src = src;
           return (recorder);
         }
@@ -1289,6 +1498,61 @@ VOICE_COMMUNICATION 7       11  (Microphone audio source tuned for voice communi
     }
     return (null);
   }
+
+
+  public void setInternalCapturePreset (int preset) {
+    if ((preset == 1999)//MediaRecorder.AudioSource.HOTWORD)
+                    || (preset == MediaRecorder.AudioSource.REMOTE_SUBMIX)) {
+//      mSource = preset;
+    } else {
+//      setCapturePreset(preset);
+    }
+    return;// this;
+  }
+
+/*
+    AudioFormat.Builder afb = new AudioFormat.Builder ();
+    afb.setSampleRate (m_samplerate);
+    afb.setChannelMask (chan_in_get (m_channels));
+    afb.setEncoding (AudioFormat.ENCODING_PCM_16BIT);
+    AudioFormat af = afb.build ();
+
+    AudioAttributes.Builder aab = new AudioAttributes.Builder ();
+    aab.setUsage (AudioAttributes.USAGE_MEDIA);
+    aab.setContentType (AudioAttributes.CONTENT_TYPE_MUSIC);
+    aab.setLegacyStreamType (AudioManager.STREAM_MUSIC);
+
+//aab.mSource = 12; // !!!! Reflect w/ set access !!
+
+    AudioAttributes aa = aab.build ();
+
+    AudioRecord ar = new AudioRecord (m_aud_src, m_samplerate, chan_in_get (m_channels), AudioFormat.ENCODING_PCM_16BIT, m_audio_bufsize);
+
+//    ar = new AudioRecord (aa, af, m_audio_bufsize, 1);
+    
+  }
+*/
+
+/*
+  public AudioRecord ar_new (AudioAttributes attributes, AudioFormat format, int bufferSizeInBytes, int sessionId) throws IllegalArgumentException {
+    AudioRecord ret = new AudioRecord (attributes, format, bufferSizeInBytes, sessionId);
+  }
+*/
+/*
+   public AudioRecord (int audioSource, int sampleRateInHz, int channelConfig, int audioFormat, int bufferSizeInBytes)
+    throws IllegalArgumentException {
+        this((new AudioAttributes.Builder())
+                    .setInternalCapturePreset(audioSource)
+                    .build(),
+                (new AudioFormat.Builder())
+                    .setChannelMask(getChannelMaskFromLegacyConfig(channelConfig, true))  //allow legacy configurations
+                    .setEncoding(audioFormat)
+                    .setSampleRate(sampleRateInHz)
+                    .build(),
+                bufferSizeInBytes,
+                AudioManager.AUDIO_SESSION_ID_GENERATE);
+    }
+*/
 
   private void volume_observer_register () {
     com_uti.logd ("");
@@ -1312,7 +1576,11 @@ VOICE_COMMUNICATION 7       11  (Microphone audio source tuned for voice communi
                                                                         // If analog mode,  set tuner volume as needed
                                                                         // If digital mode, set tuner volume to maximum
     cur_stream_vol = m_AM.getStreamVolume (audio_stream);
-    com_uti.logd ("cur_stream_vol: " + cur_stream_vol);
+    com_uti.logd ("cur_stream_vol: " + cur_stream_vol + "  enable_stockmode: " + enable_stockmode);
+
+    if (enable_stockmode) {
+      return (0);
+    }
 
     int tuner_vol = 65535;
     if (is_analog_audio_mode ()) {
@@ -1325,8 +1593,11 @@ VOICE_COMMUNICATION 7       11  (Microphone audio source tuned for voice communi
       audio_digital_amp = 1;                                            // Factor 1 = normal default
       m_AM.setStreamVolume (audio_stream, cur_stream_vol, 0);           // Restore volume without displaying volume change on screen (have HAL do it after audio plugin has changed volumes)
     }
-    com_uti.logd ("tuner_vol: " + tuner_vol);
-    com_uti.daemon_set ("tuner_vol", "" + tuner_vol);                   // Set in daemon
+
+    //if (! m_com_api.chass_plug_aud.equals ("QCV"))
+      com_uti.logd ("tuner_vol: " + tuner_vol);
+      com_uti.daemon_set ("tuner_vol", "" + tuner_vol);                   // Set in daemon
+    //}
 
     return (0);
   }

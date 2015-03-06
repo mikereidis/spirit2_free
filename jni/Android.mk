@@ -28,8 +28,8 @@ LOCAL_LDLIBS := -llog
 include $(BUILD_SHARED_LIBRARY)
 
 include $(CLEAR_VARS)
-LOCAL_SRC_FILES:= tnr/tnr_gen.c
-LOCAL_MODULE:= libs2t_gen
+LOCAL_SRC_FILES:= tnr/tnr_cus.c
+LOCAL_MODULE:= libs2t_cus
 LOCAL_LDLIBS := -llog
 include $(BUILD_SHARED_LIBRARY)
 

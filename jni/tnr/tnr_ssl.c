@@ -259,15 +259,6 @@
 
   int sls_status_chip_imp_pilot_sg_cnt = 0;
 
-    // RDS:
-
-//#define  SUPPORT_RDS
-#ifdef  SUPPORT_RDS
-  #include "rds_ssl.c"
-#else
-  int rds_poll (unsigned char * rds_grpd) {return (-1);}
-#endif
-
   //int sls_status_chip_imp_event_sg_cnt = 0;
 
   int seek_stop () {
@@ -284,6 +275,13 @@
 
 
     // Chip API:
+
+//#define  SUPPORT_RDS
+#ifdef  SUPPORT_RDS
+  #include "rds_ssl.c"
+#else
+  int rds_poll (unsigned char * rds_grpd) {return (EVT_GET_NONE);}
+#endif
 
   int chip_imp_event_sg (unsigned char * rds_grpd) {                    // Polling function called every event_sg_ms milliseconds. Not used remotely but could be in future.
     int ret = 0;
@@ -596,7 +594,8 @@ sys/bus/i2c/drivers/Si4709
 
     logd ("chip_imp_state_sg IOCTL Si4709_IOC_POWERUP success");
     //chip_info_log ();
-    //chip_imp_mute_sg (1);                                                       // Mute for now
+
+    chip_imp_mute_sg (1);                                               // Mute for now
 
     if (curr_rds_state) {
       ret = ioctl (dev_hndl, Si4709_IOC_RDS_ENABLE);
@@ -626,6 +625,20 @@ sys/bus/i2c/drivers/Si4709
     curr_state = 1;
     logd ("chip_imp_state_sg curr_state: %d", curr_state);
     return (curr_state);
+  }
+
+  int chip_imp_antenna_sg (int antenna) {
+    if (antenna == GET)
+      return (curr_antenna);
+/*
+    if (chip_ctrl_set (V4L2_CID_PRIVATE_IRIS_ANTENNA, antenna) < 0)     // 0 = common external, 1 = Sony Z/Z1 internal
+      loge ("chip_imp_antenna_sg ANTENNA error");
+    else
+      logd ("chip_imp_antenna_sg ANTENNA success");
+*/
+    curr_antenna = antenna;
+    logd ("chip_imp_antenna_sg curr_antenna: %d", curr_antenna);
+    return (curr_antenna);
   }
 
   int chip_imp_band_sg (int band) {
@@ -677,9 +690,9 @@ sys/bus/i2c/drivers/Si4709
     int ret = 0;
 
     int vol_ext = 0;                                                    // 0 = Default
-    if (vol_ext == 2 || file_get ("/sdcard/ssl_volext_ena"))            // If Volume Extension enabled...       GS3: IOCTL Si4709_IOC_VOLEXT error: -1 25  vol_ext: 0
+    if (vol_ext == 2 || file_get ("/sdcard/spirit/ssl_volext_ena"))            // If Volume Extension enabled...       GS3: IOCTL Si4709_IOC_VOLEXT error: -1 25  vol_ext: 0
       ret = ioctl (dev_hndl, Si4709_IOC_VOLEXT_ENB);
-    else if (vol_ext == 1 || file_get ("/sdcard/ssl_volext_dis"))       // Else if Volume Extension disabled...
+    else if (vol_ext == 1 || file_get ("/sdcard/spirit/ssl_volext_dis"))       // Else if Volume Extension disabled...
       ret = ioctl (dev_hndl, Si4709_IOC_VOLEXT_DISB);
 
     if (ret < 0)
@@ -716,19 +729,41 @@ sys/bus/i2c/drivers/Si4709
   int chip_imp_mute_sg (int mute) {
     if (mute == GET)
       return (curr_mute);
+
     int ret = 0;
+    errno = 0;
     if (mute)
       ret = ioctl (dev_hndl, Si4709_IOC_MUTE_ON);
     else
       ret = ioctl (dev_hndl, Si4709_IOC_MUTE_OFF);
     if (ret < 0)
-      loge ("chip_imp_mute_sg IOCTL Si4709_IOC_MUTE error: %d %d", ret, errno);
+      loge ("chip_imp_mute_sg IOCTL Si4709_IOC_MUTE error: %d  errno: %d (%s)", ret, errno, strerror (errno));
     else
       logd ("chip_imp_mute_sg IOCTL Si4709_IOC_MUTE success");
 
     curr_mute = mute;
     logd ("chip_imp_mute_sg curr_mute: %d", curr_mute);
     return (curr_mute);
+  }
+
+  int chip_imp_softmute_sg (int softmute) {
+    if (softmute == GET)
+      return (curr_softmute);
+
+    int ret = 0;
+    errno = 0;
+    if (softmute)
+      ret = ioctl (dev_hndl, Si4709_IOC_DSMUTE_ON);
+    else
+      ret = ioctl (dev_hndl, Si4709_IOC_DSMUTE_OFF);
+    if (ret < 0)
+      loge ("chip_imp_softmute_sg IOCTL Si4709_IOC_DSMUTE error: %d  errno: %d (%s)", ret, errno, strerror (errno));
+    else
+      logd ("chip_imp_softmute_sg IOCTL Si4709_IOC_DSMUTE success");
+
+    curr_softmute = softmute;
+    logd ("chip_imp_softmute_sg curr_softmute: %d", curr_softmute);
+    return (curr_softmute);
   }
 
   int chip_imp_stereo_sg (int stereo) {                                        //

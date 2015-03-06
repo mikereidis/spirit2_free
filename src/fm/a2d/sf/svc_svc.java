@@ -15,6 +15,7 @@ import android.graphics.BitmapFactory;
 import android.media.AudioManager;
 import android.media.MediaMetadataRetriever;
 import android.media.RemoteControlClient;
+import android.net.wifi.WifiManager;
 import android.os.Build.VERSION_CODES;
 import android.os.Bundle;
 import android.os.IBinder;
@@ -91,8 +92,8 @@ public class svc_svc extends Service implements svc_tcb, svc_acb {  // Service c
           com_uti.logd ("m_com_api: " + m_com_api);
       }
 
-      m_com_api.chass_plug_aud = com_uti.chass_plug_aud_get (m_context);// Setup Tuner Plugin, and Audio Plugin
-      m_com_api.chass_plug_tnr = com_uti.chass_plug_tnr;
+      m_com_api.chass_plug_aud = com_uti.chass_plug_aud_get (m_context);// Setup Audio Plugin
+      m_com_api.chass_plug_tnr = com_uti.chass_plug_tnr_get (m_context);// Setup Tuner Plugin
 
       //com_uti.strict_mode_set (true);                                 // Enable strict mode; disabled for now
       com_uti.strict_mode_set (false);                                  // !!!! Disable strict mode so we can send network packets from Java
@@ -238,8 +239,12 @@ public class svc_svc extends Service implements svc_tcb, svc_acb {  // Service c
 
 
 // audio_android_smo    // ?? setMode == setPhoneState ???
-    if (! (val = extras.getString ("audio_android_smo", "")).equals (""))
+    if (! (val = extras.getString ("audio_android_smo", "")).equals ("")) {
       m_AM.setMode (com_uti.int_get (val));
+      com_uti.logd ("com_uti.setMode: " + m_AM.getMode ());
+    }
+    if (! (val = extras.getString ("audio_android_gmo", "")).equals (""))
+      com_uti.logd ("com_uti.getMode: " + m_AM.getMode ());
 
 // audio_android_sso
     if (! (val = extras.getString ("audio_android_sso", "")).equals ("")) {
@@ -257,29 +262,72 @@ public class svc_svc extends Service implements svc_tcb, svc_acb {  // Service c
     if (! (val = extras.getString ("audio_android_gpa", "")).equals (""))
       com_uti.logd ("m_AM.getParameters (): " + m_AM.getParameters (val));
 
+// audio_android_gfc
+    if (! (val = extras.getString ("audio_android_gfc", "")).equals (""))
+      com_uti.logd ("com_uti.getForceUse (FOR_COMMUNICATION): " + com_uti.getForceUse (com_uti.FOR_COMMUNICATION));
+// audio_android_gfm
+    if (! (val = extras.getString ("audio_android_gfm", "")).equals (""))
+      com_uti.logd ("com_uti.getForceUse (FOR_MEDIA): "         + com_uti.getForceUse (com_uti.FOR_MEDIA));
+// audio_android_gfr
+    if (! (val = extras.getString ("audio_android_gfr", "")).equals (""))
+      com_uti.logd ("com_uti.getForceUse (FOR_RECORD): "        + com_uti.getForceUse (com_uti.FOR_RECORD));
+// audio_android_gfd
+    if (! (val = extras.getString ("audio_android_gfd", "")).equals (""))
+      com_uti.logd ("com_uti.getForceUse (FOR_DOCK): "          + com_uti.getForceUse (com_uti.FOR_DOCK));
+// audio_android_gfs
+    if (! (val = extras.getString ("audio_android_gfs", "")).equals (""))
+      com_uti.logd ("com_uti.getForceUse (FOR_SYSTEM): "        + com_uti.getForceUse (com_uti.FOR_SYSTEM));
+// audio_android_gfh
+    if (! (val = extras.getString ("audio_android_gfh", "")).equals (""))
+      com_uti.logd ("com_uti.getForceUse (FOR_HDMI): "          + com_uti.getForceUse (com_uti.FOR_HDMI_SYSTEM_AUDIO));
+
 // audio_android_sfc
     if (! (val = extras.getString ("audio_android_sfc", "")).equals (""))
-      com_uti.logd ("com_uti.setForceUse (FOR_COMMUNICATION): " + com_uti.setForceUse (com_uti.FOR_COMMUNICATION, com_uti.int_get (val)));
+      com_uti.logd ("com_uti.setForceUse (FOR_COMMUNICATION): " + com_uti.setForceUse (com_uti.FOR_COMMUNICATION,       com_uti.int_get (val)));
 // audio_android_sfm
     if (! (val = extras.getString ("audio_android_sfm", "")).equals (""))
-      com_uti.logd ("com_uti.setForceUse (FOR_MEDIA): "         + com_uti.setForceUse (com_uti.FOR_MEDIA,         com_uti.int_get (val)));
+      com_uti.logd ("com_uti.setForceUse (FOR_MEDIA): "         + com_uti.setForceUse (com_uti.FOR_MEDIA,               com_uti.int_get (val)));
 // audio_android_sfr
     if (! (val = extras.getString ("audio_android_sfr", "")).equals (""))
-      com_uti.logd ("com_uti.setForceUse (FOR_RECORD): "        + com_uti.setForceUse (com_uti.FOR_RECORD,        com_uti.int_get (val)));
+      com_uti.logd ("com_uti.setForceUse (FOR_RECORD): "        + com_uti.setForceUse (com_uti.FOR_RECORD,              com_uti.int_get (val)));
 // audio_android_sfd
     if (! (val = extras.getString ("audio_android_sfd", "")).equals (""))
-      com_uti.logd ("com_uti.setForceUse (FOR_DOCK): "          + com_uti.setForceUse (com_uti.FOR_DOCK,          com_uti.int_get (val)));
+      com_uti.logd ("com_uti.setForceUse (FOR_DOCK): "          + com_uti.setForceUse (com_uti.FOR_DOCK,                com_uti.int_get (val)));
+// audio_android_sfs
+    if (! (val = extras.getString ("audio_android_sfs", "")).equals (""))
+      com_uti.logd ("com_uti.setForceUse (FOR_SYSTEM): "        + com_uti.setForceUse (com_uti.FOR_SYSTEM,              com_uti.int_get (val)));
+// audio_android_sfh
+    if (! (val = extras.getString ("audio_android_sfh", "")).equals (""))
+      com_uti.logd ("com_uti.setForceUse (FOR_HDMI): "          + com_uti.setForceUse (com_uti.FOR_HDMI_SYSTEM_AUDIO,   com_uti.int_get (val)));
 
 
-// audio_android_gdc
-    if (! (val = extras.getString ("audio_android_gdc", "")).equals (""))
-      com_uti.logd ("com_uti.getDeviceConnectionState (): " + com_uti.getDeviceConnectionState (com_uti.int_get (val), ""));
-// audio_android_sdu
-    if (! (val = extras.getString ("audio_android_sdu", "")).equals (""))
-      com_uti.logd ("com_uti.setDeviceConnectionState (UNAVAILABLE): " + com_uti.setDeviceConnectionState (com_uti.int_get (val), com_uti.DEVICE_STATE_UNAVAILABLE, ""));
-// audio_android_sda
-    if (! (val = extras.getString ("audio_android_sda", "")).equals (""))
-      com_uti.logd ("com_uti.setDeviceConnectionState (AVAILABLE): " + com_uti.setDeviceConnectionState (com_uti.int_get (val), com_uti.DEVICE_STATE_AVAILABLE, ""));
+// audio_android_gdco
+    if (! (val = extras.getString ("audio_android_gdco", "")).equals (""))
+      com_uti.logd ("output com_uti.getDeviceConnectionState (): " + com_uti.getDeviceConnectionState (com_uti.int_get (val), ""));
+// audio_android_gdci
+    if (! (val = extras.getString ("audio_android_gdci", "")).equals (""))
+      com_uti.logd ("input com_uti.getDeviceConnectionState (): " + com_uti.getDeviceConnectionState (com_uti.int_get (val), ""));
+// audio_android_argo
+    if (! (val = extras.getString ("audio_android_argo", "")).equals (""))
+      com_uti.logd ("output com_uti.output_audio_routing_get (): " + com_uti.output_audio_routing_get ());
+// audio_android_argi
+    if (! (val = extras.getString ("audio_android_argi", "")).equals (""))
+      com_uti.logd ("input com_uti.output_audio_routing_get (): " + com_uti.input_audio_routing_get ());
+
+
+
+// audio_android_sduo
+    if (! (val = extras.getString ("audio_android_sduo", "")).equals (""))
+      com_uti.logd ("output com_uti.setDeviceConnectionState (UNAVAILABLE): " + com_uti.setDeviceConnectionState (com_uti.int_get (val), com_uti.DEVICE_STATE_UNAVAILABLE, ""));
+// audio_android_sdao
+    if (! (val = extras.getString ("audio_android_sdao", "")).equals (""))
+      com_uti.logd ("output com_uti.setDeviceConnectionState (AVAILABLE): " + com_uti.setDeviceConnectionState (com_uti.int_get (val), com_uti.DEVICE_STATE_AVAILABLE, ""));
+// audio_android_sdui
+    if (! (val = extras.getString ("audio_android_sdui", "")).equals (""))
+      com_uti.logd ("input com_uti.setDeviceConnectionState (UNAVAILABLE): " + com_uti.setDeviceConnectionState (com_uti.int_get (val) | 0x80000000, com_uti.DEVICE_STATE_UNAVAILABLE, ""));
+// audio_android_sdai
+    if (! (val = extras.getString ("audio_android_sdai", "")).equals (""))
+      com_uti.logd ("input com_uti.setDeviceConnectionState (AVAILABLE): " + com_uti.setDeviceConnectionState (com_uti.int_get (val) | 0x80000000, com_uti.DEVICE_STATE_AVAILABLE, ""));
 
 
 
@@ -313,7 +361,7 @@ public class svc_svc extends Service implements svc_tcb, svc_acb {  // Service c
     else {
     }
 
-    // Tuner:
+// Tuner:
     val = extras.getString ("tuner_state", "");
     if (! val.equals (""))
       tuner_state_set (val);
@@ -351,24 +399,24 @@ public class svc_svc extends Service implements svc_tcb, svc_acb {  // Service c
       tuner_rds_af_state_set (val);
     }
 
-    val = extras.getString ("tuner_vol", "");
-    if (! val.equals (""))
-      com_uti.daemon_set ("tuner_vol", val);
+
+// These are just passed directly to the daemon:
+    com_uti.extras_daemon_set ("tuner_vol",   extras);
+    com_uti.extras_daemon_set ("tuner_acdb",   extras);
+    com_uti.extras_daemon_set ("tuner_softmute", extras);
+    com_uti.extras_daemon_set ("tuner_antenna", extras);
 
     com_uti.extras_daemon_set ("tuner_rds_pi", extras);
     com_uti.extras_daemon_set ("tuner_rds_pt", extras);
     com_uti.extras_daemon_set ("tuner_rds_ps", extras);
     com_uti.extras_daemon_set ("tuner_rds_rt", extras);
 
-    com_uti.extras_daemon_set ("tuner_acdb",   extras);
+    //Disable Plugin changing to ensure problems don't happen while FM running
+//    com_uti.extras_daemon_set ("chass_plug_aud", extras);
+//    com_uti.extras_daemon_set ("chass_plug_tnr", extras);
 
-    com_uti.extras_daemon_set ("tuner_softmute", extras);
-    com_uti.extras_daemon_set ("tuner_antenna", extras);
 
-    com_uti.extras_daemon_set ("chass_plug_aud", extras);
-    com_uti.extras_daemon_set ("chass_plug_tnr", extras);
-
-    // Audio:
+// Audio:
     val = extras.getString ("audio_mode", "");
     if (! val.equals ("")) {
       m_svc_aap.audio_mode_set (val);
@@ -651,6 +699,8 @@ public class svc_svc extends Service implements svc_tcb, svc_acb {  // Service c
 
     if (new_audio_state.equals ("Start")) {                   // If new audio state = Start...
 //      service_update_send ();                                           // Update GUI/Widget/Remote/Notification with latest data
+
+      com_uti.daemon_set ("tuner_mute", "Unmute");                      // Finally unmute tuner audio now that audio start has completed (!! ensure digital output does not require unmute earlier !)
     }
     else if (new_audio_state.equals ("Stop")) {               // Else if new audio state = Stop...
 //      service_update_send ();                                           // Update GUI/Widget/Remote/Notification with latest data
@@ -699,6 +749,29 @@ public class svc_svc extends Service implements svc_tcb, svc_acb {  // Service c
   }
 
 
+  private void wifi_hack () {
+
+    if (com_uti.android_version <  VERSION_CODES.LOLLIPOP)
+      return;
+
+    if (! m_com_api.chass_plug_aud.equals ("LG2"))
+      return;
+
+    WifiManager wifiManager = (WifiManager) this.getSystemService(Context.WIFI_SERVICE); 
+    if (wifiManager.isWifiEnabled ()) {
+      com_uti.logd ("Wifi IS on");
+      wifiManager.setWifiEnabled (false);
+      com_uti.logd ("wifiManager.isWifiEnabled (): " + wifiManager.isWifiEnabled ());
+//      com_uti.ms_sleep (1000);
+//      com_uti.loge ("wifiManager.isWifiEnabled (): " + wifiManager.isWifiEnabled ());
+      wifiManager.setWifiEnabled (true);
+      com_uti.logd ("wifiManager.isWifiEnabled (): " + wifiManager.isWifiEnabled ());
+    }
+    else {
+      com_uti.logd ("Wifi not on");
+    }
+  }
+
     // Tuner State callback called only by cb_tuner_key ("tuner_state") which is called for tuner_state only by:
         // svc_tnr:tuner_state_set()        Start, Stop
         // svc_tnr:poll_tmr_hndlr:run()     Start, Stop from daemon (still disabled)
@@ -713,6 +786,7 @@ public class svc_svc extends Service implements svc_tcb, svc_acb {  // Service c
         need_audio_start_after_tuner_start = false;
         m_svc_aap.audio_state_set ("Start");                            // Set Audio State synchronously
       }
+wifi_hack ();
       return;
     }
     else if (new_tuner_state.equals ("Stop")) {               // Else if tuner state is Stop...

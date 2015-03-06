@@ -30,6 +30,7 @@
   int curr_mode         = 0;                                            // 0 = Receive, 1 = Transmit
   int curr_state        = 0;
 
+  int curr_antenna      = 0;                                            // 0 = Default External/Wired headset antenna, 1 = Internal for many Sony Xperia Z/Z1 class Qualcomm chips
   int curr_band         = 0;                                            // 0 = EU
 
   int curr_freq_int     =  88500;
@@ -40,6 +41,7 @@
   int curr_vol          = 7;
   int curr_thresh       = 0;
   int curr_mute         = 0;
+  int curr_softmute     = 1;                                            // 1 for default SoftMute or RF Mute, which lowers audio volume when signal is weak. 0 to disable to listen to weak signals.
 
   int curr_stereo       = 0;
 
@@ -48,9 +50,8 @@
   int curr_rds_af_state = 0;                                            // 0 = Disabled, 1 = Manual, 2 = RDS, 3 = Allow Regional  !! > 1 means need RDS so leave on even if screen off
 
   int curr_rssi         = -7;
-  int curr_pilot          = 0;                                            // 0 = Mono, 1 = Stereo: read only indication of pilot 19 KHz / stereo
+  int curr_pilot        = 0  ;                                          // 0 = Mono, 1 = Stereo: read only indication of pilot 19 KHz / stereo
 
-  int curr_antenna = 0;                                                 // 0 = Default External/Wired headset antenna, 1 = Rare Sony Internal for Qualcomm chips
 
     // RDS Values: Current (under construction), Candidate (complete, but must be repeated before confirmed), Confirmed (Displayable, with few if any visual/logical defects.)
 
@@ -422,12 +423,14 @@
     chip_imp_mode_sg,                                                    // 0 / 1 = Receive      / Transmit
     chip_imp_state_sg,                                                   // 0 / 1 = Stop         / Start
 
+    chip_imp_antenna_sg,                                                 // 0 / 1 = External     / Internal
     chip_imp_band_sg,                                                    // 0 / 1 = EU           / US
     chip_imp_freq_sg,                                                    // 65/76/87.5 - 108,..., 65000/76000/87500 - 108000
     chip_imp_vol_sg,                                                     // 0 - 65535
     chip_imp_thresh_sg,                                                  // 0 - ?
 
     chip_imp_mute_sg,                                                    // 0 / 1 = Unmute       / Mute
+    chip_imp_softmute_sg,                                                // 0 / 1 = SoftMute dis / SoftMute enable
     chip_imp_stereo_sg,                                                  // 0 / 1 = Mono         / Stereo    (Stereo request)
     chip_imp_seek_state_sg,                                              // 0 / 1 / 2 = Stop, Up, Down
     chip_imp_rds_state_sg,                                               // 0 / 1 = Stop         / Start

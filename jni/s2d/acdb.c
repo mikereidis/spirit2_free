@@ -1,7 +1,17 @@
 
-//#define ACDB_STUFF
+    // Audio calibration related functions
+
+#define ACDB_STUFF
 #ifdef  ACDB_STUFF
-/* Audio calibration related functions */
+
+
+//"/system/etc/audio_platform_info.xml"
+
+
+
+
+
+
 typedef void (*acdb_deallocate_t)();
 typedef int  (*acdb_init_t)();
 typedef void (*acdb_send_audio_cal_t)(int, int);
@@ -24,7 +34,7 @@ acdb_loader_get_calibration_t acdb_loader_get_calibration;
     #define AUDIO_IOCTL_MAGIC 'a'
     #define AUDIO_DEREGISTER_PMEM _IOW(AUDIO_IOCTL_MAGIC, 16, unsigned)
 
-  int acdb_disable_init () {
+  int acdb_set_init () {
     acdb_handle = dlopen (LIB_ACDB_LOADER, RTLD_NOW);
     if (acdb_handle == NULL) {
       loge ("%s: DLOPEN failed for %s", __func__, LIB_ACDB_LOADER);
@@ -58,22 +68,23 @@ acdb_loader_get_calibration_t acdb_loader_get_calibration;
   }
 
 
-  char * acdb_disable_flag = "/dev/msm_acdb_s2";
+  char * acdb_set_flag = "/dev/msm_acdb_s2";
 
-  int acdb_disable () {
-    if (file_get (acdb_disable_flag)) {
+  int acdb_set (int acdb_id) {
+/*
+    if (file_get (acdb_set_flag)) {
       loge ("!!!!!!!!!!!!!!!!!!! Already disabled");
       return (-1);
     }
 
     //sys_run ("touch /dev/msm_acdb_s2");
-    file_write (acdb_disable_flag, "", 0, O_CREAT | O_RDWR);                   // Signal acdb disabled
+    file_write (acdb_set_flag, "", 0, O_CREAT | O_RDWR);                   // Signal acdb disabled
 
     if (android_version < 21) {                                   // For pre-Lollipop
       loge ("!!!!!!!!!!!!!!!!!!! android_version: %d", android_version);
       return (-1);
     }
-
+*/
     if (! file_get ("/dev/msm_acdb")) {
       loge ("!!!!!!!!!!!!!!!!!!! No /dev/msm_acdb");
       return (-1);
@@ -83,13 +94,14 @@ acdb_loader_get_calibration_t acdb_loader_get_calibration;
       loge ("!!!!!!!!!!!!!!!!!!! No /system/vendor/lib/libacdbloader.so & No /system/lib/libacdbloader.so");
       return (-1);
     }
-
+/*
     if (! file_get ("/system/etc/acdbdata/MTP/MTP_General_cal.acdb")) {
       loge ("!!!!!!!!!!!!!!!!!!! No /system/etc/acdbdata/MTP/MTP_General_cal.acdb");
       return (-1);
     }
+*/
 
-    acdb_disable_init ();   // Get function pointers
+    acdb_set_init ();   // Get function pointers
 
 //ms_sleep (1000);
     int ret = 0;
@@ -101,25 +113,26 @@ acdb_loader_get_calibration_t acdb_loader_get_calibration;
     else
       loge ("acdb_init == NULL !!!!!!!!!!!!!!!!!!!!!!1");
 
-//ms_sleep (1000);
-/*
+ms_sleep (1000);
+///*
 //ms_sleep (700);
 #define ACDB_DEV_TYPE_OUT 1
 #define ACDB_DEV_TYPE_IN 2
 
-    int acdb_dev_id     = 0;//acdb_device_table [snd_device];       [SND_DEVICE_IN_HANDSET_MIC] = 4,        [SND_DEVICE_IN_CAPTURE_FM] = 0,
+    int acdb_dev_id     = acdb_id;//0;//acdb_device_table [snd_device];       [SND_DEVICE_IN_HANDSET_MIC] = 4,        [SND_DEVICE_IN_CAPTURE_FM] = 0,
     int acdb_dev_type   = ACDB_DEV_TYPE_IN;
+    //int snd_device = 47;
 
     if (acdb_send_audio_cal != NULL) {
-      logd ("about to call acdb_send_audio_cal");
+      logd ("about to call acdb_send_audio_cal acdb_id: %d", acdb_id);
       acdb_send_audio_cal (acdb_dev_id, acdb_dev_type);
       logd ("acdb_send_audio_cal done");
     }
     else
       loge ("acdb_send_audio_cal == NULL !!!!!!!!!!!!!!!!!!!!!!1");
 
-ms_sleep (1000);
-*/
+ms_sleep (2000);
+//*/
 /*
     if (acdb_deallocate != NULL) {
       logd ("about to call acdb_deallocate");
@@ -131,6 +144,8 @@ ms_sleep (1000);
 
 ms_sleep (1000);
 */
+
+/*
 if (0) {
     acdb_loader_get_calibration = (acdb_loader_get_calibration_t)
           dlsym(acdb_handle, "acdb_loader_get_calibration");
@@ -140,9 +155,11 @@ if (0) {
            dlerror());
         return;
     }
+
     if (send_codec_cal(acdb_loader_get_calibration, acdb_handle) < 0)
         loge ("%s: Could not send anc cal", __FUNCTION__);
 }
+*/
 
 /*
       int fd = open ("/dev/msm_acdb", O_RDWR);
@@ -167,6 +184,40 @@ if (0) {
       else
         loge ("Ioctl success");
       close (fd);
+
+
+#define AUDIO_MAX_COMMON_IOCTL_NUM      100
+
+a strace -f -e ioctl -t -p 282 | grep "ioctl(19"
+
+[pid   886] 19:38:41 ioctl(19, 0x40046171, 0xb41ffa5c) = 0     13   AUDIO_SET_ADM_RX_TOPOLOGY       Int32
+[pid   886] 19:38:41 ioctl(19, 0x40046167, 0xb41ffa60) = 0      3   AUDIO_SET_AUDPROC_RX_CAL        SamePtr2       ENI_SETMULT
+[pid   886] 19:38:41 ioctl(19, 0x40046169, 0xb41ffa60) = 0      5   AUDIO_SET_AUDPROC_RX_VOL_CAL    SamePtr2
+[pid   886] 19:38:41 ioctl(19, 0x40046175, 0xb41ffa18) = 0     11   AUDIO_SET_VOICE_RX_TOPOLOGY     Ptr3
+
+[pid 14260] 19:38:42 ioctl(19, 0x40046172, 0xa49f1ac4) = 0     14   AUDIO_SET_ADM_TX_TOPOLOGY       Int32
+[pid 14260] 19:38:42 ioctl(19, 0x4004616a, 0xa49f1ac8) = 0      6   AUDIO_SET_AUDPROC_TX_CAL        SamePtr5
+[pid 14260] 19:38:42 ioctl(19, 0x4004616c, 0xa49f1ac8) = 0      8   AUDIO_SET_AUDPROC_TX_VOL_CAL    SamePtr5
+[pid 14260] 19:38:42 ioctl(19, 0x40046174, 0xa49f1a80) = 0     16   AUDIO_SET_AFE_TX_CAL            Ptr6
+
+
+
+strace -f -e ioctl -t -p 282 2 > &1 | grep "ioctl(19"
+
+                                                                    b4003000-b4100000 rw-p 00000000 00:00 0          [stack:886]
+[pid   886] 23:46:02 ioctl(19, 0x40046171, 0xb40ffa5c) = 0
+[pid   886] 23:46:02 ioctl(19, ENI_SETMULT, 0xb40ffa60) = 0
+[pid   886] 23:46:02 ioctl(19, 0x40046169, 0xb40ffa60) = 0
+[pid   886] 23:46:02 ioctl(19, 0x40046175, 0xb40ffa18) = 0
+
+                                                                    a587f000-a597c000 rw-p 00000000 00:00 0          [stack:6187]
+
+[pid  6187] 23:46:03 ioctl(19, 0x40046172, 0xa597bac4) = 0      2000
+[pid  6187] 23:46:03 ioctl(19, 0x4004616a, 0xa597bac8) = 0      2, b6efbf9c     > 1, 10
+[pid  6187] 23:46:03 ioctl(19, 0x4004616c, 0xa597bac8) = 0
+[pid  6187] 23:46:03 ioctl(19, 0x40046174, 0xa597ba80) = 0      a9b5b0f0    ->  
+
+
 */
     return (0);
   }

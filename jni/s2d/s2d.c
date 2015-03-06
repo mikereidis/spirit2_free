@@ -52,47 +52,45 @@
 //int curr_audio_state_int = 0;
                                                                         // Simpler to use integer forms of variables
     // Chassis: 2 only
-  #define PLUG_AUD_UNK_STR           "-1";
-  char  curr_chass_plug_aud        [16]= "UNK";
-int curr_chass_plug_aud_int = PLUG_AUD_UNK;                                // Should make this available to plugins !! tnr_bch needs and qcv antenna ??
+  char  curr_chass_plug_aud     [16]= "UNK";
+  int   curr_chass_plug_aud_int     = PLUG_AUD_UNK;                           // Should make this available to plugins !! tnr_bch needs and qcv antenna ??
 
-  char  curr_chass_plug_tnr        [16]= "UNK";
-int curr_chass_plug_tnr_int = PLUG_AUD_UNK;
+  char  curr_chass_plug_tnr     [16]= "UNK";
 
 
     // Tuner Integer forms of variables:
 
-int   curr_tuner_api_mode_int = 0;
-int   curr_tuner_api_state_int = 0;
-int   curr_tuner_mode_int = 0;
-int   curr_tuner_state_int = 0;
+  int   curr_tuner_api_mode_int     = 0;
+  int   curr_tuner_api_state_int    = 0;
+  int   curr_tuner_mode_int         = 0;
+  int   curr_tuner_state_int        = 0;
 
-int   curr_tuner_band_int     =  0;
+  int   curr_tuner_antenna_int      = 0;
+  int   curr_tuner_band_int         =  0;
 
   int   curr_tuner_freq_int         = -7;
 
-int   curr_tuner_freq_lo_int     =  87500;
-int   curr_tuner_freq_hi_int     = 108000;
-//emph75
-//rbds
-    int   curr_tuner_freq_inc_int     = 100;                              // EU frequency increment = 100 KHz
+  int   curr_tuner_freq_lo_int      =  87500;
+  int   curr_tuner_freq_hi_int      = 108000;
+  //emph75
+  //rbds
+  int   curr_tuner_freq_inc_int     = 100;                              // EU frequency increment = 100 KHz
 
-  int   curr_tuner_vol_int         = -7;
+  int   curr_tuner_vol_int          = -7;
 
-int   curr_tuner_thresh_int        = -7;
-int   curr_tuner_mute_int          = -7;
-int   curr_tuner_stereo_int        = -7;
-int   curr_tuner_seek_state_int    = -7;
-int   curr_tuner_rds_state_int     = -7;
-int   curr_tuner_rds_af_state_int  = -7;
+  int   curr_tuner_thresh_int       = -7;
+  int   curr_tuner_mute_int         = -7;
+  int   curr_tuner_softmute_int     = -7;
+  int   curr_tuner_stereo_int       = -7;
+  int   curr_tuner_seek_state_int   = -7;
+  int   curr_tuner_rds_state_int    = -7;
+  int   curr_tuner_rds_af_state_int = -7;
 
-  int   curr_tuner_rssi_int        = -7;
-  int   curr_tuner_pilot_int       = 0;
+  int   curr_tuner_rssi_int         = -7;
+  int   curr_tuner_pilot_int        = 0;
 
-int   curr_tuner_antenna_int       = 0;
-
-  int   curr_tuner_rds_pi_int      = -7;
-  int   curr_tuner_rds_pt_int      = -7;
+  int   curr_tuner_rds_pi_int       = -7;
+  int   curr_tuner_rds_pt_int       = -7;
 
     // Tuner String forms of variables:
   char  curr_tuner_api_mode     [16]= "UART";                           // 0 = UART / 1 = SHIM
@@ -100,12 +98,14 @@ int   curr_tuner_antenna_int       = 0;
   char  curr_tuner_mode         [16]= "Receive";
   char  curr_tuner_state        [16]= "Stop";
 
+  char  curr_tuner_antenna      [16]= "External";
   char  curr_tuner_band         [16]= "EU";
 
   char  curr_tuner_freq         [16]= "0";//"107900";
   char  curr_tuner_vol          [16]= "65535";
   char  curr_tuner_thresh       [16]= "0";
-char  curr_tuner_mute       [16]= "Mute";
+  char  curr_tuner_mute         [16]= "Mute";
+  char  curr_tuner_softmute     [16]= "Enable";
   char  curr_tuner_stereo       [16]= "Mono";
 
   char  curr_tuner_seek_state   [16]= "Stop";                           // 0 = Stop, 1 = Up, 2 = Down
@@ -116,118 +116,11 @@ char  curr_tuner_mute       [16]= "Mute";
   char  curr_tuner_pilot        [16]= "0";
   char  curr_tuner_extension    [16]= "0";
 
-char  curr_tuner_antenna        [16]= "External";
-
-
   char  curr_tuner_rds_pi       [16]= "0";//"";
   char  curr_tuner_rds_pt       [16]= "0";//"-";
   char  curr_tuner_rds_ps       [16]= "";//-7";//"-";
   char  curr_tuner_rds_rt       [96]= "";//-7";//"-";
 
-
-/*
-  char * chass_plug_aud_get (int device) {
-    switch (device) {
-      case PLUG_AUD_UNK: return ("UNK");
-      case PLUG_AUD_GEN: return ("GEN");
-      case PLUG_AUD_GS1: return ("GS1");
-      case PLUG_AUD_GS2: return ("GS2");
-      case PLUG_AUD_GS3: return ("GS3");
-      case PLUG_AUD_QCV: return ("QCV");
-      case PLUG_AUD_OM7: return ("OM7");
-      case PLUG_AUD_LG2: return ("LG2");
-      case PLUG_AUD_XZ2: return ("XZ2");
-    }
-    return ("UNK");
-  }
-  char * chass_plug_tnr_get (int aud) {                                 // Get Tuner Plugin string from Audio Plugin integer
-    switch (aud) {
-      case PLUG_AUD_GS1: return ("SSL");
-      case PLUG_AUD_GS2: return ("SSL");
-      case PLUG_AUD_GS3: return ("SSL");
-      case PLUG_AUD_QCV: return ("QCV");
-      case PLUG_AUD_OM7: return ("BCH");
-      case PLUG_AUD_LG2: return ("BCH");
-      case PLUG_AUD_XZ2: return ("BCH");
-      case PLUG_AUD_UNK: return ("UNK");
-      case PLUG_AUD_GEN: return ("UNK");
-    }
-    return ("UNK");
-  }
-*/
-/*
-
-Set Audio Plugin:
-    Set Audio Plugin string     from Audio Plugin string    =
-    Set Audio Plugin integer    from Audio Plugin string    chass_plug_aud_int_get (char * aud)
-    Set Tuner Plugin string     from Audio Plugin string    chass_plug_tnr_get (char * aud)
-    Set Tuner Plugin integer    from Audio Plugin string    chass_plug_tnr_int_get (char * aud)
-
-Set Tuner Plugin:       LATER !!
-    Set Tuner Plugin string     from Tuner Plugin string    =
-    Set Tuner Plugin integer    from Tuner Plugin string    chass_plug_tnr_int_get_tnr (char * tnr)
-
-*/
-  int chass_plug_aud_int_get (char * aud) {                             // Get Audio Plugin integer from Audio Plugin string
-    if (! strcmp (aud, "UNK")) return (PLUG_AUD_UNK);
-    if (! strcmp (aud, "GEN")) return (PLUG_AUD_UNK);
-    if (! strcmp (aud, "GS1")) return (PLUG_AUD_GS1);
-    if (! strcmp (aud, "GS2")) return (PLUG_AUD_GS2);
-    if (! strcmp (aud, "GS3")) return (PLUG_AUD_GS3);
-    if (! strcmp (aud, "QCV")) return (PLUG_AUD_QCV);
-    if (! strcmp (aud, "OM7")) return (PLUG_AUD_OM7);
-    if (! strcmp (aud, "LG2")) return (PLUG_AUD_LG2);
-    if (! strcmp (aud, "XZ2")) return (PLUG_AUD_XZ2);
-    return (PLUG_TNR_UNK);
-  }
-
-  int chass_plug_tnr_int_get (char * aud) {                             // Get Tuner Plugin integer from Audio Plugin string
-    if (! strcmp (aud, "UNK")) return (PLUG_TNR_UNK);
-    if (! strcmp (aud, "GEN")) return (PLUG_TNR_GEN);
-    if (! strcmp (aud, "GS1")) return (PLUG_TNR_SSL);
-    if (! strcmp (aud, "GS2")) return (PLUG_TNR_SSL);
-    if (! strcmp (aud, "GS3")) return (PLUG_TNR_SSL);
-    if (! strcmp (aud, "QCV")) return (PLUG_TNR_QCV);
-    if (! strcmp (aud, "OM7")) return (PLUG_TNR_BCH);
-    if (! strcmp (aud, "LG2")) return (PLUG_TNR_BCH);
-    if (! strcmp (aud, "XZ2")) return (PLUG_TNR_BCH);
-    return (PLUG_TNR_UNK);
-  }
-
-  char * chass_plug_tnr_get (char * aud) {                              // Get Tuner Plugin string from Audio Plugin string
-    if (! strcmp (aud, "UNK")) return ("UNK");
-    if (! strcmp (aud, "GEN")) return ("GEN");
-    if (! strcmp (aud, "GS1")) return ("SSL");
-    if (! strcmp (aud, "GS2")) return ("SSL");
-    if (! strcmp (aud, "GS3")) return ("SSL");
-    if (! strcmp (aud, "QCV")) return ("QCV");
-    if (! strcmp (aud, "OM7")) return ("BCH");
-    if (! strcmp (aud, "LG2")) return ("BCH");
-    if (! strcmp (aud, "XZ2")) return ("BCH");
-    return ("UNK");
-  }
-
-  int tuner_plugin_libname_get (char * tnr, char * lib_name, size_t max_size) {
-
-    strlcpy (lib_name, "/data/data/fm.a2d.sf/lib/libs2t_", max_size);
-    strlcat (lib_name, tnr, max_size);
-    strlcat (lib_name, ".so", max_size);
-    lower_set (lib_name);
-    return (0);
-/*
-    switch (chass_plug_aud) {
-      case PLUG_AUD_GEN: strlcpy (lib_name, "/data/data/fm.a2d.sf/lib/libs2t_gen.so", max_size);   return (chass_plug_aud);
-      case PLUG_AUD_GS1: strlcpy (lib_name, "/data/data/fm.a2d.sf/lib/libs2t_ssl.so", max_size);   return (chass_plug_aud);
-      case PLUG_AUD_GS2: strlcpy (lib_name, "/data/data/fm.a2d.sf/lib/libs2t_ssl.so", max_size);   return (chass_plug_aud);
-      case PLUG_AUD_GS3: strlcpy (lib_name, "/data/data/fm.a2d.sf/lib/libs2t_ssl.so", max_size);   return (chass_plug_aud);
-      case PLUG_AUD_QCV: strlcpy (lib_name, "/data/data/fm.a2d.sf/lib/libs2t_qcv.so", max_size);   return (chass_plug_aud);
-      case PLUG_AUD_OM7: strlcpy (lib_name, "/data/data/fm.a2d.sf/lib/libs2t_bch.so", max_size);   return (chass_plug_aud);
-      case PLUG_AUD_LG2: strlcpy (lib_name, "/data/data/fm.a2d.sf/lib/libs2t_bch.so", max_size);   return (chass_plug_aud);
-      case PLUG_AUD_XZ2: strlcpy (lib_name, "/data/data/fm.a2d.sf/lib/libs2t_bch.so", max_size);   return (chass_plug_aud);
-    }
-    return (PLUG_AUD_UNK);
-*/
-  }
 
 
     // Plugin data:
@@ -244,28 +137,12 @@ Set Tuner Plugin:       LATER !!
 
 
     // First order of business is to determine the device we are running on, and set up appropriate plugins.
-/*
-  int chass_plug_tnr_set (int chass_plug_tnr) {
-    return (curr_chass_plug_tnr_int);
-  }
-*/
 
-  char * chass_plug_aud_set (char * aud) {
+  char * chass_plug_tnr_set (char * tnr) {
+    strcpy (curr_chass_plug_tnr, "UNK");                                // Default if error
 
-/*Set Audio Plugin:
-    Set Audio Plugin string     from Audio Plugin string    =
-    Set Audio Plugin integer    from Audio Plugin string    chass_plug_aud_int_get  (char * aud)
-    Set Tuner Plugin string     from Audio Plugin string    chass_plug_tnr_get      (char * aud)
-    Set Tuner Plugin integer    from Audio Plugin string    chass_plug_tnr_int_get  (char * aud)*/
-
-    strcpy (curr_chass_plug_aud, aud);
-    curr_chass_plug_aud_int = chass_plug_aud_int_get (aud);
-
-    strcpy (curr_chass_plug_tnr, chass_plug_tnr_get (aud));
-    curr_chass_plug_tnr_int = chass_plug_tnr_int_get (aud);
-
-    if (curr_chass_plug_aud_int <= PLUG_AUD_UNK) {
-      if (tnr_fd != NULL)                                               // Unload plugin and return resources
+    if (tnr_fd || tnr_cbs || tnr_funcs) {                               // Unload previous plugin and return resources
+      if (tnr_fd != NULL)                                               
         dlclose (tnr_fd);
       tnr_fd = NULL;
       if (tnr_cbs != NULL)
@@ -276,25 +153,26 @@ Set Tuner Plugin:       LATER !!
       tnr_funcs = NULL;
     }
 
-    tnr_funcs = calloc (1, sizeof (plugin_funcs_t));   // Setup functions
+    tnr_funcs = calloc (1, sizeof (plugin_funcs_t));                    // Allocate functions
     if (tnr_funcs == NULL)
-      return (curr_chass_plug_aud);
+      return (curr_chass_plug_tnr);
 
-    tnr_cbs = calloc (1, sizeof (plugin_cbs_t));     // Setup callbacks
+    tnr_cbs = calloc (1, sizeof (plugin_cbs_t));                        // Allocate callbacks
     if (tnr_cbs == NULL)
-      return (curr_chass_plug_aud);
+      return (curr_chass_plug_tnr);
 
-    char lib_name [DEF_BUF] = "";
-    tuner_plugin_libname_get (curr_chass_plug_tnr, lib_name, sizeof (lib_name)); // Get Tuner Plugin library name
+    char lib_name [DEF_BUF] = "";                                       // Get Tuner Plugin library name
+    strlcpy   (lib_name, "/data/data/fm.a2d.sf/lib/libs2t_", sizeof (lib_name));
+    strlcat   (lib_name, tnr,                                sizeof (lib_name));
+    strlcat   (lib_name, ".so",                              sizeof (lib_name));
+    lower_set (lib_name);
 
     tnr_fd = dlopen (lib_name, RTLD_LAZY);                              // Load library
     if (tnr_fd == NULL) {
       loge ("Could not load library '%s'", lib_name);
-      return (curr_chass_plug_aud);
+      return (curr_chass_plug_tnr);
     }
-    else {
-      logd ("Loaded library %s  tnr_fd: %d", lib_name, tnr_fd);
-    }
+    logd ("Loaded library %s  tnr_fd: %d", lib_name, tnr_fd);
 
     tnr_cbs->cb_tuner_pilot   = imp_cb_tuner_pilot;                         // Setup callback functions structure
     tnr_cbs->cb_tuner_rds     = imp_cb_tuner_rds;
@@ -306,25 +184,48 @@ Set Tuner Plugin:       LATER !!
     if (plugin_reg == NULL) {
       loge ("Could not find plugin_reg() symbol in loaded library '%s'", lib_name);
       dlclose (tnr_fd);
-      return (curr_chass_plug_aud);
+      tnr_fd = NULL;
+      return (curr_chass_plug_tnr);
     }
 
     unsigned int ret_sig = 0;
     if (plugin_reg (& ret_sig, tnr_funcs, tnr_cbs) != 0) {                  // Register functions and get signature
       loge ("Loaded function plugin_reg() returned unsuccessful");
       dlclose (tnr_fd);
-      return (curr_chass_plug_aud);
+      tnr_fd = NULL;
+      return (curr_chass_plug_tnr);
     }
 
     if (ret_sig != PLUGIN_SIG) {                                        // If signature mismatch
       loge ("Loaded function plugin_reg() returned successful but signature %x != ret_sig %x", PLUGIN_SIG, ret_sig);
       dlclose (tnr_fd);
-      return (curr_chass_plug_aud);
+      tnr_fd = NULL;
+      return (curr_chass_plug_tnr);
     }
-
     //funcs_display ();                                                 // Show functions
 
-    return (curr_chass_plug_aud);      
+    strcpy (curr_chass_plug_tnr, tnr);                                  // Current value = as passed
+
+    return (curr_chass_plug_tnr);
+  }
+
+  int chass_plug_aud_int_get (char * aud) {                             // Get Audio Plugin integer from Audio Plugin string
+    if (! strcmp (aud, "UNK")) return (PLUG_AUD_UNK);
+    if (! strcmp (aud, "CUS")) return (PLUG_AUD_CUS);
+    if (! strcmp (aud, "GS1")) return (PLUG_AUD_GS1);
+    if (! strcmp (aud, "GS2")) return (PLUG_AUD_GS2);
+    if (! strcmp (aud, "GS3")) return (PLUG_AUD_GS3);
+    if (! strcmp (aud, "QCV")) return (PLUG_AUD_QCV);
+    if (! strcmp (aud, "OM7")) return (PLUG_AUD_OM7);
+    if (! strcmp (aud, "LG2")) return (PLUG_AUD_LG2);
+    if (! strcmp (aud, "XZ2")) return (PLUG_AUD_XZ2);
+    return (PLUG_TNR_UNK);
+  }
+
+  char * chass_plug_aud_set (char * aud) {
+    strcpy (curr_chass_plug_aud, aud);
+    curr_chass_plug_aud_int = chass_plug_aud_int_get (aud);
+    return (curr_chass_plug_aud);
   }
 
 
@@ -480,6 +381,15 @@ Set Tuner Plugin:       LATER !!
     else if (! strcmp (key, "tuner_state"))
       strlcpy (res_buf, curr_tuner_state,           res_max);
 
+    else if (! strcmp (key, "tuner_antenna"))
+      strlcpy (res_buf, curr_tuner_antenna,         res_max);
+    else if (! strcmp (key, "tuner_softmute"))
+      strlcpy (res_buf, curr_tuner_softmute,        res_max);
+    else if (! strcmp (key, "tuner_mute"))
+      strlcpy (res_buf, curr_tuner_mute,            res_max);
+    else if (! strcmp (key, "tuner_vol"))
+      strlcpy (res_buf, curr_tuner_vol,             res_max);
+
     else if (! strcmp (key, "tuner_band"))
       strlcpy (res_buf, curr_tuner_band,            res_max);
     else if (! strcmp (key, "tuner_seek_state"))
@@ -502,46 +412,44 @@ Set Tuner Plugin:       LATER !!
       strlcpy (res_buf, curr_tuner_rds_rt,          res_max);
 
 
-  #define DEVICE_KNOWN (curr_chass_plug_aud_int > PLUG_AUD_UNK)
-
-            // Values we get from the FM chip:
+            // Values we get from the FM chip which need valid tnr_funcs:
 
     else if (! strcmp (key, "tuner_thresh")) {
-      if (DEVICE_KNOWN)
+      if (tnr_funcs)
         strlcpy (curr_tuner_thresh, itoa (curr_tuner_thresh_int = tnr_funcs->tnr_tuner_thresh_sg(GET), itoa_ret, 10),  sizeof (curr_tuner_thresh));
       strlcpy (res_buf, curr_tuner_thresh,          res_max);
     }
     else if (! strcmp (key, "tuner_freq")) {
-      if (DEVICE_KNOWN)
+      if (tnr_funcs)
         strlcpy (curr_tuner_freq,   itoa (curr_tuner_freq_int   = tnr_funcs->tnr_tuner_freq_sg  (GET), itoa_ret, 10),  sizeof (curr_tuner_freq));
       strlcpy (res_buf, curr_tuner_freq,            res_max);
     }
     else if (! strcmp (key, "tuner_vol")) {
-      //if (DEVICE_KNOWN)
+      //if (tnr_funcs)
       //  strlcpy (curr_tuner_vol,    itoa (curr_tuner_vol_int    = tnr_funcs->tnr_tuner_vol_sg   (GET), itoa_ret, 10),  sizeof (curr_tuner_vol));
       strlcpy (res_buf, curr_tuner_vol,             res_max);
     }
     else if (! strcmp (key, "tuner_rssi")) {
-      if (DEVICE_KNOWN)
+      if (tnr_funcs)
         strlcpy (curr_tuner_rssi,   itoa (curr_tuner_rssi_int   = tnr_funcs->tnr_tuner_rssi_sg  (GET), itoa_ret, 10),  sizeof (curr_tuner_rssi));
       strlcpy (res_buf, curr_tuner_rssi,            res_max);
     }
     else if (! strcmp (key, "tuner_pilot ")) {
-      if (DEVICE_KNOWN)
+      if (tnr_funcs)
         strlcpy (curr_tuner_pilot,  itop (curr_tuner_pilot_int  = tnr_funcs->tnr_tuner_pilot_sg (GET)),                sizeof (curr_tuner_pilot));
       strlcpy (res_buf, curr_tuner_pilot,            res_max);
     }
 
     else if (! strcmp (key, "tuner_bulk")) {                        // Tuner Bulk:  Update freq, rssi, pilot from tuner plugin
 
-      if (DEVICE_KNOWN)
+      if (tnr_funcs)
         strlcpy (curr_tuner_freq,   itoa (curr_tuner_freq_int   = tnr_funcs->tnr_tuner_freq_sg  (GET), itoa_ret, 10),  sizeof (curr_tuner_freq));
 
-      if (DEVICE_KNOWN)
+      if (tnr_funcs)
         strlcpy (curr_tuner_rssi,   itoa (curr_tuner_rssi_int   = tnr_funcs->tnr_tuner_rssi_sg  (GET), itoa_ret, 10),  sizeof (curr_tuner_rssi));
 
 //!!!! May interfere with RDS on SSL, so disable for now !!  (used to interfere with BCH also)
-      //if (DEVICE_KNOWN)
+      //if (tnr_funcs)
       //  strlcpy (curr_tuner_pilot,  itop (curr_tuner_pilot_int  = tnr_funcs->tnr_tuner_pilot_sg (GET)),                sizeof (curr_tuner_pilot));
 
       res_buf [0] = 0;
@@ -623,19 +531,17 @@ Set Tuner Plugin:       LATER !!
     }
 
     else if (! strcmp (key, "tuner_acdb")) {                        // If Tuner ACDB...
-      //loge ("GOT tuner_acdb: %d", acdb_disable ());
+      loge ("GOT tuner_acdb: %d", acdb_set (atoi (val)));
     }
 
     else if (! strcmp (key, "chass_plug_aud")) {                    // If chass_plug_aud...
       logd ("key_set chass_plug_aud_set: %s", pret = chass_plug_aud_set (val));
     }
-/*
+
     else if (! strcmp (key, "chass_plug_tnr")) {                    // If chass_plug_tnr...
-      logd ("key_set chass_plug_tnr_set: %d", ret = curr_chass_plug_tnr_int = chass_plug_tnr_set (sval = atoi (val)));
-      if (ret == sval)
-        strlcpy (curr_chass_plug_tnr, val,  sizeof (curr_chass_plug_tnr));
+      logd ("key_set chass_plug_tnr_set: %s", pret = chass_plug_tnr_set (val));
     }
-*/
+
     else if (! strcmp (key, "tuner_mode")) {                        // If Tuner Mode...
       if (! strcmp (val, "Transmit"))
         logd ("key_set tuner_mode transmit: %d", ret = curr_tuner_mode_int = tnr_funcs->tnr_tuner_mode_sg (sval = 1));
@@ -666,10 +572,10 @@ Set Tuner Plugin:       LATER !!
     }
 
 
-    // Remaining set commands require valid curr_chass_plug_aud_int:
+    // Remaining set commands require valid tnr_funcs:
 
-    else if (! DEVICE_KNOWN) {
-      loge ("key_set ! DEVICE_KNOWN");
+    else if (! tnr_funcs) {
+      loge ("key_set tnr_funcs: %p", tnr_funcs);
     }
 
         // Audio:
@@ -707,13 +613,36 @@ Set Tuner Plugin:       LATER !!
       }
     }
 
-    else if (! strcmp (val, "tuner_mute")) {                        // If Tuner Mute...
+    else if (! strcmp (key, "tuner_mute")) {                        // If Tuner Mute...
+      logd ("tuner_mute val: %s", val);
       if (! strcmp (val, "Mute"))                                   // If Mute...
-        logd ("key_set tuner_mute_sg Start: %d", ret = curr_tuner_mute_int = tnr_funcs->tnr_tuner_mute_sg (sval = 1));
+        logd ("key_set tuner_mute_sg Mute: %d",   ret = curr_tuner_mute_int = tnr_funcs->tnr_tuner_mute_sg (sval = 1));
       else if (! strcmp (val, "Unmute"))                            // If Unmute...
-        logd ("key_set tuner_mute_sg Stop: %d",  ret = curr_tuner_mute_int = tnr_funcs->tnr_tuner_mute_sg (sval = 0));
+        logd ("key_set tuner_mute_sg Unmute: %d", ret = curr_tuner_mute_int = tnr_funcs->tnr_tuner_mute_sg (sval = 0));
       if (ret == sval)
         strlcpy (curr_tuner_mute, val,  sizeof (curr_tuner_mute));
+    }
+
+    else if (! strcmp (key, "tuner_antenna")) {                         // If Tuner Antenna...
+      logd ("tuner_antenna val: %s", val);
+      if (! strcmp (val, "Internal"))                                   // If Sony Z/Z1 class specific Internal Antenna...
+        logd ("key_set tuner_antenna_sg Internal %d",  ret = curr_tuner_antenna_int = tnr_funcs->tnr_tuner_antenna_sg (sval = 1));
+      else if (! strcmp (val, "Headset"))                               // If Headset/External Antenna...
+        logd ("key_set tuner_antenna_sg Headset %d",   ret = curr_tuner_antenna_int = tnr_funcs->tnr_tuner_antenna_sg (sval = 0));
+      else if (! strcmp (val, "External"))                              // If Headset/External Antenna...
+        logd ("key_set tuner_antenna_sg External: %d", ret = curr_tuner_antenna_int = tnr_funcs->tnr_tuner_antenna_sg (sval = 0));
+      if (ret == sval)
+        strlcpy (curr_tuner_antenna, val,  sizeof (curr_tuner_antenna));
+    }
+
+    else if (! strcmp (key, "tuner_softmute")) {                    // If Tuner Softmute...
+      logd ("tuner_softmute val: %s", val);
+      if (! strcmp (val, "Enable"))                                 // If Softmute...
+        logd ("key_set tuner_softmute_sg Enable %d",    ret = curr_tuner_softmute_int = tnr_funcs->tnr_tuner_softmute_sg (sval = 1));
+      else if (! strcmp (val, "Disable"))                           // If no Softmute...
+        logd ("key_set tuner_softmute_sg Disable: %d",  ret = curr_tuner_softmute_int = tnr_funcs->tnr_tuner_softmute_sg (sval = 0));
+      if (ret == sval)
+        strlcpy (curr_tuner_softmute, val,  sizeof (curr_tuner_softmute));
     }
 
     else if (! strcmp (key, "tuner_seek_state")) {                  // If Tuner Seek State...
@@ -757,10 +686,7 @@ Set Tuner Plugin:       LATER !!
         strlcpy (curr_tuner_freq, val,  sizeof (curr_tuner_freq));
     }
     else if (! strcmp (key, "tuner_vol")) {                         // Tuner Vol
-      /*if (curr_chass_plug_aud_int == PLUG_AUD_GS1)                           // GS1 volume controlled by chip
-        logd ("key_set tuner_vol -> audio_ana_vol: %d", ret = curr_tuner_vol_int = tnr_funcs->tnr_tuner_vol_sg (sval = atoi (val)));
-      else*/
-        logd ("key_set tuner_vol -> audio_ana_vol: %d", ret = curr_tuner_vol_int =           audio_ana_vol_set (sval = atoi (val)));
+      logd ("key_set tuner_vol -> audio_ana_vol: %d", ret = curr_tuner_vol_int = audio_ana_vol_set (sval = atoi (val)));
       if (ret == sval)
         strlcpy (curr_tuner_vol, val,  sizeof (curr_tuner_vol));
     }
@@ -797,6 +723,10 @@ Set Tuner Plugin:       LATER !!
       logd ("key_set tuner_extension_sg: %d", pret = tnr_funcs->tnr_tuner_extension_sg (val));
       if (pret)
         strlcpy (curr_tuner_extension, pret,  sizeof (curr_tuner_extension));
+    }
+
+    else {
+      loge ("Unknown key: \"%s\"  val: \"%s\"", key, val);
     }
 
     if (pret)                                                           // If pointer return not NULL...
@@ -846,16 +776,16 @@ Set Tuner Plugin:       LATER !!
     }
     if (is_set) {                                                       // If a SET (and get) operation
       if (ena_log_s2d_cmd)
-        logd ("gen_server_loop_func prior to key_set key: %s  val: %s", key, val);
+        logd ("gen_server_loop_func prior to key_set key: \"%s\"  val: \"%s\"", key, val);
 
       ret = key_set (key, res_buf, res_max, val);                       // SET value
 
       if (ena_log_s2d_cmd)
-        logd ("gen_server_loop_func after    key_set key: %s  val: %s  ret: %d", key, val, ret);
+        logd ("gen_server_loop_func after    key_set key: \"%s\"  val: \"%s\"  ret: %d", key, val, ret);
     }
     else {                                                              // Else if just a GET operation
       if (ena_log_s2d_cmd)
-        logd ("gen_server_loop_func prior to get key: %s", key);
+        logd ("gen_server_loop_func prior to get key: \"%s\"", key);
     }
 
     int res_len = key_get (key, res_buf, res_max, val);                 // GET value: (And do SET Response)
@@ -870,7 +800,7 @@ Set Tuner Plugin:       LATER !!
     }
 
     if (ena_log_s2d_cmd)
-      logd ("gen_server_loop_func after    key_get key: %s  res_len: %d  res_buf: \"%s\"", key, res_len, res_buf);
+      logd ("gen_server_loop_func after    key_get key: \"%s\"  res_len: %d  res_buf: \"%s\"", key, res_len, res_buf);
 
     return (res_len);                                                   // Return size of result
   }
@@ -962,8 +892,367 @@ Set Tuner Plugin:       LATER !!
 
     // Main entrance:
 
+  #include <sys/ioctl.h>
+  #include <linux/videodev2.h>
+
+  int dev_hndl = -1;
+
+  struct v4l2_control       v4l_ctrl    = {0};
+
+  const char * cid_iris_private [] = {
+    "SRCHMODE",
+    "SCANDWELL",
+    "SRCHON",
+    "STATE",
+    "TRANSMIT_MODE",
+    "RDSGROUP_MASK",
+    "REGION",
+    "SIGNAL_TH",
+    "SRCH_PTY",
+    "SRCH_PI",
+    "SRCH_CNT",
+    "EMPHASIS",
+    "RDS_STD",
+    "SPACING",
+    "RDSON",
+    "RDSGROUP_PROC",
+    "LP_MODE",
+    "ANTENNA",
+    "RDSD_BUF",
+    "PSALL",
+
+    "TX_SETPSREPEATCOUNT",
+    "STOP_RDS_TX_PS_NAME",
+    "STOP_RDS_TX_RT",
+    "IOVERC",
+    "INTDET",
+    "MPX_DCC",
+    "AF_JUMP",
+    "RSSI_DELTA",
+    "HLSI",             // 0x800001d
+
+        /*Diagnostic commands*/
+    "SOFT_MUTE",
+    "RIVA_ACCS_ADDR",
+    "RIVA_ACCS_LEN",
+    "RIVA_PEEK",
+    "RIVA_POKE",
+    "SSBI_ACCS_ADDR",
+    "SSBI_PEEK",
+    "SSBI_POKE",
+    "TX_TONE",
+    "RDS_GRP_COUNTERS",
+    "SET_NOTCH_FILTER", // 0x8000028
+    "SET_AUDIO_PATH",   // TAVARUA specific command
+    "DO_CALIBRATION",
+    "SRCH_ALGORITHM",   // TAVARUA specific command
+    "GET_SINR",
+    "INTF_LOW_THRESHOLD",
+    "INTF_HIGH_THRESHOLD",
+    "SINR_THRESHOLD",
+    "SINR_SAMPLES",          // 0x8000030
+
+
+   };
+
+
+
+
+
+  enum v4l2_cid_iris_private_iris_t {
+        V4L2_CID_PRIVATE_IRIS_SRCHMODE = (0x08000000 + 1),  // = 0
+        V4L2_CID_PRIVATE_IRIS_SCANDWELL,
+        V4L2_CID_PRIVATE_IRIS_SRCHON,           // = 1 ? Stuck searching ?
+        V4L2_CID_PRIVATE_IRIS_STATE,            // = 1
+        V4L2_CID_PRIVATE_IRIS_TRANSMIT_MODE,    // 0x08000005 Tx only
+        V4L2_CID_PRIVATE_IRIS_RDSGROUP_MASK,
+        V4L2_CID_PRIVATE_IRIS_REGION,
+
+        V4L2_CID_PRIVATE_IRIS_SIGNAL_TH,        // 0x08000008
+        V4L2_CID_PRIVATE_IRIS_SRCH_PTY,
+        V4L2_CID_PRIVATE_IRIS_SRCH_PI,
+        V4L2_CID_PRIVATE_IRIS_SRCH_CNT,
+        V4L2_CID_PRIVATE_IRIS_EMPHASIS,
+        V4L2_CID_PRIVATE_IRIS_RDS_STD,          // 0x0800000d = 1
+        V4L2_CID_PRIVATE_IRIS_SPACING,
+        V4L2_CID_PRIVATE_IRIS_RDSON,            // 0x0800000f = 1
+        V4L2_CID_PRIVATE_IRIS_RDSGROUP_PROC,    // 0x08000010 = 56 = 0x38 = 0x07 << RDS_CONFIG_OFFSET (3)
+        V4L2_CID_PRIVATE_IRIS_LP_MODE,
+        V4L2_CID_PRIVATE_IRIS_ANTENNA,          // = 1
+        V4L2_CID_PRIVATE_IRIS_RDSD_BUF,
+        V4L2_CID_PRIVATE_IRIS_PSALL,            // 0x8000014 = 56, ? Bug, copied RDSGROUP_PROC instead of boolean "pass all ps strings"
+        V4L2_CID_PRIVATE_IRIS_TX_SETPSREPEATCOUNT,                      // START TX controls:
+        V4L2_CID_PRIVATE_IRIS_STOP_RDS_TX_PS_NAME,
+        V4L2_CID_PRIVATE_IRIS_STOP_RDS_TX_RT,
+        V4L2_CID_PRIVATE_IRIS_IOVERC,
+        V4L2_CID_PRIVATE_IRIS_INTDET,
+        V4L2_CID_PRIVATE_IRIS_MPX_DCC,
+        V4L2_CID_PRIVATE_IRIS_AF_JUMP,
+        V4L2_CID_PRIVATE_IRIS_RSSI_DELTA,
+        V4L2_CID_PRIVATE_IRIS_HLSI,             // 0x800001d
+        V4L2_CID_PRIVATE_IRIS_SOFT_MUTE,        // 0x800001e            // START Diagnostic commands:
+        V4L2_CID_PRIVATE_IRIS_RIVA_ACCS_ADDR,
+        V4L2_CID_PRIVATE_IRIS_RIVA_ACCS_LEN,
+        V4L2_CID_PRIVATE_IRIS_RIVA_PEEK,
+        V4L2_CID_PRIVATE_IRIS_RIVA_POKE,
+        V4L2_CID_PRIVATE_IRIS_SSBI_ACCS_ADDR,
+        V4L2_CID_PRIVATE_IRIS_SSBI_PEEK,
+        V4L2_CID_PRIVATE_IRIS_SSBI_POKE,
+        V4L2_CID_PRIVATE_IRIS_TX_TONE,
+        V4L2_CID_PRIVATE_IRIS_RDS_GRP_COUNTERS,
+        V4L2_CID_PRIVATE_IRIS_SET_NOTCH_FILTER, // 0x8000028
+        V4L2_CID_PRIVATE_IRIS_SET_AUDIO_PATH,   // TAVARUA specific command
+        V4L2_CID_PRIVATE_IRIS_DO_CALIBRATION,
+        V4L2_CID_PRIVATE_IRIS_SRCH_ALGORITHM,   // TAVARUA specific command
+        V4L2_CID_PRIVATE_IRIS_GET_SINR,
+        V4L2_CID_PRIVATE_INTF_LOW_THRESHOLD,
+        V4L2_CID_PRIVATE_INTF_HIGH_THRESHOLD,
+        V4L2_CID_PRIVATE_SINR_THRESHOLD,
+        V4L2_CID_PRIVATE_SINR_SAMPLES,          // 0x8000030
+
+        /*using private CIDs under userclass*/
+        V4L2_CID_PRIVATE_IRIS_READ_DEFAULT = 0x00980928,
+        V4L2_CID_PRIVATE_IRIS_WRITE_DEFAULT,
+        V4L2_CID_PRIVATE_IRIS_SET_CALIBRATION,
+  };
+
+
+    // Not in /home/m/bin/android-ndk-r10/platforms/android-19/arch-arm/usr/include/linux/videodev2.h or videodev.h
+  #define V4L2_CID_RDS_TX_PI                      (V4L2_CID_FM_TX_CLASS_BASE + 2)
+  #define V4L2_CID_RDS_TX_PTY                     (V4L2_CID_FM_TX_CLASS_BASE + 3)
+  #define V4L2_CID_RDS_TX_PS_NAME                 (V4L2_CID_FM_TX_CLASS_BASE + 5)
+  #define V4L2_CID_RDS_TX_RADIO_TEXT              (V4L2_CID_FM_TX_CLASS_BASE + 6)
+
+  const char * id_get (int id) {
+    if (id >= V4L2_CID_PRIVATE_IRIS_SRCHMODE && id <= V4L2_CID_PRIVATE_SINR_SAMPLES) {          // 0x8000030
+      int idx = id - V4L2_CID_PRIVATE_IRIS_SRCHMODE;
+      //logd ("id: %d  idx: %d", id, idx);
+      const char * id_asc = cid_iris_private [idx];
+      //logd ("id_asc: %p", id_asc);
+      //logd ("id_asc s: %s", id_asc);
+      return (id_asc);
+    }
+    else
+      return ("Unk");
+  }
+
+  int chip_ctrl_get (int id) {
+    v4l_ctrl.id = id;
+
+    errno = 0;
+    int ret = ioctl (dev_hndl, VIDIOC_G_CTRL, & v4l_ctrl);
+    int value = v4l_ctrl.value;
+    if (ret < 0) {
+      loge ("chip_ctrl_get VIDIOC_G_CTRL id: %s (0x%x)  errno: %d (%s)", id_get (id), id, errno, strerror (errno));
+      return (-1);
+    }
+    else {
+      logd ("chip_ctrl_get VIDIOC_G_CTRL OK id: %s (0x%x)  value: %d (0x%x)", id_get (id), id, value, value);
+    }
+    return (value);
+  }
+
+int curr_api_state = 0;
+
+  int chip_imp_api_state_sg (int state) {
+    logd ("chip_imp_api_state_sg state: %d", state);
+    if (state == GET)
+      return (curr_api_state);
+
+    if (state == 0) {
+      //power_control_set (0);
+      if (dev_hndl >= 0) {
+        close (dev_hndl);
+      }
+      curr_api_state = 0;
+      return (curr_api_state);
+    }
+
+    if (file_get ("/system/lib/modules/radio-iris-transport.ko"))
+      util_insmod ("/system/lib/modules/radio-iris-transport.ko");
+
+    dev_hndl = open ("/dev/radio0", O_RDWR   | O_NONBLOCK);
+    if (dev_hndl < 0) {
+      loge ("chip_imp_api_state_sg error opening qualcomm /dev/radio0: %d", errno);
+      curr_api_state = 0;
+      return (curr_api_state);
+    }
+    logd ("chip_imp_api_state_sg qualcomm /dev/radio0: %d", dev_hndl);
+
+    // Need 5 - 20 ms delay when module is inserted on Xperia Z1. For a safety factor of 5, delay for 100 ms. This avoid 10s timeout and first start failure, sometimes recoverably
+    quiet_ms_sleep (100);   // Need delay even when module already loaded ??
+
+    curr_api_state = 1;
+
+    if (! file_get ("/sys/bus/platform/drivers/iris_fm/") && ! file_get ("/sys/bus/platform/drivers/iris_fm/uevent")) {
+      loge ("No /sys/bus/platform/drivers/iris_fm/ or /sys/bus/platform/drivers/iris_fm/uevent");
+      curr_api_state = 0;
+    }
+
+
+    if (! file_get ("/sys/module/radio_iris/") && ! file_get ("/sys/module/radio_iris/parameters/sig_blend") &&
+        ! file_get ("/sys/module/radio_iris_transport/") && ! file_get ("/sys/module/radio_iris_transport/uevent")) {   // Xperia Z w/ CM11 only has these
+      loge ("No /sys/module/radio_iris/ or /sys/module/radio_iris/parameters/sig_blend");
+      curr_api_state = 0;
+    }
+
+//    power_control_set (1);
+
+    return (curr_api_state);
+  }
+
+  void qcv_test () {
+
+    chip_imp_api_state_sg (1);
+    int id = 0;
+    //for (id = 0x08000001; id <= 0x08000030; id ++) {
+for (id = 0x08000001; id <= 0x08000002; id ++) {
+      logd ("chip_ctrl_get id: %d  ret: %d", id, chip_ctrl_get (id));
+    }
+
+    chip_imp_api_state_sg (0);
+  }
+
+ //#include "aud_all.c"
+ //#include "acdb.c"
+
+#include <sys/ptrace.h>
+
+	//printf("%s <pid> <start_address> <total_bytes>\n", argv [0]);
+/*
+  void dump_memory (int pid, unsigned int start_address, int total_bytes) {
+    unsigned int address;
+    unsigned int number = 0;
+    for (address = start_address; address < start_address + total_bytes; address += 4) {
+      if (address % 16 == 0)
+        printf("\n");
+      number = ptrace (PTRACE_PEEKDATA, pid, (void *) address, (void *) number);
+      char byte1 = 0xff & (number >>  0);
+      char byte2 = 0xff & (number >>  8);
+      char byte3 = 0xff & (number >> 16);
+      char byte4 = 0xff & (number >> 24);
+      printf ("%8x ", number);
+	}
+    if (total_bytes == 0) {
+      number = ptrace (PTRACE_PEEKDATA, pid, (void *) start_address, (void *) number);
+      printf("Peek at 0x%x: %x\n", (unsigned int) start_address, number);
+    }
+    printf("\n");
+  }
+*/
+    #define AUDIO_IOCTL_MAGIC 'a'
+
+    #define AUDIO_MAX_COMMON_IOCTL_NUM      100
+
+    #define AUDIO_SET_AUDPROC_TX_CAL        _IOW(AUDIO_IOCTL_MAGIC, (AUDIO_MAX_COMMON_IOCTL_NUM+6), unsigned)
+
+    #define AUDIO_SET_AUDPROC_TX_VOL_CAL    _IOW(AUDIO_IOCTL_MAGIC, (AUDIO_MAX_COMMON_IOCTL_NUM+8), unsigned)
+
+    #define AUDIO_SET_AFE_TX_CAL            _IOW(AUDIO_IOCTL_MAGIC, (AUDIO_MAX_COMMON_IOCTL_NUM+16), unsigned)
+
+    #define AUDIO_SET_ADM_TX_TOPOLOGY       _IOW(AUDIO_IOCTL_MAGIC, (AUDIO_MAX_COMMON_IOCTL_NUM+14), unsigned)
+
+    #define AUDIO_REGISTER_PMEM             _IOW(AUDIO_IOCTL_MAGIC, 15, unsigned)
+    #define AUDIO_DEREGISTER_PMEM           _IOW(AUDIO_IOCTL_MAGIC, 16, unsigned)
+
+
   int main (int argc, char ** argv) {
     int server_mode = 0;
+
+//qcv_test ();
+//return (0);
+
+/*
+    if (argc == 4) {
+      int pid = atoi (argv [1]);
+      int number;
+      ptrace (PTRACE_ATTACH, pid, NULL, NULL);
+      wait (NULL);
+      long start_address;
+      sscanf (argv [2], "0x%x", (unsigned int *) & start_address);
+      int total_bytes;
+      sscanf (argv [3], "%d", (int *) & total_bytes);
+      dump_memory (pid, start_address, total_bytes);
+      ptrace (PTRACE_CONT, pid, NULL, NULL);
+      ptrace (PTRACE_DETACH, pid, NULL, NULL);
+      return (0);
+    }
+*/
+    if (argc == 3) {
+      int acdb_id = atoi (argv[2]);
+      int aret = acdb_set (acdb_id);
+      logd ("acdb_set: %d", aret);
+      return (0);
+
+      int ret = 0;
+      errno = 0;
+      int hndl = open ("/dev/msm_acdb", O_RDWR | O_NONBLOCK);
+      if (hndl < 0) {
+        loge ("Error open /dev/msm_acdb errno: %d (%s)", errno, strerror (errno));
+        return (-1);
+      }
+      logd ("Success open /dev/msm_acdb");
+
+      struct acdb_cal_ioctl {
+        unsigned int size;
+        unsigned int cal_size;
+        unsigned int cal_offset;
+      };
+      struct acdb_cal_ioctl arg;
+      arg.size = 8;             /// Size in bytes of cal_size and call_offset
+      arg.cal_size = 0;
+      arg.cal_offset = 0;
+
+//AUDIO_ENABLE_AUDPRE
+/*
+      int zero = 0;
+      errno = 0;
+      ret = ioctl (hndl, AUDIO_DEREGISTER_PMEM, & zero);
+      if (ret < 0)
+        loge ("Ioctl errno: %s", strerror (errno));
+      else
+        loge ("Ioctl success");
+//return (0);
+
+      errno = 0;
+      ret = ioctl (hndl, AUDIO_SET_ADM_TX_TOPOLOGY, & zero);
+      if (ret < 0)
+        loge ("Ioctl errno: %s", strerror (errno));
+      else
+        loge ("Ioctl success");
+*/
+
+      errno = 0;
+      ret = ioctl (hndl, AUDIO_SET_AUDPROC_TX_CAL, & arg);
+      if (ret < 0)
+        loge ("Ioctl errno: %s", strerror (errno));
+      else
+        logd ("Ioctl success");
+/*
+      errno = 0;
+      ret = ioctl (hndl, AUDIO_SET_AUDPROC_TX_VOL_CAL, & arg);
+      if (ret < 0)
+        loge ("Ioctl errno: %s", strerror (errno));
+      else
+        loge ("Ioctl success");
+
+      errno = 0;
+      ret = ioctl (hndl, AUDIO_SET_AFE_TX_CAL, & arg);
+      if (ret < 0)
+        loge ("Ioctl errno: %s", strerror (errno));
+      else
+        loge ("Ioctl success");
+*/
+ms_sleep (2000);
+
+      close (hndl);
+
+ms_sleep (2000);
+
+
+      return (0);
+    }
+
     if (argc > 1)                                                       // If server mode... (If 1 or more parameters)
       server_mode = 1;
 

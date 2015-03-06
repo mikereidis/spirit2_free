@@ -1,13 +1,763 @@
 
   // #include "aud_all.c"                                                  // Audio functions for all supported audio architectures. To be replaced with audio plugins, similar to tuner plugins.
 
+// Does it work ? : S1 LG2_ALSA uses ssd_run_var ("5 8 44100 2 /dev/snd/pcmC0D5p  /dev/snd/pcmC0D17c &", 0);
+// Does it work ? : S1 XZ2_ALSA uses ssd_run_var ("5 8 44100 2 /dev/snd/pcmC0D25p /dev/snd/pcmC0D25c &", 1);
+//   Also uses same for digital on AOSP. Stock uses: setDeviceConnectionState (0x80000, DEVICE_STATE_AVAILABLE, "");
+// Sony Z QC Intent for stock also             uses: setDeviceConnectionState (0x80000, DEVICE_STATE_AVAILABLE, "");        (and Intent "qualcomm.intent.action.FM"/"state" and setFmReceiverOn())
+
+
+/*
+
+
+03-01 04:49:30.158 D/FMService(24599): Audio source set it as headset
+03-01 04:49:30.160 D/audio_hw_primary(  237): adev_set_parameters: enter: connect=1048576
+03-01 04:49:30.160 E/audio_a2dp_hw(  237): adev_set_parameters: ERROR: set param called even when stream out is null
+
+03-01 04:49:30.167 D/audio_hw_primary(  237): out_set_parameters: enter: usecase(0: deep-buffer-playback) kvpairs: handle_fm=1048580
+03-01 04:49:30.167 D/audio_hw_fm(  237): audio_extn_fm_set_parameters: FM usecase
+03-01 04:49:30.167 D/audio_hw_fm(  237): fm_start: enter
+03-01 04:49:30.167 D/audio_hw_primary(  237): select_devices: out_snd_device(4: headphones) in_snd_device(0: )
+03-01 04:49:30.167 W/msm8974_platform(  237): Codec backend bitwidth 16, samplerate 48000
+03-01 04:49:30.167 D/hardware_info(  237): hw_info_append_hw_type : device_name = headphones-lite
+03-01 04:49:30.170 D/audio_hw_primary(  237): select_devices: done
+03-01 04:49:30.179 D/audio_hw_fm(  237): fm_set_volume: (0.010000)
+03-01 04:49:30.179 D/audio_hw_fm(  237): fm_set_volume: Setting FM volume to 82 
+03-01 04:49:30.180 D/audio_hw_fm(  237): fm_start: exit: status(0)
+03-01 04:49:30.190 D/audio_hw_primary(  237): out_set_parameters: enter: usecase(0: deep-buffer-playback) kvpairs: routing=4
+03-01 04:49:30.195 D/audio_hw_primary(  237): out_set_parameters: enter: usecase(1: low-latency-playback) kvpairs: routing=0
+
+
+ro.board.platform:
+
+s5pc110:
+gs1
+
+exynos4:
+gs2
+gs3
+no1
+no2
+
+msm8960:
+oxl
+xz0
+om7
+
+msm8226:
+mog
+
+msm8974:
+om8
+xz1
+xz2
+lg2
+
+
+
+sudo update-alternatives --config java
+sudo update-alternatives --config javac
+
+declare -x ANDROID_JAVA_TOOLCHAIN="/usr/lib/jvm/java-1.7.0-openjdk-amd64/bin"
+declare -x JAVA_HOME="/usr/lib/jvm/java-1.7.0-openjdk-amd64"
+
+export ANDROID_JAVA_TOOLCHAIN="/usr/lib/jvm/java-1.7.0-openjdk-amd64/bin"
+export JAVA_HOME="/usr/lib/jvm/java-1.7.0-openjdk-amd64"
+
+
+Exclude Seconds:
+cd ~/android/system
+  3:    time grep -RIsl FM ~/android/system/ --exclude-dir=out --exclude-dir=prebuilts --exclude-dir=external --exclude-dir=frameworks --exclude-dir=kernel | wc -l
+ 11:    time grep -RIsl FM ~/android/system/ --exclude-dir=out --exclude-dir=prebuilts --exclude-dir=external --exclude-dir=frameworks                      | wc -l
+ 12:    time grep -RIsl FM ~/android/system/ --exclude-dir=out --exclude-dir=prebuilts --exclude-dir=external                                               | wc -l
+141:    time grep -RIsl FM ~/android/system/ --exclude-dir=out --exclude-dir=prebuilts                                                                      | wc -l
+
+ 1133
+ 7363
+ 7512
+12203
+
+======================================================================================================================================================
+
+frameworks/base/media/java/android/media/MediaRecorder.java
+  public static final int FM_RX      = 10;
+  public static final int FM_RX_A2DP = 11;
+   public static final int getAudioSourceMax() {
+        return AudioSource.FM_RX_A2DP;
+    }
+
+
+frameworks/base/media/java/android/media/MediaRecorder.java
+    protected static final int HOTWORD = 1999;
+
+frameworks/base/media/java/android/media/AudioAttributes.java
+       public Builder setCapturePreset(int preset) {
+            switch (preset) {
+                case MediaRecorder.AudioSource.DEFAULT:
+                case MediaRecorder.AudioSource.MIC:
+                case MediaRecorder.AudioSource.CAMCORDER:
+                case MediaRecorder.AudioSource.VOICE_RECOGNITION:
+                case MediaRecorder.AudioSource.VOICE_COMMUNICATION:
+                    mSource = preset;
+                    break;
+                default:
+                    Log.e(TAG, "Invalid capture preset " + preset + " for AudioAttributes");
+            }
+            return this;
+        }
+
+        public Builder setInternalCapturePreset(int preset) {
+            if ((preset == MediaRecorder.AudioSource.HOTWORD)
+                    || (preset == MediaRecorder.AudioSource.REMOTE_SUBMIX)) {
+                mSource = preset;
+            } else {
+                setCapturePreset(preset);
+            }
+            return this;
+        }
+    };
+======================================================================================================================================================
+
+
+cd ~/android/system
+grep -RIs FM  device | el
+
+device/motorola/msm8226-common/BoardConfigCommon.mk
+# Audio
+AUDIO_FEATURE_ENABLED_FM := true
+# FM
+TARGET_QCOM_NO_FM_FIRMWARE := true
+
+device/motorola/msm8226-common/msm8226.mk
+# FM
+PRODUCT_PACKAGES += \
+    FM2 \
+    FMRecord \
+    libqcomfm_jni \
+    qcom.fmradio
+
+device/motorola/msm8226-common/configs/audio_policy.conf    global_conf:        attached_input_devices...                               AUDIO_DEVICE_IN_FM_RX   AUDIO_DEVICE_IN_FM_RX_A2DP
+device/motorola/msm8226-common/configs/audio_policy.conf:   primary:            devices...                  AUDIO_DEVICE_OUT_FM     AUDIO_DEVICE_OUT_FM_TX
+device/motorola/msm8226-common/configs/audio_policy.conf:   low_latency:                                    AUDIO_DEVICE_OUT_FM     AUDIO_DEVICE_OUT_FM_TX
+device/motorola/msm8226-common/configs/audio_policy.conf:   compress_offload:   devices...                                          AUDIO_DEVICE_OUT_FM_TX
+device/motorola/msm8226-common/configs/audio_policy.conf:   inputs primary:     devices...                                              AUDIO_DEVICE_IN_FM_RX   AUDIO_DEVICE_IN_FM_RX_A2DP
+
+device/sony/rhine-common/audio/audio_policy.conf:       SAME as above but no global_conf
+
+
+device/motorola/falcon/configs/mixer_paths.xml
+  <mixer> <!-- These are the initial mixer settings -->
+  <!-- fm -->
+    <ctl name="SLIMBUS_0_RX Port Mixer INTERNAL_FM_TX" value="0" />
+    <ctl name="SLIMBUS_DL_HL Switch" value="0" />
+    <ctl name="MultiMedia1 Mixer INTERNAL_FM_TX" value="0" />
+    <ctl name="MultiMedia2 Mixer INTERNAL_FM_TX" value="0" />
+    <ctl name="INTERNAL_FM_RX Audio Mixer MultiMedia1" value="0" />
+    <ctl name="INTERNAL_FM_RX Audio Mixer MultiMedia5" value="0" />
+  <!-- fm end -->
+  <path name="audio-record capture-fm">
+    <ctl name="MultiMedia1 Mixer INTERNAL_FM_TX" value="1" />
+  </path>
+  <path name="fm-virtual-record capture-fm">
+    <ctl name="MultiMedia2 Mixer INTERNAL_FM_TX" value="1" />
+  </path>
+  <path name="play-fm">
+    <ctl name="Internal FM RX Volume" value="1" />
+    <ctl name="SLIMBUS_0_RX Port Mixer INTERNAL_FM_TX" value="1" />
+    <ctl name="SLIMBUS_DL_HL Switch" value="1" />
+  </path>
+  <path name="capture-fm">
+  </path>
+
+device/sony/honami/audio/mixer_paths.xml
+Above, plus:
+  <mixer> <!-- These are the initial mixer settings -->
+    <ctl name="INTERNAL_FM_RX Audio Mixer MultiMedia4" value="0" />
+    <path name="deep-buffer-playback transmission-fm">
+        <ctl name="INTERNAL_FM_RX Audio Mixer MultiMedia1" value="1" />
+    </path>
+    <path name="low-latency-playback transmission-fm">
+        <ctl name="INTERNAL_FM_RX Audio Mixer MultiMedia5" value="1" />
+    </path>
+    <path name="compress-offload-playback transmission-fm">
+        <ctl name="INTERNAL_FM_RX Audio Mixer MultiMedia4" value="1" />
+    </path>
+    <path name="play-fm usb-headphones">
+        <ctl name="Internal FM RX Volume" value="1" />
+        <ctl name="AFE_PCM_RX Port Mixer INTERNAL_FM_TX" value="1" />
+        <ctl name="SLIMBUS_DL_HL Switch" value="1" />
+    </path>
+    <path name="transmission-fm">
+    </path>
+
+
+
+
+
+device/sony/rhine-common/rhine.mk
+# FM Radio
+PRODUCT_COPY_FILES += \
+    $(COMMON_PATH)/rootdir/system/etc/init.qcom.fm.sh:system/etc/init.qcom.fm.sh
+
+device/sony/rhine-common/rootdir/system/etc/init.qcom.fm.sh
+...
+
+device/sony/rhine-common/proprietary-files.txt
+# FM
+bin/fmconfig
+bin/fm_qsoc_patches
+lib/libfmradio.so
+lib/libfmradio.sony-iris.so
+
+
+
+======================================================================================================================================================
+frameworks/av/services/audiopolicy/AudioPolicyManager.cpp
+
+#ifdef AUDIO_EXTN_FM_ENABLED
+    case AUDIO_SOURCE_FM_RX:
+        device = AUDIO_DEVICE_IN_FM_RX;
+        break;
+    case AUDIO_SOURCE_FM_RX_A2DP:
+        device = AUDIO_DEVICE_IN_FM_RX_A2DP;
+        break;
+#endif
+
+time grep -RIsl ~/android/system/ --exclude-dir=out --exclude-dir=prebuilts --exclude-dir=external -e AUDIO_SOURCE_FM_RX
+
+
+!! Vs 9 / 10 !!
+/home/m/android/system/system/core/include/system/audio.h:    AUDIO_SOURCE_FM_RX               = 10,
+/home/m/android/system/system/core/include/system/audio.h:    AUDIO_SOURCE_FM_RX_A2DP          = 11,
+
+/home/m/android/system/hardware/qcom/audio-caf/apq8084/hal/audio_extn/audio_extn.h:#define AUDIO_SOURCE_FM_RX 9
+/home/m/android/system/hardware/qcom/audio-caf/apq8084/hal/audio_extn/audio_extn.h:#define AUDIO_SOURCE_FM_RX_A2DP 10
+
+
+#ifdef AUDIO_EXTN_FM_ENABLED
+        if(device == AUDIO_DEVICE_OUT_FM) {
+            if (state == AUDIO_POLICY_DEVICE_STATE_AVAILABLE) {
+                mOutputs.valueFor(mPrimaryOutput)->changeRefCount(AUDIO_STREAM_MUSIC, 1);
+                newDevice = (audio_devices_t)(getNewOutputDevice(mPrimaryOutput, false) | AUDIO_DEVICE_OUT_FM);
+            } else {
+                mOutputs.valueFor(mPrimaryOutput)->changeRefCount(AUDIO_STREAM_MUSIC, -1);
+            }
+
+            AudioParameter param = AudioParameter();
+            param.addInt(String8("handle_fm"), (int)newDevice);
+            ALOGV("setDeviceConnectionState() setParameters handle_fm");
+            mpClientInterface->setParameters(mPrimaryOutput, param.toString());
+        }
+#endif
+
+
+~/android/system/hardware/qcom/audio-caf/msm8974 $ el hal/audio_extn/audio_extn.h
+
+#ifndef FM_ENABLED
+#define AUDIO_DEVICE_OUT_FM 0x80000
+#define AUDIO_DEVICE_OUT_FM_TX 0x100000
+#define AUDIO_SOURCE_FM_RX 9
+#define AUDIO_SOURCE_FM_RX_A2DP 10
+#define AUDIO_DEVICE_IN_FM_RX (AUDIO_DEVICE_BIT_IN | 0x8000)
+#define AUDIO_DEVICE_IN_FM_RX_A2DP (AUDIO_DEVICE_BIT_IN | 0x10000)
+#endif
+
+======================================================================================================================================================
+system/core/include/system/audio.h :
+
+#ifdef QCOM_HARDWARE
+    AUDIO_SOURCE_FM_RX               = 10,
+    AUDIO_SOURCE_FM_RX_A2DP          = 11,
+#endif
+
+    AUDIO_DEVICE_OUT_FM                        = 0x100000,      // FM transmitter out ?
+#ifdef QCOM_HARDWARE
+    AUDIO_DEVICE_OUT_FM_TX                     = 0x1000000,
+    AUDIO_DEVICE_OUT_PROXY                     = 0x2000000,
+#endif
+
+    AUDIO_DEVICE_BIT_IN                        = 0x80000000,
+    AUDIO_DEVICE_IN_FM_TUNER              = AUDIO_DEVICE_BIT_IN | 0x2000,           // FM tuner input
+#ifdef QCOM_HARDWARE
+    AUDIO_DEVICE_IN_PROXY                 = AUDIO_DEVICE_BIT_IN | 0x100000,
+    AUDIO_DEVICE_IN_FM_RX                 = AUDIO_DEVICE_BIT_IN | 0x200000,
+    AUDIO_DEVICE_IN_FM_RX_A2DP            = AUDIO_DEVICE_BIT_IN | 0x400000,
+#endif
+
+
+
+
+hardware/qcom/audio-caf/msm8974/hal/audio_extn/audio_extn.h
+hardware/qcom/audio-caf/apq8084/hal/audio_extn/audio_extn.h
+hardware/qcom/audio-caf/msm8916/hal/audio_extn/audio_extn.h
+#ifndef FM_ENABLED
+#define AUDIO_DEVICE_OUT_FM 0x80000
+#define AUDIO_DEVICE_OUT_FM_TX 0x100000
+#define AUDIO_SOURCE_FM_RX 9
+#define AUDIO_SOURCE_FM_RX_A2DP 10
+#define AUDIO_DEVICE_IN_FM_RX (AUDIO_DEVICE_BIT_IN | 0x8000)
+#define AUDIO_DEVICE_IN_FM_RX_A2DP (AUDIO_DEVICE_BIT_IN | 0x10000)
+#endif
+
+
+
+
+
+qall shell "getprop ro.modversion ; grep -l -e AUDIO_DEVICE_OUT_FM -e AUDIO_DEVICE_IN_FM -e fm_volume -e handle_fm -e FmVolume -e HandleFm system/lib/libaudio*"
+
+12-20150226-NIGHTLY-evita
+system/lib/libaudiopolicymanagerdefault.so
+
+12-20150226-NIGHTLY-falcon
+system/lib/libaudiopolicymanagerdefault.so
+
+11-20150223-NIGHTLY-yuga
+system/lib/libaudioflinger.so
+system/lib/libaudioparameter.so
+
+12-20150226-NIGHTLY-honami
+system/lib/libaudiopolicymanagerdefault.so
+
+12-20150226-NIGHTLY-m8
+system/lib/libaudiopolicymanagerdefault.so
+
+qall shell "getprop ro.modversion ; strings system/lib/libaudio*|grep -e AUDIO_DEVICE_OUT_FM -e AUDIO_DEVICE_IN_FM -e fm_volume -e handle_fm -e FmVolume -e HandleFm"
+
+12-20150226-NIGHTLY-evita                       Only most basic symbols, so no FM support
+AUDIO_DEVICE_OUT_FM
+AUDIO_DEVICE_IN_FM_TUNER
+
+12-20150226-NIGHTLY-falcon
+fm_volume
+handle_fm
+AUDIO_DEVICE_OUT_FM
+AUDIO_DEVICE_OUT_FM_TX
+AUDIO_DEVICE_IN_FM_TUNER
+AUDIO_DEVICE_IN_FM_RX
+AUDIO_DEVICE_IN_FM_RX_A2DP
+
+11-20150223-NIGHTLY-yuga                        CM11, so different, but few symbols and little FM support ?
+_ZN7android14AudioParameter11keyFmVolumeE
+_ZN7android14AudioParameter11keyHandleFmE
+fm_volume
+handle_fm
+_ZN7android14AudioParameter11keyFmVolumeE
+_ZN7android14AudioParameter11keyHandleFmE
+fm_volume
+handle_fm
+
+12-20150226-NIGHTLY-honami
+AUDIO_DEVICE_OUT_FM
+AUDIO_DEVICE_IN_FM_TUNER
+
+12-20150226-NIGHTLY-m8
+AUDIO_DEVICE_OUT_FM
+AUDIO_DEVICE_IN_FM_TUNER
+
+
+
+MOG:    a strings system/lib/hw/audio.primary.msm8226.so|grep -i fm|sort|uniq|wc -l
+21
+audio_extn_fm_set_parameters
+audio_hw_fm
+capture-fm
+fm_set_volume
+fm_start
+fm_stop
+fm-virtual-record
+fm_volume
+handle_fm
+Internal FM RX Volume
+play-fm
+%s: error in retrieving fm volume
+%s: FM usecase
+SND_DEVICE_IN_CAPTURE_FM
+SND_DEVICE_OUT_TRANSMISSION_FM
+sound card is OFFLINE, stop FM
+sound card is ONLINE, restart FM
+%s: Problem in FM start: status(%d)
+%s: set_fm_volume usecase
+%s: Setting FM volume to %d 
+transmission-fm
+
+
+OM8:    a strings system/lib/hw/audio.primary.msm8974.so|grep -i fm|wc
+      6       6     115
+XZ1:    a strings system/lib/hw/audio.primary.msm8974.so|grep -i fm|wc
+      6       6     115
+play-fm
+fm-virtual-record
+capture-fm
+transmission-fm
+SND_DEVICE_OUT_TRANSMISSION_FM
+SND_DEVICE_IN_CAPTURE_FM
+
+
+XZ0:    a strings system/lib/hw/audio.primary.msm8960.so|grep -i fm|sort|uniq|wc -l
+20 these 3 more than OXL
+handle_fm
+_ZN7android14AudioParameter11keyFmVolumeE
+_ZN7android14AudioParameter11keyHandleFmE
+
+OXL:    a strings system/lib/hw/audio.primary.msm8960.so|grep -i fm|sort|uniq|wc -l
+17
+Both:
+Capture A2DP FM
+Capture FM
+FM A2DP REC
+FM Digital Radio
+FM REC
+fm_volume
+Internal FM RX Volume
+Play FM
+set Fm Volume(%f) over 1.0, assuming 1.0
+set Fm Volume(%f) under 0.0, assuming 0.0
+startFm: could not open PCM device
+startFm: pcm_prepare failed
+startFm: setHardwareParams failed
+startFm: setSoftwareParams failed
+startFm: SNDRV_PCM_IOCTL_START failed
+_ZN20android_audio_legacy10ALSADevice11setFmVolumeEi
+_ZN20android_audio_legacy10ALSADevice7startFmEPNS_13alsa_handle_tE
+
+
+
+time grep -RIsl AUDIO_FEATURE_ENABLED_FM ~/android/system/ --exclude-dir=out --exclude-dir=prebuilts --exclude-dir=external
+
+frameworks/av/services/audiopolicy/Android.mk           -> AUDIO_EXTN_FM_ENABLED
+hardware/qcom/audio-caf/msm8974/policy_hal/Android.mk
+hardware/qcom/audio-caf/apq8084/policy_hal/Android.mk
+hardware/qcom/audio-caf/msm8226/policy_hal/Android.mk
+hardware/qcom/audio-caf/msm8916/policy_hal/Android.mk
+
+hardware/qcom/audio-caf/msm8974/hal/Android.mk          -> FM_ENABLED       LOCAL_SRC_FILES += audio_extn/fm.c
+....
+
+
+!!
+hardware/qcom/audio-caf/msm8226         ->              hardware/qcom/audio-caf/msm8974
+
+??
+cd ~/android/system
+grep -RIs QCOM_FM_ENABLED hardware/|grep -v ifdef
+    hardware/qcom/audio-caf/msm8960/legacy/alsa_sound/Android.mk:ifeq ($(strip $(QCOM_FM_ENABLED)),true)
+    hardware/qcom/audio-caf/msm8960/legacy/alsa_sound/Android.mk:    common_cflags += -DQCOM_FM_ENABLED
+
+
+
+time grep -RIs FM_ENABLE frameworks/ kernel/ hardware/
+
+x12:frameworks/av/services/audiopolicy/AudioPolicyManager.cpp:                  #ifdef AUDIO_EXTN_FM_ENABLED        defines handle_fm, fm_volume and others (MOG & OM8 only)
+
+    frameworks/av/services/audiopolicy/Android.mk:common_cflags += -DAUDIO_EXTN_FM_ENABLED
+
+    hardware/qcom/audio-caf/msm8974/legacy/alsa_sound/ALSAStreamOps.cpp:        #ifdef QCOM_FM_ENABLED
+x2: hardware/qcom/audio-caf/msm8974/legacy/alsa_sound/AudioStreamInALSA.cpp:    #ifdef QCOM_FM_ENABLED
+x2: hardware/qcom/audio-caf/msm8974/legacy/alsa_sound/alsa_default.cpp:         #ifdef QCOM_FM_ENABLED
+x4: hardware/qcom/audio-caf/msm8974/legacy/alsa_sound/audio_hw_hal.cpp:         #ifdef QCOM_FM_ENABLED
+x2: hardware/qcom/audio-caf/msm8974/legacy/alsa_sound/AudioHardwareALSA.h:      #ifdef QCOM_FM_ENABLED
+x8: hardware/qcom/audio-caf/msm8974/legacy/alsa_sound/AudioHardwareALSA.cpp:    #ifdef QCOM_FM_ENABLED
+x8: hardware/qcom/audio-caf/msm8974/policy_hal/AudioPolicyManager.cpp:          #ifdef AUDIO_EXTN_FM_ENABLED
+x6: hardware/qcom/audio-caf/msm8974/hal/msm8974/platform.c:                     #ifdef FM_ENABLED
+x2: hardware/qcom/audio-caf/msm8974/hal/audio_extn/audio_extn.c:                #ifndef FM_ENABLED
+    hardware/qcom/audio-caf/msm8974/hal/audio_extn/fm.c:                        #ifdef FM_ENABLED
+hardware/qcom/audio-caf/msm8974/policy_hal/Android.mk:LOCAL_CFLAGS += -DAUDIO_EXTN_FM_ENABLED
+hardware/qcom/audio-caf/msm8974/hal/Android.mk:    LOCAL_CFLAGS += -DFM_ENABLED
+
+And similar for:
+
+    hardware/qcom/audio-caf/msm8960/legacy/alsa_sound/ALSAStreamOps.cpp:        #ifdef QCOM_FM_ENABLED
+    hardware/qcom/audio-caf/msm8960/legacy/alsa_sound/AudioStreamInALSA.cpp:    #ifdef QCOM_FM_ENABLED
+    hardware/qcom/audio-caf/msm8960/legacy/alsa_sound/ALSADevice.cpp:           #ifdef QCOM_FM_ENABLED
+    hardware/qcom/audio-caf/msm8960/legacy/alsa_sound/audio_hw_hal.cpp:         #ifdef QCOM_FM_ENABLED
+    hardware/qcom/audio-caf/msm8960/legacy/alsa_sound/AudioHardwareALSA.h:      #ifdef QCOM_FM_ENABLED
+    hardware/qcom/audio-caf/msm8960/legacy/alsa_sound/AudioHardwareALSA.cpp:    #ifdef QCOM_FM_ENABLED
+    hardware/qcom/audio-caf/msm8960/legacy/alsa_sound/AudioPolicyManagerALSA.cpp:#ifdef QCOM_FM_ENABLED
+hardware/qcom/audio-caf/msm8960/legacy/alsa_sound/Android.mk:ifeq ($(strip $(QCOM_FM_ENABLED)),true)
+hardware/qcom/audio-caf/msm8960/legacy/alsa_sound/Android.mk:    common_cflags += -DQCOM_FM_ENABLED
+
+    hardware/qcom/audio-caf/msm8226/legacy/alsa_sound/ALSAStreamOps.cpp:        #ifdef QCOM_FM_ENABLED
+    hardware/qcom/audio-caf/msm8226/legacy/alsa_sound/AudioStreamInALSA.cpp:    #ifdef QCOM_FM_ENABLED
+    hardware/qcom/audio-caf/msm8226/legacy/alsa_sound/alsa_default.cpp:         #ifdef QCOM_FM_ENABLED
+    hardware/qcom/audio-caf/msm8226/legacy/alsa_sound/audio_hw_hal.cpp:         #ifdef QCOM_FM_ENABLED
+    hardware/qcom/audio-caf/msm8226/legacy/alsa_sound/AudioHardwareALSA.h:      #ifdef QCOM_FM_ENABLED
+    hardware/qcom/audio-caf/msm8226/legacy/alsa_sound/AudioHardwareALSA.cpp:    #ifdef QCOM_FM_ENABLED
+    hardware/qcom/audio-caf/msm8226/policy_hal/AudioPolicyManager.cpp:          #ifdef AUDIO_EXTN_FM_ENABLED
+    hardware/qcom/audio-caf/msm8226/hal/msm8974/platform.c:                     #ifdef FM_ENABLED
+    hardware/qcom/audio-caf/msm8226/hal/audio_extn/audio_extn.c:                #ifndef FM_ENABLED
+    hardware/qcom/audio-caf/msm8226/hal/audio_extn/audio_extn.h:                #ifndef FM_ENABLED
+    hardware/qcom/audio-caf/msm8226/hal/audio_extn/fm.c:                        #ifdef FM_ENABLED
+hardware/qcom/audio-caf/msm8226/policy_hal/Android.mk:LOCAL_CFLAGS += -DAUDIO_EXTN_FM_ENABLED
+hardware/qcom/audio-caf/msm8226/hal/Android.mk:    LOCAL_CFLAGS += -DFM_ENABLED
+
+    hardware/qcom/audio-caf/msm8916/policy_hal/AudioPolicyManager.cpp:          #ifdef AUDIO_EXTN_FM_ENABLED
+    hardware/qcom/audio-caf/msm8916/hal/audio_extn/audio_extn.c:                #ifndef FM_ENABLED
+    hardware/qcom/audio-caf/msm8916/hal/audio_extn/audio_extn.h:                #ifndef FM_ENABLED
+    hardware/qcom/audio-caf/msm8916/hal/audio_extn/fm.c:                        #ifdef FM_ENABLED
+hardware/qcom/audio-caf/msm8916/policy_hal/Android.mk:LOCAL_CFLAGS += -DAUDIO_EXTN_FM_ENABLED
+hardware/qcom/audio-caf/msm8916/hal/Android.mk:    LOCAL_CFLAGS += -DFM_ENABLED
+
+    hardware/qcom/audio/default/legacy/alsa_sound/ALSAStreamOps.cpp:            #ifdef QCOM_FM_ENABLED
+    hardware/qcom/audio/default/legacy/alsa_sound/AudioStreamInALSA.cpp:        #ifdef QCOM_FM_ENABLED
+    hardware/qcom/audio/default/legacy/alsa_sound/alsa_default.cpp:             #ifdef QCOM_FM_ENABLED
+    hardware/qcom/audio/default/legacy/alsa_sound/audio_hw_hal.cpp:             #ifdef QCOM_FM_ENABLED
+    hardware/qcom/audio/default/legacy/alsa_sound/AudioHardwareALSA.h:          #ifdef QCOM_FM_ENABLED
+    hardware/qcom/audio/default/legacy/alsa_sound/AudioHardwareALSA.cpp:        #ifdef QCOM_FM_ENABLED
+
+
+
+
+qall shell "getprop ro.product.device ; grep -R -l -e AUDIO_DEVICE_OUT_FM -e AUDIO_DEVICE_IN_FM -e fm_volume -e handle_fm -e FmVolume -e HandleFm ??????/lib/"
+evita
+    system/lib/hw/audio.primary.msm8960.so
+    system/lib/libaudiopolicymanagerdefault.so
+falcon_umts
+    system/lib/hw/audio.primary.msm8226.so
+    system/lib/libaudiopolicymanagerdefault.so
+honami                                                  # honami Z1 only has: AUDIO_DEVICE_OUT_FM   AUDIO_DEVICE_IN_FM
+    system/lib/libaudiopolicymanagerdefault.so
+htc_m8
+    system/lib/hw/audio.primary.msm8974.so
+    system/lib/libaudiopolicymanagerdefault.so
+
+
+Same for AUDIO_DEVICE_IN_FM:
+qall shell "getprop ro.product.device ; grep -R -l -e AUDIO_DEVICE_OUT_FM ??????/lib/"
+evita
+    system/lib/libaudiopolicymanagerdefault.so
+falcon_umts
+    system/lib/libaudiopolicymanagerdefault.so
+honami
+    system/lib/libaudiopolicymanagerdefault.so
+htc_m8
+    system/lib/libaudiopolicymanagerdefault.so
+
+qall shell "getprop ro.product.device ; grep -R -l -e fm_volume ??????/lib/"
+evita
+    system/lib/hw/audio.primary.msm8960.so
+falcon_umts
+    system/lib/hw/audio.primary.msm8226.so
+    system/lib/libaudiopolicymanagerdefault.so
+honami
+htc_m8
+    system/lib/hw/audio.primary.msm8974.so
+    system/lib/libaudiopolicymanagerdefault.so
+
+qall shell "getprop ro.product.device ; grep -R -l -e handle_fm ??????/lib/"
+evita
+falcon_umts
+    system/lib/hw/audio.primary.msm8226.so
+    system/lib/libaudiopolicymanagerdefault.so
+honami
+htc_m8
+    system/lib/hw/audio.primary.msm8974.so
+    system/lib/libaudiopolicymanagerdefault.so
+
+qall shell "getprop ro.product.device ; grep -R -l -e FmVolume ??????/lib/"
+evita
+    system/lib/hw/audio.primary.msm8960.so
+falcon_umts
+honami
+htc_m8
+
+qall shell "getprop ro.product.device ; grep -R -l -e HandleFm ??????/lib/"
+evita
+falcon_umts
+honami
+htc_m8
+
+
+
+
+qall shell " echo ; getprop ro.product.device ; strings -n9 system/lib/libaud* | grep -i fm | grep -v -e Fmke -e Fmt"
+
+evita
+AUDIO_DEVICE_OUT_FM
+AUDIO_DEVICE_IN_FM_TUNER
+
+falcon_umts
+fm_volume
+handle_fm
+AUDIO_DEVICE_OUT_FM
+AUDIO_DEVICE_OUT_FM_TX
+AUDIO_DEVICE_IN_FM_TUNER
+AUDIO_DEVICE_IN_FM_RX
+AUDIO_DEVICE_IN_FM_RX_A2DP
+
+honami
+AUDIO_DEVICE_OUT_FM
+AUDIO_DEVICE_IN_FM_TUNER
+
+htc_m8
+fm_volume
+handle_fm
+AUDIO_DEVICE_OUT_FM
+AUDIO_DEVICE_OUT_FM_TX
+AUDIO_DEVICE_IN_FM_TUNER
+AUDIO_DEVICE_IN_FM_RX
+AUDIO_DEVICE_IN_FM_RX_A2DP
+
+
+qall shell " echo ; getprop ro.product.device ; grep -i -e fm_ -e _fm -e handlefm -e fmvolume  system/lib/libaud*"
+
+evita
+Binary file system/lib/libaudiopolicymanagerdefault.so matches
+
+falcon_umts
+Binary file system/lib/libaudiopolicymanagerdefault.so matches
+
+honami
+Binary file system/lib/libaudiopolicymanagerdefault.so matches
+
+htc_m8
+Binary file system/lib/libaudiopolicymanagerdefault.so matches
+
+
+qall shell " echo ; getprop ro.product.device ; strings  system/lib/hw/* | grep -i fm | grep -i -v -e cfm -e fmt"
+
+grep -i -e "-fm" -e "fm-" -e _fm -e fm_ -e startFm -e "FM volume" -e "FM RX Volume" -e "FM start" - "stop FM" -e "restart FM" -e "FM usecase" -e FmVolume -e "FM Digital" -e "Play FM" -e "FM REC" -e "Capture FM" -e "FM A2DP REC" -e "Capture A2DP FM" -e "Internal FM RX Volume"
+
+#qall shell echo && getprop ro.product.device && grep -Ri system/lib/hw/* -e "-fm" -e "fm-" -e _fm -e fm_ -e startFm -e "FM volume" -e "FM RX Volume" -e "FM start" - "stop FM" -e "restart FM" -e "FM usecase" -e FmVolume -e "FM Digital" -e "Play FM" -e "FM REC" -e "Capture FM" -e "FM A2DP REC" -e "Capture A2DP FM" -e "Internal FM RX Volume"
+
+grep -Ri /system/lib/hw/* -e "-fm" -e "fm-" -e _fm -e fm_ -e startFm -e 'FM volume' -e 'FM RX Volume' -e "FM start" -e "stop FM" -e "restart FM" -e "FM usecase" -e FmVolume -e "FM Digital" -e "Play FM" -e "FM REC" -e "Capture FM" -e "FM A2DP REC" -e "Capture A2DP FM" -e "Internal FM RX Volume"
+
+a strings /system/lib/hw/* | grep -i -e "-fm" -e "fm-" -e _fm -e fm_ -e startFm -e 'FM volume' -e 'FM RX Volume' -e "FM start" -e "stop FM" -e "restart FM" -e "FM usecase" -e FmVolume -e "FM Digital" -e "Play FM" -e "FM REC" -e "Capture FM" -e "FM A2DP REC" -e "Capture A2DP FM" -e "Internal FM RX Volume"
+
+    audio_extn_fm_set_parameters
+    play-fm
+    fm-virtual-record
+    capture-fm
+    transmission-fm
+    audio_hw_fm
+    %s: Setting FM volume to %d 
+    Internal FM RX Volume
+    %s: Problem in FM start: status(%d)
+    sound card is OFFLINE, stop FM
+    sound card is ONLINE, restart FM
+    handle_fm
+    %s: FM usecase
+    fm_volume
+    %s: error in retrieving fm volume
+    %s: set_fm_volume usecase
+    fm_set_volume
+    fm_stop
+    audio_extn_fm_set_parameters
+    fm_start
+    SND_DEVICE_OUT_TRANSMISSION_FM
+    SND_DEVICE_IN_CAPTURE_FM
+
+    _ZN20android_audio_legacy10ALSADevice11setFmVolumeEi
+    _ZN20android_audio_legacy10ALSADevice7startFmEPNS_13alsa_handle_tE
+    FM Digital Radio
+    Play FM
+    FM REC
+    Capture FM
+    fm_volume
+    set Fm Volume(%f) under 0.0, assuming 0.0
+    set Fm Volume(%f) over 1.0, assuming 1.0
+    FM A2DP REC
+    Capture A2DP FM
+    Internal FM RX Volume
+    startFm: could not open PCM device
+    startFm: setHardwareParams failed
+    startFm: setSoftwareParams failed
+    startFm: SNDRV_PCM_IOCTL_START failed
+    startFm: pcm_prepare failed
+
+
+
+a strings /system/lib/libaud* | grep -i -e "-fm" -e "fm-" -e _fm -e fm_ -e startFm -e 'FM volume' -e 'FM RX Volume' -e "FM start" -e "stop FM" -e "restart FM" -e "FM usecase" -e FmVolume -e "FM Digital" -e "Play FM" -e "FM REC" -e "Capture FM" -e "FM A2DP REC" -e "Capture A2DP FM" -e "Internal FM RX Volume" | grep -i -v -e cfm_ -e fmul -e fmt
+
+xz1 / oxl:
+AUDIO_DEVICE_OUT_FM
+AUDIO_DEVICE_IN_FM_TUNER
+
+mog / om8:
+fm_volume
+handle_fm
+AUDIO_DEVICE_OUT_FM
+AUDIO_DEVICE_OUT_FM_TX
+AUDIO_DEVICE_IN_FM_TUNER
+AUDIO_DEVICE_IN_FM_RX
+AUDIO_DEVICE_IN_FM_RX_A2DP
+
+
+a strings /system/lib/hw/audio.primary.* | grep -i -e "-fm" -e "fm-" -e _fm -e fm_ -e startFm -e 'FM volume' -e 'FM RX Volume' -e "FM start" -e "stop FM" -e "restart FM" -e "FM usecase" -e FmVolume -e "FM Digital" -e "Play FM" -e "FM REC" -e "Capture FM" -e "FM A2DP REC" -e "Capture A2DP FM" -e "Internal FM RX Volume" | grep -i -v -e cfm_ -e fmul -e fmt
+
+xz1
+play-fm
+fm-virtual-record
+capture-fm
+transmission-fm
+SND_DEVICE_OUT_TRANSMISSION_FM
+SND_DEVICE_IN_CAPTURE_FM
+
+oxl
+_ZN20android_audio_legacy10ALSADevice11setFmVolumeEi
+_ZN20android_audio_legacy10ALSADevice7startFmEPNS_13alsa_handle_tE
+FM Digital Radio
+Play FM
+FM REC
+Capture FM
+fm_volume
+set Fm Volume(%f) under 0.0, assuming 0.0
+set Fm Volume(%f) over 1.0, assuming 1.0
+FM A2DP REC
+Capture A2DP FM
+Internal FM RX Volume
+startFm: could not open PCM device
+startFm: setHardwareParams failed
+startFm: setSoftwareParams failed
+startFm: SNDRV_PCM_IOCTL_START failed
+startFm: pcm_prepare failed
+
+mog / om8
+audio_extn_fm_set_parameters
+play-fm
+fm-virtual-record
+capture-fm
+transmission-fm
+audio_hw_fm
+%s: Setting FM volume to %d 
+Internal FM RX Volume
+%s: Problem in FM start: status(%d)
+sound card is OFFLINE, stop FM
+sound card is ONLINE, restart FM
+handle_fm
+%s: FM usecase
+fm_volume
+%s: error in retrieving fm volume
+%s: set_fm_volume usecase
+fm_set_volume
+fm_stop
+audio_extn_fm_set_parameters
+fm_start
+SND_DEVICE_OUT_TRANSMISSION_FM
+SND_DEVICE_IN_CAPTURE_FM
+
+*/
   int analog_output_mode = 0;
-  int analog_and_digital = 0;//1;       // Not working on GS1 and GS2/NO1
+  int analog_and_digital = 0;//1;                                       // Not working on GS1 and GS2/NO1
   int hostless_samplerate = 48000;//44100;
   int hostless_channels = 2;
 
-
-  void tuner_mute_set (int mute) {
+  int audio_ana_vol_set (int vol) {                                     // Volume for analog mode, via ALSA or codec_reg
+    logd ("audio_ana_vol_set vol: %d  curr_chass_plug_aud: %s", vol, curr_chass_plug_aud);
+    int ret = -1;
+    switch (curr_chass_plug_aud_int) {
+      case PLUG_AUD_CUS: if (1) ret = cus_ana_vol_set (vol);break;
+      case PLUG_AUD_GS1: if (1) ret = gs1_ana_vol_set (vol);break;
+      case PLUG_AUD_GS2: if (1) ret = gs2_ana_vol_set (vol);break;
+      case PLUG_AUD_GS3: if (1) ret = gs3_ana_vol_set (vol);break;
+      case PLUG_AUD_QCV: if (1) ret = qcv_ana_vol_set (vol);break;
+      case PLUG_AUD_OM7: if (1) ret = om7_ana_vol_set (vol);break;
+      case PLUG_AUD_LG2: if (1) ret = lg2_ana_vol_set (vol);break;
+      case PLUG_AUD_XZ2: if (1) ret = xz2_ana_vol_set (vol);break;
+    }
+    return (ret);
+  }
+/*
+  void tuner_mute_set (int mute) {                                      // Mute tuner; here to avoid noise
     if (tnr_funcs == NULL)
       return;
     if (mute == 0) {
@@ -21,57 +771,113 @@
         strlcpy (curr_tuner_mute, "Mute",  sizeof (curr_tuner_mute));
     }
   }
-
+*/
   int audio_state_start () {
     int ret = -1;
-    tuner_mute_set (1);                                                 // Mute to avoid noise
+    //tuner_mute_set (1);                                                 // Mute to avoid noise
     switch (curr_chass_plug_aud_int) {
-      case PLUG_AUD_UNK: ret = -1;               break;
-      case PLUG_AUD_GEN: ret = -1;               break;
-      case PLUG_AUD_GS1: if (analog_output_mode) ret = gs1_ana_audio_state_start ();  if (analog_output_mode == 0 || analog_and_digital != 0) ret = gs1_dig_audio_state_start ();  break;
-      case PLUG_AUD_GS2: if (analog_output_mode) ret = gs2_ana_audio_state_start ();  if (analog_output_mode == 0 || analog_and_digital != 0) ret = gs2_dig_audio_state_start ();  break;
-      case PLUG_AUD_GS3: if (analog_output_mode) ret = gs3_ana_audio_state_start ();  if (analog_output_mode == 0 || analog_and_digital != 0) ret = gs3_dig_audio_state_start ();  break;
-      case PLUG_AUD_QCV: if (analog_output_mode) ret = qcv_ana_audio_state_start ();  if (analog_output_mode == 0 || analog_and_digital != 0) ret = qcv_dig_audio_state_start ();  break;
-      case PLUG_AUD_OM7: if (analog_output_mode) ret = om7_ana_audio_state_start ();  if (analog_output_mode == 0 || analog_and_digital != 0) ret = om7_dig_audio_state_start ();  break;
-      case PLUG_AUD_LG2: if (analog_output_mode) ret = lg2_ana_audio_state_start ();  if (analog_output_mode == 0 || analog_and_digital != 0) ret = lg2_dig_audio_state_start ();  break;
-      case PLUG_AUD_XZ2: if (analog_output_mode) ret = xz2_ana_audio_state_start ();  if (analog_output_mode == 0 || analog_and_digital != 0) ret = xz2_dig_audio_state_start ();  break;
+      case PLUG_AUD_CUS: if (analog_output_mode) ret = cus_ana_audio_state_start ();  if (! analog_output_mode || analog_and_digital) ret = cus_dig_audio_state_start ();  break;
+      case PLUG_AUD_GS1: if (analog_output_mode) ret = gs1_ana_audio_state_start ();  if (! analog_output_mode || analog_and_digital) ret = gs1_dig_audio_state_start ();  break;
+      case PLUG_AUD_GS2: if (analog_output_mode) ret = gs2_ana_audio_state_start ();  if (! analog_output_mode || analog_and_digital) ret = gs2_dig_audio_state_start ();  break;
+      case PLUG_AUD_GS3: if (analog_output_mode) ret = gs3_ana_audio_state_start ();  if (! analog_output_mode || analog_and_digital) ret = gs3_dig_audio_state_start ();  break;
+      case PLUG_AUD_QCV: if (analog_output_mode) ret = qcv_ana_audio_state_start ();  if (! analog_output_mode || analog_and_digital) ret = qcv_dig_audio_state_start ();  break;
+      case PLUG_AUD_OM7: if (analog_output_mode) ret = om7_ana_audio_state_start ();  if (! analog_output_mode || analog_and_digital) ret = om7_dig_audio_state_start ();  break;
+      case PLUG_AUD_LG2: if (analog_output_mode) ret = lg2_ana_audio_state_start ();  if (! analog_output_mode || analog_and_digital) ret = lg2_dig_audio_state_start ();  break;
+      case PLUG_AUD_XZ2: if (analog_output_mode) ret = xz2_ana_audio_state_start ();  if (! analog_output_mode || analog_and_digital) ret = xz2_dig_audio_state_start ();  break;
     }
-    tuner_mute_set (0);                                                 // Unmute to play audio
+    //tuner_mute_set (0);                                                 // Unmute to play audio
     return (ret);
   }
 
   int audio_state_stop () {
-    tuner_mute_set (1);                                                 // Mute to avoid noise
     int ret = -1;
+    //tuner_mute_set (1);                                                 // Mute to avoid noise (Audio stopping so leave muted; don't need to unmute at end)
     switch (curr_chass_plug_aud_int) {
-      case PLUG_AUD_UNK: ret = -1;               break;
-      case PLUG_AUD_GEN: ret = -1;               break;
-      case PLUG_AUD_GS1: if (analog_output_mode) ret = gs1_ana_audio_state_stop ();  if (analog_output_mode == 0 || analog_and_digital != 0) ret = gs1_dig_audio_state_stop ();  break;
-      case PLUG_AUD_GS2: if (analog_output_mode) ret = gs2_ana_audio_state_stop ();  if (analog_output_mode == 0 || analog_and_digital != 0) ret = gs2_dig_audio_state_stop ();  break;
-      case PLUG_AUD_GS3: if (analog_output_mode) ret = gs3_ana_audio_state_stop ();  if (analog_output_mode == 0 || analog_and_digital != 0) ret = gs3_dig_audio_state_stop ();  break;
-      case PLUG_AUD_QCV: if (analog_output_mode) ret = qcv_ana_audio_state_stop ();  if (analog_output_mode == 0 || analog_and_digital != 0) ret = qcv_dig_audio_state_stop ();  break;
-      case PLUG_AUD_OM7: if (analog_output_mode) ret = om7_ana_audio_state_stop ();  if (analog_output_mode == 0 || analog_and_digital != 0) ret = om7_dig_audio_state_stop ();  break;
-      case PLUG_AUD_LG2: if (analog_output_mode) ret = lg2_ana_audio_state_stop ();  if (analog_output_mode == 0 || analog_and_digital != 0) ret = lg2_dig_audio_state_stop ();  break;
-      case PLUG_AUD_XZ2: if (analog_output_mode) ret = xz2_ana_audio_state_stop ();  if (analog_output_mode == 0 || analog_and_digital != 0) ret = xz2_dig_audio_state_stop ();  break;
+      case PLUG_AUD_CUS: if (analog_output_mode) ret = cus_ana_audio_state_stop ();  if (! analog_output_mode || analog_and_digital) ret = cus_dig_audio_state_stop ();  break;
+      case PLUG_AUD_GS1: if (analog_output_mode) ret = gs1_ana_audio_state_stop ();  if (! analog_output_mode || analog_and_digital) ret = gs1_dig_audio_state_stop ();  break;
+      case PLUG_AUD_GS2: if (analog_output_mode) ret = gs2_ana_audio_state_stop ();  if (! analog_output_mode || analog_and_digital) ret = gs2_dig_audio_state_stop ();  break;
+      case PLUG_AUD_GS3: if (analog_output_mode) ret = gs3_ana_audio_state_stop ();  if (! analog_output_mode || analog_and_digital) ret = gs3_dig_audio_state_stop ();  break;
+      case PLUG_AUD_QCV: if (analog_output_mode) ret = qcv_ana_audio_state_stop ();  if (! analog_output_mode || analog_and_digital) ret = qcv_dig_audio_state_stop ();  break;
+      case PLUG_AUD_OM7: if (analog_output_mode) ret = om7_ana_audio_state_stop ();  if (! analog_output_mode || analog_and_digital) ret = om7_dig_audio_state_stop ();  break;
+      case PLUG_AUD_LG2: if (analog_output_mode) ret = lg2_ana_audio_state_stop ();  if (! analog_output_mode || analog_and_digital) ret = lg2_dig_audio_state_stop ();  break;
+      case PLUG_AUD_XZ2: if (analog_output_mode) ret = xz2_ana_audio_state_stop ();  if (! analog_output_mode || analog_and_digital) ret = xz2_dig_audio_state_stop ();  break;
     }
-    //tuner_mute_set (0);                                                 // DISABLE: Audio stopped so leave muted      WAS: Unmute to play audio
     return (ret);
   }
 
-  char * audio_state_set (char * audio_state) {
-    if (! strcmp (audio_state, "Start"))                            // Start
+  char * audio_state_set (char * new_audio_state) {
+    logd ("audio_state_set new_audio_state: %d  curr_chass_plug_aud: %s", new_audio_state, curr_chass_plug_aud);
+    if (! strcmp (new_audio_state, "Start"))                            // Start
       logd ("audio_state Start: %d", audio_state_start ());
-    else if (! strcmp (audio_state, "Stop"))                        // Stop and Pause are the same
+    else if (! strcmp (new_audio_state, "Stop"))                        // Stop and Pause are the same
       logd ("audio_state Stop: %d", audio_state_stop ());
-    else if (! strcmp (audio_state, "Pause"))
+    else if (! strcmp (new_audio_state, "Pause"))
       logd ("audio_state Stop: %d", audio_state_stop ());
     else
-      logd ("audio_state Unknown: %s", audio_state);
+      logd ("Unknown new_audio_state: %s", new_audio_state);
 
-    strlcpy (curr_audio_state, audio_state, sizeof (curr_audio_state));
+    strlcpy (curr_audio_state, new_audio_state, sizeof (curr_audio_state));
     return (curr_audio_state);
   }
 
+
+    //
+
+  char * audio_mode_set (char * new_audio_mode) {
+    logd ("audio_mode_set new_audio_mode: %d  curr_chass_plug_aud: %s", new_audio_mode, curr_chass_plug_aud);
+    int new_analog_output_mode = -1;
+    if (! strcmp (new_audio_mode, "Digital")) {
+      logd ("audio_mode_set Digital curr_audio_state: %s", curr_audio_state);
+      new_analog_output_mode = 0;
+    }
+    else if (! strcmp (new_audio_mode, "Analog")) {
+      logd ("audio_mode_set Analog curr_audio_state: %s", curr_audio_state);
+      new_analog_output_mode = 1;
+    }
+    else {
+      logd ("Unknown audio_mode_set: %s", new_audio_mode);
+      return (curr_audio_mode);
+    }
+
+    if (! strcmp (curr_audio_state, "Start"))
+      audio_state_stop ();                                              // Turn off current
+
+    analog_output_mode = new_analog_output_mode;                        // Set new mode
+
+    if (! strcmp (curr_audio_state, "Start"))
+      audio_state_start ();                                             // Turn on new
+
+    strlcpy (curr_audio_mode, new_audio_mode, sizeof (curr_audio_mode));
+    return (curr_audio_mode);
+  }
+
+
+    // Custom:
+
+  int cus_dig_audio_state_start () {
+
+    return (0);
+  }
+
+  int cus_dig_audio_state_stop () {
+
+    return (0);
+  }
+
+  int cus_ana_audio_state_start () {
+
+    return (0);
+  }
+
+  int cus_ana_audio_state_stop () {
+
+    return (0);
+  }
+
+  int cus_ana_vol_set (int vol) {
+
+    return (0);
+  }
 
 
     // GS1:
@@ -121,6 +927,7 @@
 
     return (0);
   }
+
 
   //String hex_get ()
 
@@ -228,10 +1035,10 @@ alsa_bool_set ("Headphone Playback Switch", 1);
 
     // GT-I9300 Galaxy S3 & GT-N7100 Note2:
 
-  #define NOTE2_1_CHANNEL_LOW_HACK
-  #ifdef NOTE2_1_CHANNEL_LOW_HACK
+  #define NOTE2_MIXINR_IN2R_Switch_HACK
+  #ifdef NOTE2_MIXINR_IN2R_Switch_HACK
 
-  void lowchannel_hack () {
+  void NOTE2_MIXINR_IN2R_Switch_hack () {
     // PROBLEM 2:
     // Note2 problem is that FM Right (IN2RN) is very low, compared to FM Left:
     // FM Left     IN2RP       OK
@@ -271,7 +1078,7 @@ alsa_bool_set ("Headphone Playback Switch", 1);
     close (fd);                                                         // Close codec_reg file
 
   }
-  #endif    // #ifdef NOTE2_1_CHANNEL_LOW_HACK
+  #endif    // #ifdef NOTE2_MIXINR_IN2R_Switch_HACK
 
 
     // GS3 Analog: GS3 schematic:
@@ -351,9 +1158,9 @@ alsa_bool_set ("Headphone Playback Switch", 1);
     alsa_enum_set ("AIF1ADCR Source", 1);                               // Right= Right     !! Set to Left (0) on recent KK/LOL ROMs January 2015, perhaps due to stereo recording of mono microphone
     //alsa_long_set ("AIF1ADC1 Volume", 96);//104);         // Raise ADC gain from 96
 
-  #ifdef NOTE2_1_CHANNEL_LOW_HACK
-    lowchannel_hack ();
-  #endif    // #ifdef NOTE2_1_CHANNEL_LOW_HACK
+  #ifdef NOTE2_MIXINR_IN2R_Switch_HACK
+    NOTE2_MIXINR_IN2R_Switch_hack ();
+  #endif    // #ifdef NOTE2_MIXINR_IN2R_Switch_HACK
 
     return (0);
   }
@@ -407,14 +1214,19 @@ alsa_bool_set ("Headphone Playback Switch", 1);
   int qcv_dig_audio_state_start () {
     if (curr_tuner_mode_int) {                                          // If Transmit...
       alsa_bool_set ("SLIMBUS_0_RX Audio Mixer MultiMedia1", 0);        // Wired headset audio off
-      alsa_bool_set ("INTERNAL_FM_RX Audio Mixer MultiMedia1", 1);      // Transmit input on MM 1
-      alsa_bool_set ("INTERNAL_FM_RX Audio Mixer MultiMedia4", 1);      // Transmit input on MM 4
-      alsa_bool_set ("INTERNAL_FM_RX Audio Mixer MultiMedia5", 1);      // Transmit input on MM 5
+      alsa_bool_set ("INTERNAL_FM_RX Audio Mixer MultiMedia1", 1);      // Transmit input on MM 1:  <path name=     "deep-buffer-playback transmission-fm">
+      alsa_bool_set ("INTERNAL_FM_RX Audio Mixer MultiMedia4", 1);      // Transmit input on MM 4:  <path name="compress-offload-playback transmission-fm">
+      alsa_bool_set ("INTERNAL_FM_RX Audio Mixer MultiMedia5", 1);      // Transmit input on MM 5:  <path name=     "low-latency-playback transmission-fm">
       return (0);
     }
 
-    alsa_bool_set ("MultiMedia1 Mixer INTERNAL_FM_TX", 1);              // Internal FM audio source on
-    alsa_bool_set ("MultiMedia1 Mixer SLIM_0_TX", 0);                   // Turn off microphone path
+    alsa_bool_set ("MultiMedia1 Mixer SLIM_0_TX", 0);                   // Turn off microphone path to MM 1
+    //alsa_enum_set ("SLIM_0_TX Channels", 1);                            // 2        Set SLIMBus TX channels     to "2"
+    //alsa_enum_set ("SLIM_0_TX Channels", 0);
+    //alsa_enum_set ("SLIM_0_TX Channels", 1);                            // 2        Set SLIMBus TX channels     to "2"
+
+    alsa_bool_set ("MultiMedia1 Mixer INTERNAL_FM_TX", 1);              // Internal FM audio source to MM 1
+//    alsa_bool_set ("MultiMedia1 Mixer SLIM_0_TX", 0);                   // Turn off microphone path to MM 1
 
     //acdb_disable ();
     return (0);
@@ -422,7 +1234,7 @@ alsa_bool_set ("Headphone Playback Switch", 1);
 
   int qcv_dig_audio_state_stop () {
     if (curr_tuner_mode_int) {                                          // If Transmit...
-      alsa_bool_set ("SLIMBUS_0_RX Audio Mixer MultiMedia1", 1);        // Wired headset audio on
+      alsa_bool_set ("SLIMBUS_0_RX Audio Mixer MultiMedia1", 1);        // Restore Wired headset audio to on, since we turned it off before
       return (0);
     }
 
@@ -430,11 +1242,7 @@ alsa_bool_set ("Headphone Playback Switch", 1);
     return (0);
   }
 
-
-
   int qcv_ana_vol_set (int vol) {
-    //return (utils_qcv_ana_vol_set (vol));                             // DISABLED: WAS:   In utils.c so that aud_all and tnr_qcv can access the same function:
-
     //alsa_long_set ("HPHL Volume", vol / 3276); // Range 0 - 20        // 'HPH? Volume' doesn't work so must use Internal FM RX Volume
     //alsa_long_set ("HPHR Volume", vol / 3276); // Range 0 - 20
 
@@ -445,11 +1253,10 @@ alsa_bool_set ("Headphone Playback Switch", 1);
     return (vol);
   }
 
-
-  int qcv_ana_audio_state_start () {
-    alsa_bool_set ("SLIMBUS_0_RX Port Mixer INTERNAL_FM_TX", 1);
-    alsa_bool_set ("SLIMBUS_DL_HL Switch", 1);
-
+  int qcv_ana_audio_state_start () {                                    // Qualcomm FM has pure digital audio, so this just sets up hostless transfer
+    alsa_bool_set ("SLIMBUS_0_RX Port Mixer INTERNAL_FM_TX", 1);        // FM to Slimbus 0
+    alsa_bool_set ("SLIMBUS_DL_HL Switch", 1);                          // Enable hostless transfer
+                                                                        // Start hostless transfer
     hostless_transfer_start (hostless_samplerate, hostless_channels, "/dev/snd/pcmC0D6c", NULL);
     return (0);
   }
@@ -498,8 +1305,8 @@ alsa_bool_set ("Headphone Playback Switch", 1);
     return (vol);
   }
 
-  int om7_ana_audio_state_start () {
-//    alsa_long_set ("RX3 Digital Volume", 70);//83);                            // Def: 84/124
+  int om7_ana_audio_state_start () {                                    // HTC One M7 has pure digital audio, so this just sets up hostless transfer
+//    alsa_long_set ("RX3 Digital Volume", 70);//83);                   // Def: 84/124
     //alsa_long_set ("RX4 Digital Volume", 83);
 //    alsa_long_set ("RX5 Digital Volume", 70);//83);
     //alsa_long_set ("RX6 Digital Volume", 83);
@@ -536,7 +1343,7 @@ alsa_bool_set ("Headphone Playback Switch", 1);
 
     alsa_enum_set ("SLIM_0_TX Channels", 1);                            // 2        Set SLIMBus TX channels     to "2"
 
-    alsa_bool_set ("MultiMedia1 Mixer SLIM_0_TX", 1);                   // MultiMedia1 enable  SLIMBus TX channel 0:    On, off, on
+    alsa_bool_set ("MultiMedia1 Mixer SLIM_0_TX", 1);                   // MultiMedia1 enable  SLIMBus TX channel 0:    On, off, on needed to reset here (for channels) because audio was already playing
     alsa_bool_set ("MultiMedia1 Mixer SLIM_0_TX", 0);
     alsa_bool_set ("MultiMedia1 Mixer SLIM_0_TX", 1);
     return (0);
@@ -555,7 +1362,7 @@ alsa_bool_set ("Headphone Playback Switch", 1);
 
 #define XZ2_SIMPLE_METHOD
 #ifdef  XZ2_SIMPLE_METHOD
-  int xz2_ana_audio_state_start () {
+  int xz2_ana_audio_state_start () {                                    // Xperia Z2/Z3+ FM audio is actually analog, so this simple method works and avoids ALSA interference issues.
     alsa_bool_set ("HPHR_PA_MIXER AUX_PGA_R Switch", 1);
     alsa_bool_set ("HPHL_PA_MIXER AUX_PGA_L Switch", 1);
     return (0);
@@ -567,7 +1374,7 @@ alsa_bool_set ("Headphone Playback Switch", 1);
     return (0);
   }
 #else
-  int xz2_ana_audio_state_start () {
+  int xz2_ana_audio_state_start () {                                    // This is how the stock app enables FM audio
     //alsa_enum_set ("SLIM_0_RX Channels", 1);
     //alsa_enum_set ("SLIM_0_TX Channels", 1);
     //alsa_bool_set ("MultiMedia1 Mixer SLIM_0_TX", 1);
@@ -576,7 +1383,7 @@ alsa_bool_set ("Headphone Playback Switch", 1);
     alsa_bool_set ("SLIMBUS_0_RX Port Mixer SLIM_0_TX", 1);
     //alsa_bool_set ("SLIMBUS_DL_HL Switch", 1);
 
-    hostless_transfer_start (hostless_samplerate, hostless_channels, "/dev/snd/pcmC0D25c", NULL);
+    hostless_transfer_start (hostless_samplerate, hostless_channels, "/dev/snd/pcmC0D25c", NULL);   // 25c/25p = "Voice Stub"; just a convenient virtual hitching post for hostless ?
     return (0);
   }
 
@@ -586,7 +1393,7 @@ alsa_bool_set ("Headphone Playback Switch", 1);
     //alsa_bool_set ("MultiMedia1 Mixer SLIM_0_TX", 0);
     alsa_bool_set ("SLIMBUS_0_RX Port Mixer SLIM_0_TX", 0);
     alsa_bool_set ("Voice Stub Tx Mixer SLIM_0_TX", 0);
-    alsa_bool_set ("SLIM_0_RX_Voice Mixer Voice Stub", 0);
+    alsa_bool_set ("SLIM_0_RX_Voice Mixer Voice Stub", 0);              // Some kind of weird Voice Stub/Mixer connection to FM; should check to see if audio is any better
     //alsa_enum_set ("SLIM_0_RX Channels", 0);
     //alsa_enum_set ("SLIM_0_TX Channels", 0);
 
@@ -620,17 +1427,26 @@ alsa_bool_set ("Headphone Playback Switch", 1);
     return (vol);
   }
 
-  int lg2_ana_audio_state_start () {
-    alsa_enum_set ("FM Radio", 0);                                    // ALSA Control Missing on pure AOSP ROMs without the LG ALSA FM extensions
-    //sys_run ("echo 69 > /sys/class/gpio/export ; echo out > /sys/class/gpio/gpio69/direction ; echo 0 > /sys/class/gpio/gpio69/value", 1);  // !!!! Testing only !!!!
-    alsa_bool_set ("SLIMBUS_0_RX Port Mixer TERT_MI2S_TX", 1);        // ALSA Control Missing on pure AOSP ROMs without the LG ALSA FM extensions
+  int lg2_ana_audio_state_start () {                                    // LG G2 has pure digital audio, so this just sets up hostless transfer
+
+                                                                        // Enable FM audio output
+    alsa_enum_set ("FM Radio", 0);                                      // ALSA Control Missing on pure AOSP ROMs without the LG ALSA FM extensions
+
+                                                                        // !!!! Testing only !!!!       This is the silly GPIO that "FM Radio" controls should use to select between BT and FM with
+                                                                        // that weird analog switch chip where it appears software could have been used instead, since both go to SOC. (BT & FM play together too.)
+    //sys_run ("echo 69 > /sys/class/gpio/export ; echo out > /sys/class/gpio/gpio69/direction ; echo 0 > /sys/class/gpio/gpio69/value", 1);
+
+                                                                        // Enable Tertiary MI2S FM digital audio input
+    alsa_bool_set ("SLIMBUS_0_RX Port Mixer TERT_MI2S_TX", 1);          // ALSA Control Missing on pure AOSP ROMs without the LG ALSA FM extensions
     alsa_bool_set ("SLIMBUS_DL_HL Switch", 1);
+
 //    alsa_long_set ("RX1 Digital Volume", 50);
 //    alsa_long_set ("RX2 Digital Volume", 50);
 
     hostless_transfer_start (hostless_samplerate, hostless_channels, "/dev/snd/pcmC0D17c", NULL);     // /dev/snd/pcmC0D5p
     return (0);
   }
+
 
   int lg2_ana_audio_state_stop () {
     hostless_transfer_stop ();
@@ -641,55 +1457,4 @@ alsa_bool_set ("Headphone Playback Switch", 1);
 
     return (0);
   }
-
-
-    //
-
-  char * audio_mode_set (char * audio_mode) {
-    int new_analog_output_mode = -1;
-    if (! strcmp (audio_mode, "Digital")) {
-      logd ("audio_mode_set Digital curr_audio_state: %s", curr_audio_state);
-      //if (! analog_output_mode)                                       // DISABLED: If unchanged
-      //  return (0);
-      new_analog_output_mode = 0;
-    }
-    else if (! strcmp (audio_mode, "Analog")) {
-      logd ("audio_mode_set Analog curr_audio_state: %s", curr_audio_state);
-      new_analog_output_mode = 1;
-    }
-    else
-      logd ("audio_mode_set Unknown: %s", audio_mode);
-
-    if (new_analog_output_mode < 0)
-      return (curr_audio_mode);
-
-    if (! strcmp (curr_audio_state, "Start"))
-      audio_state_stop ();                                              // Turn off current
-
-    analog_output_mode = new_analog_output_mode;                        // Set new mode
-
-    if (! strcmp (curr_audio_state, "Start"))
-      audio_state_start ();                                             // Turn on new
-
-    strlcpy (curr_audio_mode, audio_mode, sizeof (curr_audio_mode));
-    return (curr_audio_mode);
-  }
-
-  int audio_ana_vol_set (int vol) {
-    int ret = -1;
-    switch (curr_chass_plug_aud_int) {
-      case PLUG_AUD_GS1: if (1) ret = gs1_ana_vol_set (vol);break;
-      case PLUG_AUD_GS2: if (1) ret = gs2_ana_vol_set (vol);break;
-      case PLUG_AUD_GS3: if (1) ret = gs3_ana_vol_set (vol);break;
-      case PLUG_AUD_QCV: if (1) ret = qcv_ana_vol_set (vol);break;
-      case PLUG_AUD_OM7: if (1) ret = om7_ana_vol_set (vol);break;
-      case PLUG_AUD_LG2: if (1) ret = lg2_ana_vol_set (vol);break;
-      case PLUG_AUD_XZ2: if (1) ret = xz2_ana_vol_set (vol);break;
-      case PLUG_AUD_UNK: ret = -1;                          break;
-      case PLUG_AUD_GEN: ret = -1;                          break;
-      default:           ret = -1;                          break;
-    }
-    return (ret);
-  }
-
 

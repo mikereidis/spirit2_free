@@ -1,9 +1,13 @@
 
-    // Tuner API
+    // Tuner component API implemented by svc_tnr for svc_svc
 
 package fm.a2d.sf;
 
 public interface svc_tap {
+
+    // Now only 2 functions: tuner_get() and tuner_set(), to minimize the coupling between main SpiritF Service svc_svc, and it's instantiated Tuner class svc_tnr.
+    // Two functions makes new additions easy; just define new key, value pairs to pass.
+    // For 1 function, we could move to Set/Get model seen in C tuner plugin code, eg: tuner_sg()
 
   public abstract String tuner_get (String key);
 /*

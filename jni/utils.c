@@ -89,7 +89,7 @@
 
 
   #define PLUG_AUD_UNK -1
-  #define PLUG_AUD_GEN 0
+  #define PLUG_AUD_CUS 0
   #define PLUG_AUD_GS1 1
   #define PLUG_AUD_GS2 2
   #define PLUG_AUD_GS3 3
@@ -99,7 +99,7 @@
   #define PLUG_AUD_XZ2 7
 
   #define PLUG_TNR_UNK -1
-  #define PLUG_TNR_GEN 0
+  #define PLUG_TNR_CUS 0
   #define PLUG_TNR_SSL 1
   #define PLUG_TNR_QCV 2
   #define PLUG_TNR_BCH 3
@@ -307,27 +307,31 @@
     return (! strncmp (sys_prop_manuf,"HTC", strlen ("HTC")));
   }  
 
-  int qcv_internal_antenna_get () {
-    int internal_antenna = 0;
+  int qcv_need_internal_antenna_get () {
 
-    // These use internal:
+    if (! sony_get ())                                                  // Non Sony's use External
+      return (0);
+
+    // These are the Sony External exceptions for Xperia L, M, C:
+
+    if (! strncmp (sys_prop_device, "C2",       strlen ("C2"))      ||
+        ! strncmp (sys_prop_device, "S39",      strlen ("S39"))     ||
+        ! strncmp (sys_prop_device, "C19",      strlen ("C19"))     ||
+        ! strncmp (sys_prop_device, "NICKI",    strlen ("NICKI"))   ||
+        ! strncmp (sys_prop_device, "TAOSHAN",  strlen ("TAOSHAN")) )
+      return (0);
+
+
+    // Most Sony's use Internal, including Xperia SP:
+    // m_device.startsWith ("HUASHAN")
+    // m_device.startsWith ("C53")
+    // m_device.startsWith ("M35")
+
+    // And these use internal:
     //if (! strncmp (sys_prop_device, "LT29", 4))      // 29i = TX
     //if (! strncmp (sys_prop_device, "LT30", 4))      // 30p/30at/30a = T
     //if (! strncmp (sys_prop_device, "MINT", 4))      // FreeXperia T
     //if (! strncmp (sys_prop_device, "HAYA", 4))      // FreeXperia TX "HAYABUSA"
-    //! strncmp (sys_prop_device, "C53", 3)
-    //! strncmp (sys_prop_device, "M35", 3)
-    //! strncmp (sys_prop_device, "C19", 3)
-    //! strncmp (sys_prop_device, "HUASHAN", 7)
-
-    if (! sony_get ())
-      return (0);
-
-        // These use external:
-    if (! strncmp (sys_prop_device, "C2",    2) || ! strncmp (sys_prop_device, "S39",     3) || ! strncmp (sys_prop_device, "C19", 3) ||
-        ! strncmp (sys_prop_device, "NICKI", 5) || ! strncmp (sys_prop_device, "TAOSHAN", 7)
-        )
-      return (0);
 
     return (1);
   }
@@ -1211,7 +1215,7 @@
     sock_tmo_set (sockfd, rx_tmo);
     res_len = recvfrom (sockfd, res_buf, res_max, 0,(struct sockaddr *)&srv_addr, &srv_len);
     if (res_len <= 0) {
-      loge ("gen_client_cmd: recvfrom errno: %d", errno);
+      loge ("gen_client_cmd: recvfrom errno: %d", errno);               // Occasionally get EAGAIN here
     #ifdef  CS_DGRAM_UNIX
       unlink (api_clisock);
     #endif

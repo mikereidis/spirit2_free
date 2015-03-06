@@ -33,9 +33,9 @@
   #include <termios.h>
 
   // 100 / 50 / 100 was OK, but @ 4 MBits/second on the M7 the 50 for normal_uart_recv resulted in a patchram error
-  int patchram_uart_recv_tmo_ms = 200;//100;//500;//1000;         // Initial patchram command only
-  int normal_uart_recv_tmo_ms   = 200;// 50;//200;//400;
-  int normal_uart_send_tmo_ms   = 200;//100;//400;    //800);//1000);      // Write HCI command, waiting up to 0.8 (1) second to complete
+  int patchram_uart_recv_tmo_ms = 501;//201;//100;//500;//1000;         // Initial patchram command only
+  int normal_uart_recv_tmo_ms   = 502;//202;// 50;//200;//400;
+  int normal_uart_send_tmo_ms   = 203;//100;//400;    //800);//1000);      // Write HCI command, waiting up to 0.8 (1) second to complete
 
   int gen_server_loop_func (unsigned char * cmd_buf, int cmd_len, unsigned char * res_buf, int res_max );
 
@@ -140,15 +140,18 @@
   int baudrate_reset (int baudrate) {                                   // Reset the HCI interface baudrate, then set the port baudrate; Assumes we have valid communications first
     logd ("baudrate_reset: %d", baudrate);
     int ret = -1;
-    int termios_baudrate = termios_baudrate_get (baudrate);
+    int termios_baudrate = termios_baudrate_get (baudrate);             // Get termios_baudrate
+
     if (termios_baudrate) {                                             // If valid baudrate
       hci_cmd_baudrate_reset [13] = (unsigned char) (baudrate >> 24);
       hci_cmd_baudrate_reset [12] = (unsigned char) (baudrate >> 16);
       hci_cmd_baudrate_reset [11] = (unsigned char) (baudrate >> 8);
       hci_cmd_baudrate_reset [10] = (unsigned char) (baudrate & 0xFF);
+                                                                        // Send Baudrate reset command
       if (uart_hci_xact (hci_cmd_baudrate_reset, sizeof (hci_cmd_baudrate_reset)) < 0)
-        return (-1);                                                    // Return error and don't change UART baudrate
-      ret = uart_baudrate_set (baudrate);                               // Validated so this never return an error
+        return (-1);                                                    // If error, return error and don't change UART baudrate
+
+      ret = uart_baudrate_set (baudrate);                               // Change UART baudrate. Validated so this never return an error
       return (ret);
     }
     loge ("baudrate_reset invalid: %d",baudrate);
@@ -324,9 +327,11 @@
       return (-1);
     }
                                                                         // Always times out now ?
-    ret = tmo_read (uart_fd, & hci_cmd_patchram_send_buf [4], 2, patchram_uart_recv_tmo_ms, 0);   // W/ timeout 1000 ms, Read 2 bytes from UART (uses neither byte), doing multiple reads if needed
+    ret = tmo_read (uart_fd, & hci_cmd_patchram_send_buf [4], 2, patchram_uart_recv_tmo_ms, 0);   // W/ timeout, Read 2 bytes from UART (uses neither byte), doing multiple reads if needed
     logd ("patchram_set read 1 ret: %d", ret);
 
+
+// !! patchram takes 5 seconds regardless !!
     baudrate_reset (high_baudrate);                                     // Reset baudrate high
 
     quiet_ms_sleep (55);                                            // !! ?? Need ??
@@ -574,8 +579,7 @@
     else
       rret = tmo_read (fd, & buf [1], 3, normal_uart_recv_tmo_ms, 0);     // W/ timeout 400 ms, Read first 3 bytes, doing multiple reads if needed
     if (rret != 3) {                                                      // If a read error or 3 bytes not read
-      if (! flush)
-        loge ("uart_recv error 1 rret: %d  flush: %d", rret, flush);
+      //if (! flush) loge ("uart_recv error 1 rret: %d  flush: %d", rret, flush);   // tmo_read already logged an error message
       return (-1);
     }
 
@@ -624,14 +628,20 @@
   }
 
 
+#define RENAME_TTY      // Intended to protect against Bluetooth changes, but unstable for some ?
 
   char * uart_list [] = {
+#ifdef  RENAME_TTY      // Intended to protect against Bluetooth changes, but unstable for some ?
     "/dev/ttyHSs20",                                                    // Ours
     "/dev/ttyHSs299",                                                   // Ours
+#endif  // #ifdef  RENAME_TTY      // Intended to protect against Bluetooth changes, but unstable for some ?
     "/dev/ttyHS0",                                                      // Most: HTC One M7, Xperia Z2
     "/dev/ttyHS99",                                                     // LG G2
   };
+
+#ifdef  RENAME_TTY      // Intended to protect against Bluetooth changes, but unstable for some ?
   char uart_orig [DEF_BUF] = {0};
+#endif  // #ifdef  RENAME_TTY      // Intended to protect against Bluetooth changes, but unstable for some ?
 
   #define AID_BLUETOOTH     1002                                        // bluetooth subsystem user
 
@@ -711,6 +721,7 @@
 
     logd ("uart_hci_stop OK rfkill_state_set: %d", rfkill_state_get (bt_rfkill_state_file, sizeof (bt_rfkill_state_file), "bluetooth"));
 
+#ifdef  RENAME_TTY      // Intended to protect against Bluetooth changes, but unstable for some ?
     char * renamed  = "/dev/ttyHS0";
     char * orig     = "/dev/ttyHS0";
     if (file_get ("/dev/ttyHSs20")) {
@@ -732,6 +743,7 @@
       logd ("uart_hci_stop rename ret: %d  renamed: %s  orig: %s", ret, renamed, orig);
     else
       loge ("uart_hci_stop rename error ret: %d  errno: %d (%s)  renamed: %s  orig: %s", ret, errno, strerror (errno), renamed, orig);
+#endif  // #ifdef  RENAME_TTY      // Intended to protect against Bluetooth changes, but unstable for some ?
 
     return (0);
   }
@@ -807,8 +819,8 @@
     baudrate_reset (high_baudrate);                                     // Set to high baudrate (Already set ?)
 */
 
+#ifdef  RENAME_TTY      // Intended to protect against Bluetooth changes, but unstable for some ?
     strlcpy (uart_orig, uart, sizeof (uart_orig));
-
     errno = 0;
     int ret = 0;
     if (! strcmp ("/dev/ttyHS0", uart))
@@ -819,6 +831,7 @@
       logd ("uart_hci_start rename ret: %d", ret);
     else
       loge ("uart_hci_start rename error ret: %d  errno: %d (%s)", ret, errno, strerror (errno));
+#endif  // #ifdef  RENAME_TTY      // Intended to protect against Bluetooth changes, but unstable for some ?
 
     return (0);                                                         // Done success
   }
@@ -1087,15 +1100,15 @@
   #define BC_VAL_CTL_BLEND                    0x00
   #define BC_VAL_CTL_SWITCH                   0x08    // BCM2048_STEREO_MONO_BLEND_SWITCH
   
-  #define BCM2048_HI_LO_INJECTION			0x10
+  #define BCM2048_HI_LO_INJECTION           0x10
   
   /* BCM2048_I2C_RDS_CTRL0 */
-  #define BCM2048_RBDS_RDS_SELECT		0x01
-  #define BCM2048_FLUSH_FIFO		0x02
+  #define BCM2048_RBDS_RDS_SECT             0x01
+  #define BCM2048_FLUSH_FIFO                0x02
   
   /* BCM2048_I2C_FM_AUDIO_PAUSE */
-  #define BCM2048_AUDIO_PAUSE_RSSI_TRESH	0x0f
-  #define BCM2048_AUDIO_PAUSE_DURATION	0xf0
+  #define BCM2048_AUDIO_PAUSE_RSSI_TRESH    0x0f
+  #define BCM2048_AUDIO_PAUSE_DURATION      0xf0
   
   
   
@@ -1421,16 +1434,6 @@ void bc_reg_dump (int lo, int hi, int bytes) {
 */
 
 
-    // RDS:
-
-//#define  SUPPORT_RDS
-#ifdef  SUPPORT_RDS
-  #include "rds_bch.c"
-#else
-  int rds_poll (unsigned char * rds_grpd) {return (-1);}
-#endif
-
-
   // Event flags requiring callback:
 //  extern int need_freq_chngd;//     = 0;
 
@@ -1535,6 +1538,12 @@ void bc_reg_dump (int lo, int hi, int bytes) {
 
     // Chip API:   
 
+//#define  SUPPORT_RDS
+#ifdef  SUPPORT_RDS
+  #include "rds_bch.c"
+#else
+  int rds_poll (unsigned char * rds_grpd) {return (EVT_GET_NONE);}
+#endif
                                                                         // Polling function called every event_sg_ms milliseconds. Not used remotely but could be in future.
   int chip_imp_event_sg (unsigned char * rds_grpd) {
     //logd ("chip_imp_event_sg: %p", rds_grpd);
@@ -1656,7 +1665,7 @@ void bc_reg_dump (int lo, int hi, int bytes) {
     int bc_rev_id = reg_get (0x28);                                     // REV_ID always 0xff
     logd ("chip_imp_state_sg bc_rev_id: %d", bc_rev_id);
 
-    chip_imp_mute_sg (0);                                               // Unmute
+    //chip_imp_mute_sg (0);                                               // Unmute
 
     reg_set (0xfb | 0x20000,  0x00000000);                              // Audio PCM ????       fb 00 00 00 00 00 
     int inc = 100;
@@ -1694,6 +1703,20 @@ void bc_reg_dump (int lo, int hi, int bytes) {
     curr_state = 1;
     logd ("chip_imp_state_sg curr_state: %d", curr_state);
     return (curr_state);
+  }
+
+  int chip_imp_antenna_sg (int antenna) {
+    if (antenna == GET)
+      return (curr_antenna);
+/*
+    if (chip_ctrl_set (V4L2_CID_PRIVATE_IRIS_ANTENNA, antenna) < 0)     // 0 = common external, 1 = Sony Z/Z1 internal
+      loge ("chip_imp_antenna_sg ANTENNA error");
+    else
+      logd ("chip_imp_antenna_sg ANTENNA success");
+*/
+    curr_antenna = antenna;
+    logd ("chip_imp_antenna_sg curr_antenna: %d", curr_antenna);
+    return (curr_antenna);
   }
 
   int chip_imp_band_sg (int band) {
@@ -1775,6 +1798,26 @@ void bc_reg_dump (int lo, int hi, int bytes) {
     curr_mute = mute;
     logd ("chip_imp_mute_sg curr_mute: %d", curr_mute);
     return (curr_mute);
+  }
+
+  int chip_imp_softmute_sg (int softmute) {
+    if (softmute == GET)
+      return (curr_softmute);
+
+    //#define BC_VAL_AUD_CTL0_RF_MUTE_DISABLE     0x00
+    //#define BC_VAL_AUD_CTL0_RF_MUTE_ENABLE      0x01
+    if (softmute)
+      bc_reg_aud_ctl0 |= 0x01;
+    else
+      bc_reg_aud_ctl0 &= 0xfffe;    //~ 0x02;
+    if (reg_set (0x05 | 0x10000, bc_reg_aud_ctl0) < 0)
+      loge ("chip_imp_softmute_sg error writing 0x05");
+    else
+      logd ("chip_imp_softmute_sg success writing 0x05");
+  
+    curr_softmute = softmute;
+    logd ("chip_imp_softmute_sg curr_softmute: %d", curr_softmute);
+    return (curr_softmute);
   }
 
 /*

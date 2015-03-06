@@ -1,11 +1,18 @@
 
-    // Tuner Callbacks
+    // Tuner component callback API implemented by svc_svc for svc_tnr
 
 package fm.a2d.sf;
 
 public interface svc_tcb {
 
-  public abstract void cb_tuner_key          (String key, String val);
+    // Now only one callback function cb_tuner_key(), to minimize the coupling between main SpiritF Service svc_svc, and it's instantiated Tuner class svc_tnr.
+    // One function makes new additions easy; just define new key, value pairs to pass.
+
+
+    // When a value changes, call cb_tuner_key() with the key and the value:
+
+  public abstract void cb_tuner_key (String key, String val);
+
 
 /*  Callbacks are possible for changes to each of these:
 // Essential:

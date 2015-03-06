@@ -90,14 +90,14 @@
   <item>5  = Camcorder</item>
   <item>6  = Voice Recognition</item>
   <item>7  = Voice Communication</item>
-  <item>8  = FM1 GS3Note</item>
-  <item>9  = FM2 SonyJB422</item>
-  <item>10 = FM3 SonyFXP</item>
-  <item>11 = FM4</item>
-  <item>12 = FM5</item>
-  <item>13 = FM6</item>
-  <item>14 = FM7</item>
-  <item>15 = FM8</item>
+  <item>8  = Remote Submix</item>
+  <item>9  = FM1</item>
+  <item>10 = FM2</item>
+  <item>11 = FM3</item>
+  <item>12 = FM4</item>
+  <item>13 = FM5</item>
+  <item>14 = FM6</item>
+  <item>15 = FM7</item>
   </string-array>
 
   <string-array name="enable_disable">
@@ -156,7 +156,7 @@
   <item>SSL</item>
   <item>QCV</item>
   <item>BCH</item>
-  <item>GEN</item>
+  <item>CUS</item>
   </string-array>
 
   <string-array name="chass_plug_aud">
@@ -168,7 +168,7 @@
   <item>OM7</item>
   <item>LG2</item>
   <item>XZ2</item>
-  <item>GEN</item>
+  <item>CUS</item>
   </string-array>
 
 

@@ -52,7 +52,7 @@ public final class com_uti  {
   private static final int      DEF_BUF         = 512;
 
     // s2d daemon communications:
-  private static int            bytear_daemon_cmd_sem  = 0;                // Only 1 client at a time
+  private static int            do_daemon_cmd_sem  = 0;                // Only 1 client at a time
   private static InetAddress    loop                = null;             // Make global to avoid constant re-initialization; reuse
   private static boolean        loop_set            = false;
 
@@ -578,6 +578,136 @@ public final class com_uti  {
 
 */
 
+//    <acdb_ids>
+//        <device name="SND_DEVICE_IN_CAMCORDER_MIC" acdb_id="0" />
+
+  //FileOutputStream fos = null;
+  private static boolean fixed_once = false;
+  private static void line_fix (Context context, String line) {
+    com_uti.logd ("line: " + line);
+    try {
+      bw.write (line);
+      bw.newLine ();
+      if (! fixed_once && line.contains ("acdb_ids")) {
+        fixed_once = true;
+        String add_line = "        <device name=\"SND_DEVICE_IN_CAMCORDER_MIC\" acdb_id=\"34\" />";
+        com_uti.logd ("add_line: " + add_line);
+        bw.write (add_line);
+        bw.newLine ();
+      }
+    }
+    catch (Throwable e) {
+      com_uti.loge ("exception: " + e);
+      e.printStackTrace ();
+      return;
+    }
+  }
+
+
+  private static void create_file_fix (Context context) {
+    com_uti.logd ("");
+    try {
+      bw.write ("<?xml version=\"1.0\" encoding=\"ISO-8859-1\"?>\n");
+      bw.write ("<audio_platform_info>\n");
+      bw.write ("    <acdb_ids>\n");
+      bw.write ("        <device name=\"SND_DEVICE_IN_CAMCORDER_MIC\" acdb_id=\"34\" />\n");
+      bw.write ("    </acdb_ids>\n");
+      bw.write ("</audio_platform_info>\n");
+      com_uti.logd ("done");
+    }
+    catch (Throwable e) {
+      com_uti.loge ("exception: " + e);
+      e.printStackTrace ();
+      return;
+    }
+  }
+
+  public static void acdbfix_remove (Context context) {
+    com_uti.logd ("");
+    String cmd = "";
+    cmd += ("mount -o remount,rw /system ; ");
+    if (! com_uti.file_get (platform_orig)) {
+      com_uti.loge ("Original file does not exist platform_orig: " + platform_orig);
+      if (com_uti.file_size_get (platform_file) == 187) {        // !!!!!!!!!!!!!!
+        //boolean bret = com_uti.file_delete (platform_file);
+        //com_uti.loge ("!!!!!!!!!! Our file remove bret: : " + bret);
+        cmd += ("rm " + platform_file + " ; ");
+        cmd += ("mount -o remount,ro /system ; ");
+        //cmd += ("killall -hup mediaserver ; ");
+        cmd += ("killall mediaserver ; ");
+        com_uti.sys_run (cmd, true);
+        com_uti.logd ("Done commands");
+      }
+      return;
+    }
+    cmd += ("mv " + platform_orig + " " + platform_file + " ; ");
+    cmd += ("chmod 644 " + platform_file + " ; ");
+    cmd += ("mount -o remount,ro /system ; ");
+    //cmd += ("killall -hup mediaserver ; ");
+    cmd += ("killall mediaserver ; ");
+    com_uti.sys_run (cmd, true);
+    com_uti.logd ("Done commands");
+  }
+
+  private static String platform_copy = "/data/data/fm.a2d.sf/files/audio_platform_info.xml";
+  private static String platform_file = "/system/etc/audio_platform_info.xml";
+  private static String platform_orig = "/system/etc/audio_platform_info.xml.orig";
+  private static java.io.BufferedWriter bw = null;
+  public static void acdbfix_install (Context context) {
+    com_uti.logd ("");
+    String line = null;
+    try {
+      //fos = context.openFileOutput ("/data/data/fm.a2d.sf/files/audio_platform_info.xml", Context.MODE_WORLD_WRITEABLE | Context.MODE_WORLD_READABLE);     // NullPointerException here unless permissions 755
+                                                                        // Create/open output file for writing & reading
+      bw = new java.io.BufferedWriter (new java.io.FileWriter (platform_copy), 8192);//512);  // Should never need more than 512 bytes per line
+      if (! com_uti.file_get (platform_file)) {
+        create_file_fix (context);
+        bw.close ();                                                     // Close output file
+        acdbfix_copy (context);
+        com_uti.logd ("done");
+        return;
+      }
+
+      fixed_once = false;
+      java.io.BufferedReader br = new java.io.BufferedReader (new java.io.FileReader (platform_file), 8192);//512);  // Should never need more than 512 bytes per line
+      while (true) {
+        line = br.readLine ();
+        if (line == null) {
+          bw.close ();                                                     // Close output file
+          acdbfix_copy (context);
+          com_uti.logd ("done");
+          return;
+        }
+        else {
+          //com_uti.logd ("line: " + line);
+          line_fix (context, line);
+        }
+      }
+    }
+    catch (Throwable e) {
+      com_uti.loge ("exception: " + e);
+      e.printStackTrace ();
+      //return;
+    }
+    //create_file_fix (context);
+  }
+
+  private static void acdbfix_copy (Context context) {
+    com_uti.logd ("");
+    String cmd = "";
+    cmd += ("mount -o remount,rw /system ; ");
+    if (com_uti.file_get (platform_file) && ! com_uti.file_get (platform_orig)) {   // !! Only copy to orig if orig does not already exist !
+      cmd += ("mv " + platform_file + " " + platform_orig + " ; ");
+    }
+    cmd += ("cp " + platform_copy + " " + platform_file + " ; ");
+    cmd += ("chmod 644 " + platform_file + " ; ");
+    cmd += ("mount -o remount,ro /system ; ");
+    //cmd += ("killall -hup mediaserver ; ");
+    cmd += ("killall mediaserver ; ");
+    com_uti.sys_run (cmd, true);
+    com_uti.logd ("Done commands");
+  }
+
   public static boolean su_installed_get () {
     boolean ret = false;
     if (com_uti.file_get ("/system/bin/su"))
@@ -861,40 +991,12 @@ GT-I9000    GT-I9000        Mackay. Unofficial ?
 Evo 4G LTE  jewel
 */
 
-/*
-    //                                      Tuner   Audio
-  public static final int DEV_UNK = -1;
-  public static final int DEV_GEN = 0;  // gen      gen
-  public static final int DEV_GS1 = 1;  // ssl      gs1
-  public static final int DEV_GS2 = 2;  // ssl      gs2
-  public static final int DEV_GS3 = 3;  // ssl      gs3
-  public static final int DEV_QCV = 4;  // qcv      qcv
-  public static final int DEV_OM7 = 5;  // bch      one
-  public static final int DEV_LG2 = 6;  // bch      lg2
-  public static final int DEV_XZ2 = 7;  // bch      xz2
-
-  private static String device_string_get (int device) {
-    switch (device) {
-      case DEV_UNK: return ("UNK");
-      case DEV_GEN: return ("GEN");
-      case DEV_GS1: return ("GS1");
-      case DEV_GS2: return ("GS2");
-      case DEV_GS3: return ("GS3");
-      case DEV_QCV: return ("QCV");
-      case DEV_OM7: return ("ONE");
-      case DEV_LG2: return ("LG2");
-      case DEV_XZ2: return ("XZ2");
-    }
-    return ("UNK");
-  }
-*/
-
   private static String  sys_prop_device    = "";
   private static String  sys_prop_board     = "";
   private static String  sys_prop_manuf     = "";
 
   private static String chass_plug_aud = "UNK";
-  public  static String chass_plug_tnr = "UNK";
+  private static String chass_plug_tnr = "UNK";
 
   public static String chass_plug_aud_get (Context context) {
 
@@ -945,7 +1047,7 @@ Evo 4G LTE  jewel
 
     else if (com_uti.sony_get () && file_get ("/system/lib/libbt-fmrds.so"))     // ? Z2/Z3 need to be more specific ?
       com_uti.chass_plug_aud = "XZ2";
-    else if (sys_prop_device.startsWith ("SGP5") || sys_prop_device.startsWith ("SOT") || sys_prop_device.startsWith ("SO-05") || sys_prop_device.startsWith ("D65") || sys_prop_device.startsWith ("SO-03") || sys_prop_device.startsWith ("CASTOR") || sys_prop_device.startsWith ("SIRIUS") || 
+    else if (sys_prop_device.startsWith ("Z3") || sys_prop_device.startsWith ("SGP5") || sys_prop_device.startsWith ("SOT") || sys_prop_device.startsWith ("SO-05") || sys_prop_device.startsWith ("D65") || sys_prop_device.startsWith ("SO-03") || sys_prop_device.startsWith ("CASTOR") || sys_prop_device.startsWith ("SIRIUS") || 
         sys_prop_device.startsWith ("D66") || sys_prop_device.startsWith ("D58") || sys_prop_device.startsWith ("LEO"))
       com_uti.chass_plug_aud = "XZ2";
 
@@ -1000,16 +1102,25 @@ Evo 4G LTE  jewel
       }
       com_uti.loge ("UNK fix -> chass_plug_aud: " + com_uti.chass_plug_aud);
     }
-
     com_uti.logd ("Auto-Detected chass_plug_aud: " + com_uti.chass_plug_aud);
 
     com_uti.chass_plug_aud = com_uti.prefs_get (context, "chass_plug_aud", com_uti.chass_plug_aud);
     com_uti.logd ("Final chass_plug_aud: " + com_uti.chass_plug_aud);
 
+    return (com_uti.chass_plug_aud);
+  }
+
+  public static String chass_plug_tnr_get (Context context) {
+
+    if (com_uti.chass_plug_aud.equals ("UNK"))                          // If audio (essentially device) not set yet, set it
+      chass_plug_aud_get (context);
+
+    com_uti.chass_plug_tnr = "UNK";
+
     if (com_uti.chass_plug_aud.equals ("UNK"))
       com_uti.chass_plug_tnr = "UNK";
-    else if (com_uti.chass_plug_aud.equals ("GEN"))
-      com_uti.chass_plug_tnr = "GEN";
+    else if (com_uti.chass_plug_aud.equals ("CUS"))
+      com_uti.chass_plug_tnr = "CUS";
     else if (com_uti.chass_plug_aud.equals ("GS3"))
       com_uti.chass_plug_tnr = "SSL";
     else if (com_uti.chass_plug_aud.equals ("GS2"))
@@ -1026,14 +1137,13 @@ Evo 4G LTE  jewel
       com_uti.chass_plug_tnr = "BCH";
     else
       com_uti.chass_plug_tnr = "UNK";
+    com_uti.logd ("Auto-Detected chass_plug_tnr: " + com_uti.chass_plug_tnr);
 
     com_uti.chass_plug_tnr = com_uti.prefs_get (context, "chass_plug_tnr", com_uti.chass_plug_tnr);
     com_uti.logd ("Final chass_plug_tnr: " + com_uti.chass_plug_tnr);
 
-    return (com_uti.chass_plug_aud);
+    return (com_uti.chass_plug_tnr);
   }
-
-
 
   public static String app_version_get (Context act) {                                             // Get versionName (from AndroidManifest.xml)
     String version = "";
@@ -1228,53 +1338,38 @@ Evo 4G LTE  jewel
         NUsys_prop_device_STATES
     };
 */
-  public static final int FOR_COMMUNICATION = 0;
-  public static final int FOR_MEDIA         = 1;
-  public static final int FOR_RECORD        = 2;
-  public static final int FOR_DOCK          = 3;
-
 
   public static final int DEVICE_STATE_UNAVAILABLE  = 0;
   public static final int DEVICE_STATE_AVAILABLE    = 1;
 
-/*
-    // usages used for setForceUse()
-  public enum force_use {
-    FOR_COMMUNICATION   (0),
-    FOR_MEDIA           (1),
-    FOR_RECORD          (2),
-    FOR_DOCK            (3),
-    NUM_FORCE_USE
-  };
-*/
+   // usage for setForceUse, must match AudioSystem::force_use
+  public static final int FOR_COMMUNICATION = 0;
+  public static final int FOR_MEDIA = 1;
+  public static final int FOR_RECORD = 2;
+  public static final int FOR_DOCK = 3;
+  public static final int FOR_SYSTEM = 4;
+  public static final int FOR_HDMI_SYSTEM_AUDIO = 5;
 
+    // device categories config for setForceUse, must match AudioSystem::forced_config
   public static final int FORCE_NONE = 0;
   public static final int FORCE_SPEAKER = 1;
-/*
-    // device categories used for setForceUse()
-  public enum forced_config {
-    FORCE_NONE              (0),
-    FORCE_SPEAKER           (1),
-    FORCE_HEADPHONES        (2),
-    FORCE_BT_SCO            (3),
-    FORCE_BT_A2DP           (4),
-    FORCE_WIRED_ACCESSORY   (5),
-    FORCE_BT_CAR_DOCK       (6),
-    FORCE_BT_DESK_DOCK      (7),
+  public static final int FORCE_HEADPHONES = 2;
+  public static final int FORCE_BT_SCO = 3;
+  public static final int FORCE_BT_A2DP = 4;
+  public static final int FORCE_WIRED_ACCESSORY = 5;
+  public static final int FORCE_BT_CAR_DOCK = 6;
+  public static final int FORCE_BT_DESK_DOCK = 7;
+  public static final int FORCE_ANALOG_DOCK = 8;
+  public static final int FORCE_DIGITAL_DOCK = 9;
+  public static final int FORCE_NO_BT_A2DP = 10;
+  public static final int FORCE_SYSTEM_ENFORCED = 11;
+  public static final int FORCE_HDMI_SYSTEM_AUDIO_ENFORCED = 12;
 
-// These below are not in ~/android/system/hardware/cm/audio/AudioSystem.h
-    FORCE_ANALOG_DOCK       (8),
-    FORCE_DIGITAL_DOCK      (9),
-    FORCE_NO_BT_A2DP        (10),
-    NUM_FORCE_CONFIG        (11),
-//    FORCE_DEFAULT = FORCE_NONE;
-  };
-*/
   public static int setForceUse (final int usage, final int config) {
     int ret = -9;
     com_uti.logd ("usage: " + usage + "  config: " + config);
 
-com_uti.logd ("getForceUse 1: " + getForceUse (usage));
+    com_uti.logd ("getForceUse 1: " + getForceUse (usage));
 
     try {
       //Method setForceUse = AudioManager.class.getMethod ("setForceUse", int.class, int.class);
@@ -1287,7 +1382,7 @@ com_uti.logd ("getForceUse 1: " + getForceUse (usage));
       com_uti.loge ("exception: " + e);
     }
 
-com_uti.logd ("getForceUse 2: " + getForceUse (usage));
+    com_uti.logd ("getForceUse 2: " + getForceUse (usage));
 
     return (ret);
   }
@@ -1308,7 +1403,7 @@ com_uti.logd ("getForceUse 2: " + getForceUse (usage));
     return (ret);
   }
 
-/*
+/* OLD !!:
     public enum audio_devices {
         // output devices
         DEVICE_OUT_EARPIECE             0x1,
@@ -1395,40 +1490,40 @@ com_uti.logd ("getForceUse 2: " + getForceUse (usage));
     // audio device definitions: must be kept in sync with values in system/core/audio.h
     //
 
-    public static final int DEVICE_NONE = 0x0;
+  public static final int DEVICE_NONE = 0x0;
     // reserved bits
-    public static final int DEVICE_BIT_IN = 0x80000000;
-    public static final int DEVICE_BIT_DEFAULT = 0x40000000;
+  public static final int DEVICE_BIT_IN = 0x80000000;
+  public static final int DEVICE_BIT_DEFAULT = 0x40000000;
     // output devices, be sure to update AudioManager.java also
-    public static final int DEVICE_OUT_EARPIECE = 0x1;
-    public static final int DEVICE_OUT_SPEAKER = 0x2;
-    public static final int DEVICE_OUT_WIRED_HEADSET = 0x4;
-    public static final int DEVICE_OUT_WIRED_HEADPHONE = 0x8;
-    public static final int DEVICE_OUT_BLUETOOTH_SCO = 0x10;
-    public static final int DEVICE_OUT_BLUETOOTH_SCO_HEADSET = 0x20;
-    public static final int DEVICE_OUT_BLUETOOTH_SCO_CARKIT = 0x40;
-    public static final int DEVICE_OUT_BLUETOOTH_A2DP = 0x80;
-    public static final int DEVICE_OUT_BLUETOOTH_A2DP_HEADPHONES = 0x100;
-    public static final int DEVICE_OUT_BLUETOOTH_A2DP_SPEAKER = 0x200;
-    public static final int DEVICE_OUT_AUX_DIGITAL = 0x400;
-    public static final int DEVICE_OUT_HDMI = DEVICE_OUT_AUX_DIGITAL;
-    public static final int DEVICE_OUT_ANLG_DOCK_HEADSET = 0x800;
-    public static final int DEVICE_OUT_DGTL_DOCK_HEADSET = 0x1000;
-    public static final int DEVICE_OUT_USB_ACCESSORY = 0x2000;
-    public static final int DEVICE_OUT_USB_DEVICE = 0x4000;
-    public static final int DEVICE_OUT_REMOTE_SUBMIX = 0x8000;
-    public static final int DEVICE_OUT_TELEPHONY_TX = 0x10000;
-    public static final int DEVICE_OUT_LINE = 0x20000;
-    public static final int DEVICE_OUT_HDMI_ARC = 0x40000;
-    public static final int DEVICE_OUT_SPDIF = 0x80000;
-    public static final int DEVICE_OUT_FM = 0x100000;
-    public static final int DEVICE_OUT_AUX_LINE = 0x200000;
-    public static final int DEVICE_OUT_FM_TX = 0x1000000;
-    public static final int DEVICE_OUT_PROXY = 0x2000000;
+  public static final int DEVICE_OUT_EARPIECE = 0x1;
+  public static final int DEVICE_OUT_SPEAKER = 0x2;
+  public static final int DEVICE_OUT_WIRED_HEADSET = 0x4;
+  public static final int DEVICE_OUT_WIRED_HEADPHONE = 0x8;
+  public static final int DEVICE_OUT_BLUETOOTH_SCO = 0x10;
+  public static final int DEVICE_OUT_BLUETOOTH_SCO_HEADSET = 0x20;
+  public static final int DEVICE_OUT_BLUETOOTH_SCO_CARKIT = 0x40;
+  public static final int DEVICE_OUT_BLUETOOTH_A2DP = 0x80;
+  public static final int DEVICE_OUT_BLUETOOTH_A2DP_HEADPHONES = 0x100;
+  public static final int DEVICE_OUT_BLUETOOTH_A2DP_SPEAKER = 0x200;
+  public static final int DEVICE_OUT_AUX_DIGITAL = 0x400;
+  public static final int DEVICE_OUT_HDMI = DEVICE_OUT_AUX_DIGITAL;
+  public static final int DEVICE_OUT_ANLG_DOCK_HEADSET = 0x800;
+  public static final int DEVICE_OUT_DGTL_DOCK_HEADSET = 0x1000;
+  public static final int DEVICE_OUT_USB_ACCESSORY = 0x2000;
+  public static final int DEVICE_OUT_USB_DEVICE = 0x4000;
+  public static final int DEVICE_OUT_REMOTE_SUBMIX = 0x8000;
+  public static final int DEVICE_OUT_TELEPHONY_TX = 0x10000;
+  public static final int DEVICE_OUT_LINE = 0x20000;
+  public static final int DEVICE_OUT_HDMI_ARC = 0x40000;
+  public static final int DEVICE_OUT_SPDIF = 0x80000;
+  public static final int DEVICE_OUT_FM = 0x100000;
+  public static final int DEVICE_OUT_AUX_LINE = 0x200000;
+  public static final int DEVICE_OUT_FM_TX = 0x1000000;
+  public static final int DEVICE_OUT_PROXY = 0x2000000;
 
-    public static final int DEVICE_OUT_DEFAULT = DEVICE_BIT_DEFAULT;
+  public static final int DEVICE_OUT_DEFAULT = DEVICE_BIT_DEFAULT;
 
-    public static final int DEVICE_OUT_ALL = (DEVICE_OUT_EARPIECE |
+  public static final int DEVICE_OUT_ALL = (DEVICE_OUT_EARPIECE |
                                               DEVICE_OUT_SPEAKER |
                                               DEVICE_OUT_WIRED_HEADSET |
                                               DEVICE_OUT_WIRED_HEADPHONE |
@@ -1453,49 +1548,49 @@ com_uti.logd ("getForceUse 2: " + getForceUse (usage));
                                               DEVICE_OUT_FM_TX |
                                               DEVICE_OUT_PROXY |
                                               DEVICE_OUT_DEFAULT);
-    public static final int DEVICE_OUT_ALL_A2DP = (DEVICE_OUT_BLUETOOTH_A2DP |
+  public static final int DEVICE_OUT_ALL_A2DP = (DEVICE_OUT_BLUETOOTH_A2DP |
                                                    DEVICE_OUT_BLUETOOTH_A2DP_HEADPHONES |
                                                    DEVICE_OUT_BLUETOOTH_A2DP_SPEAKER);
-    public static final int DEVICE_OUT_ALL_SCO = (DEVICE_OUT_BLUETOOTH_SCO |
+  public static final int DEVICE_OUT_ALL_SCO = (DEVICE_OUT_BLUETOOTH_SCO |
                                                   DEVICE_OUT_BLUETOOTH_SCO_HEADSET |
                                                   DEVICE_OUT_BLUETOOTH_SCO_CARKIT);
-    public static final int DEVICE_OUT_ALL_USB = (DEVICE_OUT_USB_ACCESSORY |
+  public static final int DEVICE_OUT_ALL_USB = (DEVICE_OUT_USB_ACCESSORY |
                                                   DEVICE_OUT_USB_DEVICE);
-    public static final int DEVICE_OUT_ALL_HDMI_SYSTEM_AUDIO = (DEVICE_OUT_AUX_LINE |
+  public static final int DEVICE_OUT_ALL_HDMI_SYSTEM_AUDIO = (DEVICE_OUT_AUX_LINE |
                                                                 DEVICE_OUT_HDMI_ARC |
                                                                 DEVICE_OUT_SPDIF);
-    public static final int DEVICE_ALL_HDMI_SYSTEM_AUDIO_AND_SPEAKER =
+  public static final int DEVICE_ALL_HDMI_SYSTEM_AUDIO_AND_SPEAKER =
             (DEVICE_OUT_ALL_HDMI_SYSTEM_AUDIO |
              DEVICE_OUT_SPEAKER);
 
     // input devices
-    public static final int DEVICE_IN_COMMUNICATION = DEVICE_BIT_IN | 0x1;
-    public static final int DEVICE_IN_AMBIENT = DEVICE_BIT_IN | 0x2;
-    public static final int DEVICE_IN_BUILTIN_MIC = DEVICE_BIT_IN | 0x4;
-    public static final int DEVICE_IN_BLUETOOTH_SCO_HEADSET = DEVICE_BIT_IN | 0x8;
-    public static final int DEVICE_IN_WIRED_HEADSET = DEVICE_BIT_IN | 0x10;
-    public static final int DEVICE_IN_AUX_DIGITAL = DEVICE_BIT_IN | 0x20;
-    public static final int DEVICE_IN_HDMI = DEVICE_IN_AUX_DIGITAL;
-    public static final int DEVICE_IN_VOICE_CALL = DEVICE_BIT_IN | 0x40;
-    public static final int DEVICE_IN_TELEPHONY_RX = DEVICE_IN_VOICE_CALL;
-    public static final int DEVICE_IN_BACK_MIC = DEVICE_BIT_IN | 0x80;
-    public static final int DEVICE_IN_REMOTE_SUBMIX = DEVICE_BIT_IN | 0x100;
-    public static final int DEVICE_IN_ANLG_DOCK_HEADSET = DEVICE_BIT_IN | 0x200;
-    public static final int DEVICE_IN_DGTL_DOCK_HEADSET = DEVICE_BIT_IN | 0x400;
-    public static final int DEVICE_IN_USB_ACCESSORY = DEVICE_BIT_IN | 0x800;
-    public static final int DEVICE_IN_USB_DEVICE = DEVICE_BIT_IN | 0x1000;
-    public static final int DEVICE_IN_FM_TUNER = DEVICE_BIT_IN | 0x2000;
-    public static final int DEVICE_IN_TV_TUNER = DEVICE_BIT_IN | 0x4000;
-    public static final int DEVICE_IN_LINE = DEVICE_BIT_IN | 0x8000;
-    public static final int DEVICE_IN_SPDIF = DEVICE_BIT_IN | 0x10000;
-    public static final int DEVICE_IN_BLUETOOTH_A2DP = DEVICE_BIT_IN | 0x20000;
-    public static final int DEVICE_IN_LOOPBACK = DEVICE_BIT_IN | 0x40000;
-    public static final int DEVICE_IN_PROXY = DEVICE_BIT_IN | 0x100000;
-    public static final int DEVICE_IN_FM_RX = DEVICE_BIT_IN | 0x200000;
-    public static final int DEVICE_IN_FM_RX_A2DP = DEVICE_BIT_IN | 0x400000;
-    public static final int DEVICE_IN_DEFAULT = DEVICE_BIT_IN | DEVICE_BIT_DEFAULT;
+  public static final int DEVICE_IN_COMMUNICATION = DEVICE_BIT_IN | 0x1;
+  public static final int DEVICE_IN_AMBIENT = DEVICE_BIT_IN | 0x2;
+  public static final int DEVICE_IN_BUILTIN_MIC = DEVICE_BIT_IN | 0x4;
+  public static final int DEVICE_IN_BLUETOOTH_SCO_HEADSET = DEVICE_BIT_IN | 0x8;
+  public static final int DEVICE_IN_WIRED_HEADSET = DEVICE_BIT_IN | 0x10;
+  public static final int DEVICE_IN_AUX_DIGITAL = DEVICE_BIT_IN | 0x20;
+  public static final int DEVICE_IN_HDMI = DEVICE_IN_AUX_DIGITAL;
+  public static final int DEVICE_IN_VOICE_CALL = DEVICE_BIT_IN | 0x40;
+  public static final int DEVICE_IN_TELEPHONY_RX = DEVICE_IN_VOICE_CALL;
+  public static final int DEVICE_IN_BACK_MIC = DEVICE_BIT_IN | 0x80;
+  public static final int DEVICE_IN_REMOTE_SUBMIX = DEVICE_BIT_IN | 0x100;
+  public static final int DEVICE_IN_ANLG_DOCK_HEADSET = DEVICE_BIT_IN | 0x200;
+  public static final int DEVICE_IN_DGTL_DOCK_HEADSET = DEVICE_BIT_IN | 0x400;
+  public static final int DEVICE_IN_USB_ACCESSORY = DEVICE_BIT_IN | 0x800;
+  public static final int DEVICE_IN_USB_DEVICE = DEVICE_BIT_IN | 0x1000;
+  public static final int DEVICE_IN_FM_TUNER = DEVICE_BIT_IN | 0x2000;
+  public static final int DEVICE_IN_TV_TUNER = DEVICE_BIT_IN | 0x4000;
+  public static final int DEVICE_IN_LINE = DEVICE_BIT_IN | 0x8000;
+  public static final int DEVICE_IN_SPDIF = DEVICE_BIT_IN | 0x10000;
+  public static final int DEVICE_IN_BLUETOOTH_A2DP = DEVICE_BIT_IN | 0x20000;
+  public static final int DEVICE_IN_LOOPBACK = DEVICE_BIT_IN | 0x40000;
+  public static final int DEVICE_IN_PROXY = DEVICE_BIT_IN | 0x100000;
+  public static final int DEVICE_IN_FM_RX = DEVICE_BIT_IN | 0x200000;
+  public static final int DEVICE_IN_FM_RX_A2DP = DEVICE_BIT_IN | 0x400000;
+  public static final int DEVICE_IN_DEFAULT = DEVICE_BIT_IN | DEVICE_BIT_DEFAULT;
 
-    public static final int DEVICE_IN_ALL = (DEVICE_IN_COMMUNICATION |
+  public static final int DEVICE_IN_ALL = (DEVICE_IN_COMMUNICATION |
                                              DEVICE_IN_AMBIENT |
                                              DEVICE_IN_BUILTIN_MIC |
                                              DEVICE_IN_BLUETOOTH_SCO_HEADSET |
@@ -1518,15 +1613,16 @@ com_uti.logd ("getForceUse 2: " + getForceUse (usage));
                                              DEVICE_IN_FM_RX |
                                              DEVICE_IN_FM_RX_A2DP |
                                              DEVICE_IN_DEFAULT);
-    public static final int DEVICE_IN_ALL_SCO = DEVICE_IN_BLUETOOTH_SCO_HEADSET;
-    public static final int DEVICE_IN_ALL_USB = (DEVICE_IN_USB_ACCESSORY |
+  public static final int DEVICE_IN_ALL_SCO = DEVICE_IN_BLUETOOTH_SCO_HEADSET;
+  public static final int DEVICE_IN_ALL_USB = (DEVICE_IN_USB_ACCESSORY |
                                                  DEVICE_IN_USB_DEVICE);
 
 
   public static int setDeviceConnectionState (final int device, final int state, final String address) {   // Called by audio_output_off () & audio_output_set ()
     int ret = -3;
     com_uti.logd ("device: " + device + "  state: " + state + "  address: '" + address + "'");
-    audio_routing_get ();
+    //output_audio_routing_get ();
+    //input_audio_routing_get ();
     try {
       Class<?> audioSystem = Class.forName ("android.media.AudioSystem");        // Use reflection
       Method setDeviceConnectionState = audioSystem.getMethod ("setDeviceConnectionState", int.class, int.class, String.class);
@@ -1536,7 +1632,8 @@ com_uti.logd ("getForceUse 2: " + getForceUse (usage));
     catch (Exception e) {
       com_uti.loge ("exception: " + e);
     }
-    audio_routing_get ();
+    //output_audio_routing_get ();
+    //input_audio_routing_get ();
     return (ret);
   }
 
@@ -1555,25 +1652,110 @@ com_uti.logd ("getForceUse 2: " + getForceUse (usage));
     return (ret);
   }
 
-  public static int audio_routing_get () {
+  private static final int max_out_bit = 25;//31;       b31 -> b25
+  public static int output_audio_routing_get () {
     if (! com_uti.ena_log_audio_routing_get)
       return (0);    
 
     int ctr = 0, bits = 0, ret = 0, ret_bits = 0;
     String bin_out = "";
-    for (ctr = 31; ctr >= 0; ctr --) {
+
+    for (ctr = 31; ctr > max_out_bit; ctr --) {                         // Replace high bits with "-"
       bits = 1 << ctr;
-      ret = com_uti.getDeviceConnectionState (bits, "");
-      //com_uti.logd ("getDeviceConnectionState for " + bits + "  is: " + ret);
-      bin_out += ret;
+      bin_out += "-";
+      if (ctr % 4 == 0)                                                 // Every 4 bits...
+        bin_out += " ";                                                 // Add seperator space
+    }
+
+    for (ctr = max_out_bit; ctr >= 0; ctr --) {
+      bits = 1 << ctr;
+      ret = 0;
+      if (ctr == 23)
+        bin_out += "-";
+      else
+        bin_out += ret = com_uti.getDeviceConnectionState (bits, "");
       if (ctr % 4 == 0)                                                 // Every 4 bits...
         bin_out += " ";                                                 // Add seperator space
       if (ret == 1)
         ret_bits |= bits;
     }
-    com_uti.logd ("getDeviceConnectionState: " + bin_out + "  ret_bits: " + ret_bits);
+    com_uti.logd ("output getDeviceConnectionState: " + bin_out + "  ret_bits hex: " + com_uti.hex_get (ret_bits) + "    decimal: " + ret_bits);
     return (ret_bits);
   }
+/*MOG:0000 0000 0000 0000 0000 0000 0000 0111
+b?: speaker
+b?: handset
+b2: wired headset
+...
+b19:    #define AUDIO_DEVICE_OUT_FM     0x80000     Audio output to FM Transmit ?       AUDIO_DEVICE_OUT_SPDIF =  0x80000,
+b20:    #define AUDIO_DEVICE_OUT_FM_TX 0x100000     Normal FM receive output            AUDIO_DEVICE_OUT_FM    = 0x100000,
+b21:    DEVICE_OUT_AUX_LINE = 0x200000;
+b22:
+-
+b24:    DEVICE_OUT_FM_TX = 0x1000000;
+b25:    DEVICE_OUT_PROXY = 0x2000000;
+-
+b30:    AUDIO_DEVICE_BIT_DEFAULT = 0x40000000,
+*/
+
+  private static final int max_in_bit = 22;//31;       b31 -> b23
+  public static int input_audio_routing_get () {
+    if (! com_uti.ena_log_audio_routing_get)
+      return (0);
+
+    int ctr = 0, bits = 0, ret = 0, ret_bits = 0;
+    String bin_out = "";
+
+    for (ctr = 31; ctr > max_in_bit; ctr --) {                          // Replace high bits with "-"
+      bits = 1 << ctr;
+      bin_out += "-";
+      if (ctr % 4 == 0)                                                 // Every 4 bits...
+        bin_out += " ";                                                 // Add seperator space
+    }
+
+    for (ctr = max_in_bit; ctr >= 0; ctr --) {
+      bits = 1 << ctr;
+      ret = 0;
+      if (ctr == 19)
+        bin_out += "-";
+      else
+        bin_out += ret = com_uti.getDeviceConnectionState (bits | 0x80000000, "");
+      if (ctr % 4 == 0)                                                 // Every 4 bits...
+        bin_out += " ";                                                 // Add seperator space
+      if (ret == 1)
+        ret_bits |= bits;
+    }
+    com_uti.logd ("  input getDeviceConnectionState: " + bin_out + "  ret_bits hex: " + com_uti.hex_get (ret_bits) + "    decimal: " + ret_bits);
+    return (ret_bits);
+  }
+/*MOG:0000 0000 0110 0000       0000 0001 1001 0100
+ b0:    0   AUDIO_DEVICE_IN_COMMUNICATION
+ b1:    0   AUDIO_DEVICE_IN_AMBIENT
+ b2:    1   AUDIO_DEVICE_IN_BUILTIN_MIC
+ b3:    0
+ b4:    1   AUDIO_DEVICE_IN_WIRED_HEADSET
+ b5:    0
+ b6:    0
+ b7:    1
+ b8:    1
+...
+b13:    0   AUDIO_DEVICE_IN_FM_TUNER            DEVICE_IN_FM_TUNER = DEVICE_BIT_IN | 0x2000;
+b14:    0   AUDIO_DEVICE_IN_TV_TUNER            DEVICE_IN_TV_TUNER = DEVICE_BIT_IN | 0x4000;
+b15:    0   #define AUDIO_DEVICE_IN_FM_RX (AUDIO_DEVICE_BIT_IN | 0x8000)            AUDIO_DEVICE_IN_LINE 
+b16:    0   #define AUDIO_DEVICE_IN_FM_RX_A2DP (AUDIO_DEVICE_BIT_IN | 0x10000)      AUDIO_DEVICE_IN_SPDIF
+b17:
+b18:
+b19:
+-
+b21:    1   DEVICE_IN_FM_RX      = DEVICE_BIT_IN | 0x200000;
+b22:    1   DEVICE_IN_FM_RX_A2DP = DEVICE_BIT_IN | 0x400000;
+-
+b30:    AUDIO_DEVICE_BIT_DEFAULT = 0x40000000,
+b31:    AUDIO_DEVICE_BIT_IN      = 0x80000000,
+*/
+
+
+    //
 
   public static byte [] file_read_16k (String filename) {
     main_thread_get ("file_read_16k filename: " + filename);
@@ -1712,17 +1894,10 @@ com_uti.logd ("getForceUse 2: " + getForceUse (usage));
   }
 
 
-  //int hex_times = 0;
   public static String hex_get (byte b) {
-  //String hex_get (int b) {
-    //String str = "";
-    //b &= 0x0f;
-    //char c1 = (char)((b&0x00F0)>>4);
-    //char c2 = (char)((b&0x000F));
-    byte c1 = (byte)((b&0x00F0)>>4);
-    byte c2 = (byte)((b&0x000F));
+    byte c1 = (byte)((b & 0x00F0) >> 4);
+    byte c2 = (byte)((b & 0x000F) >> 0);
 
-    //char[] buffer = new char[2];
     byte [] buffer = new byte [2];
 
     if (c1 < 10)
@@ -1734,19 +1909,24 @@ com_uti.logd ("getForceUse 2: " + getForceUse (usage));
     else
       buffer[1] = (byte)(c2 + 'A' - 10);
 
-    //if (hex_times ++ < 4) {
-    //  com_uti.logd ("zx hex_get byte: " + b + "  c1: " + c1 +  "  c2: " + c2 +  "  buffer0: " + buffer[0] +  "  buffer1: " + buffer[1] );
-    //}
-
     String str = new String (buffer);
 
     return (str);
   }
 
   public static String hex_get (short s) {
-    byte byte_lo = (byte) (s>>0 & 0xFF);
-    byte byte_hi = (byte) (s>>8 & 0xFF);
+    byte byte_lo = (byte) (s >> 0 & 0xFF);
+    byte byte_hi = (byte) (s >> 8 & 0xFF);
     String res = hex_get (byte_hi) + hex_get (byte_lo);
+    return (res);
+  }
+
+  public static String hex_get (int i) {
+    byte byte_0 = (byte) (i >> 0 & 0xFF);
+    byte byte_1 = (byte) (i >> 8 & 0xFF);
+    byte byte_2 = (byte) (i >>16 & 0xFF);
+    byte byte_3 = (byte) (i >>24 & 0xFF);
+    String res = hex_get (byte_3) + hex_get (byte_2) + hex_get (byte_1) + hex_get (byte_0);
     return (res);
   }
 
@@ -1909,51 +2089,51 @@ com_uti.logd ("getForceUse 2: " + getForceUse (usage));
 
     // Send byte array to dameon and wait for byte array response:
 
-  private static int bytear_daemon_cmd (int cmd_len, byte [] cmd_buf, int res_len, byte [] res_buf, int rx_tmo) {
-    //main_thread_get ("bytear_daemon_cmd cmd: " + cmd);
+  private static int do_daemon_cmd (int cmd_len, byte [] cmd_buf, int res_len, byte [] res_buf, int rx_tmo) {
+    //main_thread_get ("do_daemon_cmd cmd: " + cmd);
 
     String cmd = (com_uti.ba_to_str (cmd_buf)).substring (0, cmd_len);  // Get command as string for logging purposes
 
     long start_sem_ms = com_uti.tmr_ms_get ();                          // Start semaphore timer
 
     if (ena_log_daemon_cmd_sem)
-      com_uti.logd ("Before sem++ bytear_daemon_cmd_sem: " + bytear_daemon_cmd_sem + "  res_len: " + res_len + "  rx_tmo: " + rx_tmo + "  cmd: \"" + cmd + "\"");
+      com_uti.logd ("Before sem++ do_daemon_cmd_sem: " + do_daemon_cmd_sem + "  res_len: " + res_len + "  rx_tmo: " + rx_tmo + "  cmd: \"" + cmd + "\"");
 
-    bytear_daemon_cmd_sem ++;
-    while (bytear_daemon_cmd_sem != 1) {                                // Get semaphore
-      bytear_daemon_cmd_sem --;
+    do_daemon_cmd_sem ++;
+    while (do_daemon_cmd_sem != 1) {                                // Get semaphore
+      do_daemon_cmd_sem --;
       if (cmd.equals ("tuner_bulk")) {
-        com_uti.loge ("Aborting tuner_bulk for bytear_daemon_cmd_sem: " + bytear_daemon_cmd_sem + "  res_len: " + res_len + "  rx_tmo: " + rx_tmo + "  cmd: \"" + cmd + "\"  last_cmd: \"" + last_cmd + "\"");
-        return (-1);
+        com_uti.logd ("Aborting tuner_bulk for do_daemon_cmd_sem: " + do_daemon_cmd_sem + "  res_len: " + res_len + "  rx_tmo: " + rx_tmo + "  cmd: \"" + cmd + "\"  last_cmd: \"" + last_cmd + "\"");
+        return (-999);
       }
-      com_uti.loge ("Waiting for bytear_daemon_cmd_sem: " + bytear_daemon_cmd_sem + "  res_len: " + res_len + "  rx_tmo: " + rx_tmo + "  cmd: \"" + cmd + "\"  last_cmd: \"" + last_cmd + "\"");
+      com_uti.loge ("Waiting for do_daemon_cmd_sem: " + do_daemon_cmd_sem + "  res_len: " + res_len + "  rx_tmo: " + rx_tmo + "  cmd: \"" + cmd + "\"  last_cmd: \"" + last_cmd + "\"");
       com_uti.ms_sleep (101);
-      bytear_daemon_cmd_sem ++;
+      do_daemon_cmd_sem ++;
     }
 
     last_cmd = cmd;                                                     // Update last command to our current command, now that semaphore is obtained
 
     long sem_ms = com_uti.tmr_ms_get () - start_sem_ms;                 // Log semaphore wait time
-    if (sem_ms > 10)
+    if (sem_ms > 20)
       com_uti.loge ("Semaphore wait time sem_ms: " + sem_ms);
     else if (ena_log_daemon_cmd_sem)
-      com_uti.logd ("Semaphore wait time sem_ms: " + sem_ms);           // 6-7 ms is common
+      com_uti.logd ("Semaphore wait time sem_ms: " + sem_ms);           // 6-7 ms is common, 11 ms less common
 
     int len = 0;
-    long start_net_ms = com_uti.tmr_ms_get ();                          // Start command timer
+    long start_daemon_ms = com_uti.tmr_ms_get ();                       // Start command timer
 
     if (use_java_daemon_cmd)                                            // Send command to daemon and wait for response, up to rx_tmo milliseconds
       len = java_daemon_cmd (cmd_len, cmd_buf, res_len, res_buf, s2d_port, rx_tmo);
     else
       len = native_daemon_cmd (cmd_len, cmd_buf, res_len, res_buf, s2d_port, rx_tmo);
 
-    long net_ms = com_uti.tmr_ms_get () - start_net_ms;                 // Log command wait time
-    if (net_ms > (rx_tmo *3) / 4)    //300)
-      com_uti.loge ("Network transaction time net_ms: " + net_ms);
-    else if (false)
-      com_uti.logd ("Network transaction time net_ms: " + net_ms);      // 4-8 ms is common ; Broadcom is often 40+
+    long daemon_ms = com_uti.tmr_ms_get () - start_daemon_ms;           // Log command wait time
+    if (daemon_ms > 300 && daemon_ms > (rx_tmo * 15) / 16)
+      com_uti.loge ("Daemon transaction time daemon_ms: " + daemon_ms);
+    else if (ena_log_daemon_cmd)
+      com_uti.logd ("Daemon transaction time daemon_ms: " + daemon_ms); // 4-8 ms is common ; Broadcom is often 40+
 
-    bytear_daemon_cmd_sem --;                                           // Release semaphore
+    do_daemon_cmd_sem --;                                               // Release semaphore
     return (len);
   }
 
@@ -1965,35 +2145,30 @@ com_uti.logd ("getForceUse 2: " + getForceUse (usage));
     if (ena_log_daemon_cmd)
       com_uti.logd ("cmd_len: " + cmd_len + "  cmd: \"" + cmd + "\"");
 
-    byte [] cmd_buf = com_uti.str_to_ba (cmd);                          // Create byte array command from cmd string
-    /*cmd_len = cmd_buf.length;
-    if (ena_log_daemon_cmd)
-      com_uti.logd ("2 cmd_len: " + cmd_len + "  cmd: \"" + cmd + "\"");*/      // Same result
+    byte [] cmd_buf = com_uti.str_to_ba (cmd);                          // Create command in byte array form from cmd string (Byte array has same length as string)
 
-    int res_len = DEF_BUF;  // 512
-    byte [] res_buf = new byte [res_len];                               // Allocate byte array for response
+    int res_len = DEF_BUF;
+    byte [] res_buf = new byte [res_len];                               // Allocate byte array for response (DEF_BUF = 512)
 
                                                                         // Send command to daemon and wait for response, up to rx_tmo milliseconds
-    res_len = bytear_daemon_cmd (cmd_len, cmd_buf, res_len, res_buf, rx_tmo);
+    res_len = do_daemon_cmd (cmd_len, cmd_buf, res_len, res_buf, rx_tmo);
 
     String res = "";                                                    // Avoid showing 999 for RT when result is zero length string "" (actually 1 byte long for zero)      "999";
 
     if (res_len > 0 && res_len <= DEF_BUF) {                            // If valid response size...
-      //if (ena_log_daemon_cmd)
-      //  com_uti.logd ("res_len: " + res_len + "  res_buf: \"" + res_buf + "\"");
-      res = com_uti.ba_to_str (res_buf);                                // Create string from byte array response
-      /*if (ena_log_daemon_cmd)
-        com_uti.logd ("1 res: \"" + res + "\"");*/
+      res = com_uti.ba_to_str (res_buf);                                // Result is string created from byte array response
       res = res.substring (0, res_len);                                 // Remove extra data
       if (ena_log_daemon_cmd)
         com_uti.logd ("res_len: " + res_len + "  res: \"" + res + "\"");
     }
-    else if (res_len == 0) {
+    else if (res_len == 0) {                                            // If empty response ??
       com_uti.loge ("res_len: " + res_len + "  cmd: " + cmd);
-      res = "";             // Empty string
+      res = "";                                                         // Result is empty string
     }
+    else if (/*res_len == -999 &&*/ cmd.equals ("tuner_bulk"))          // Else if tuner_bulk error
+      com_uti.logd ("res_len: " + res_len + "  cmd: " + cmd);           // Log debug
     else
-      com_uti.loge ("res_len: " + res_len + "  cmd: " + cmd);
+      com_uti.loge ("res_len: " + res_len + "  cmd: " + cmd);           // Else if other error, log error
 
     return (res);                                                       // Return response
   }
@@ -2001,21 +2176,28 @@ com_uti.logd ("getForceUse 2: " + getForceUse (usage));
 
     // Get and set:
 
+    // Get for "tuner_state" simply passes the key string "tuner_state" with the "get" implied by no space characters.
+    // Since all key strings have no spaces this works well.
+
+    // Set "tuner_rds_ps" to "AB D FG " passes the key and value as "tuner_rds_ps AB D FG ".
+    // Value is one string, with optional embedded spaces. Second parameters not explicitly supported, but can be emulated with parsing.
+
   public static int num_daemon_get = 0;
   public static int num_daemon_set = 0;
+
   public static String daemon_get (String key) {
     num_daemon_get ++;
 
-    int rx_tmo = 400;//800;//500;//300;
+    int rx_tmo = 400;//800;//500;//300;                                 // Default timeout
     if (key.equals ("tuner_bulk"))
-      rx_tmo = 100;                                                     // Keep "disposable" commands like get tuner_bulk at a low timeout
+      rx_tmo = 100;                                                     // Low timeout for "disposable" commands like get tuner_bulk
 
     if (ena_log_daemon_cmd)
       com_uti.logd ("before string_daemon_cmd key: " + key + "  rx_tmo: " + rx_tmo + "  num_daemon_get: " + num_daemon_get);
 
-    long start_ms = com_uti.tmr_ms_get ();
-    String res = string_daemon_cmd (key, rx_tmo);                       // Get for "tuner_state" simply passes the key string "tuner_state" with the "get" implied by no space characters.
-    long cmd_time_ms = com_uti.tmr_ms_get () - start_ms;                // Since all key strings have no spaces this works well.
+    long start_ms = com_uti.tmr_ms_get ();                              // Reset start_ms to current time for first try and after each timeout
+    String res = string_daemon_cmd (key, rx_tmo);                       // Send get command to daemon
+    long cmd_time_ms = com_uti.tmr_ms_get () - start_ms;                // Calculate time taken for command
 
     if (ena_log_daemon_cmd)
       com_uti.logd ("after  string_daemon_cmd key: " + key + "  res: " + res + "  cmd_time_ms: " + cmd_time_ms);
@@ -2030,7 +2212,7 @@ com_uti.logd ("getForceUse 2: " + getForceUse (usage));
     long start_ms = 0;
     String res = "";
     int timeouts = 0;
-    int rx_tmo = 800;                                                   // 500; // 300;
+    int rx_tmo = 800;// 500; // 300;                                    // Default timeout
     if (key.startsWith ("test_99s_tmo"))
       rx_tmo = 99000;
     else if (key.equals ("tuner_seek_state"))
@@ -2048,13 +2230,14 @@ com_uti.logd ("getForceUse 2: " + getForceUse (usage));
       com_uti.logd ("before string_daemon_cmd key: " + key + "  val: " + val + "  rx_tmo: " + rx_tmo + "  num_daemon_set: " + num_daemon_set);
 
     int max_timeouts = 3;
-//    if (rx_tmo > 2000)
+    if (rx_tmo > 0)//2000)
       max_timeouts = 1;
     while (timeouts ++ < max_timeouts) {
-      start_ms = com_uti.tmr_ms_get ();
-      res = string_daemon_cmd (key + " " + val, rx_tmo);           // Set "tuner_rds_ps" to "AB D FG " passes the key and value as "tuner_rds_ps AB D FG ".
-      cmd_time_ms = com_uti.tmr_ms_get () - start_ms;                // Value is one string, with embedded spaces. Second parameters not explicitly supported, but can be emulated with parsing.
-      if (cmd_time_ms > (rx_tmo * 3) / 4)
+      start_ms = com_uti.tmr_ms_get ();                                 // Reset start_ms to current time for first try and after each timeout
+      res = string_daemon_cmd (key + " " + val, rx_tmo);                // Send set command to daemon
+      cmd_time_ms = com_uti.tmr_ms_get () - start_ms;                   // Calculate time taken for command
+
+      if (cmd_time_ms > (rx_tmo * 15) / 16)
         com_uti.loge ("timeouts: " + timeouts + "  cmd_time_ms: " + cmd_time_ms);
       else
         break;
@@ -2064,41 +2247,6 @@ com_uti.logd ("getForceUse 2: " + getForceUse (usage));
 
     return (res);
   }
-
-
-/*
-  private static       boolean ena_log_daemon_audio     = false;
-  public static int daemon_audio_data_get (int adevice, int samplerate, int channels, int buf_len, byte [] buffer) {
-    int len = 0;
-    //if (daemon_audio_data_get_num % 10 == 0)
-    //  ena_log_daemon_audio = true;
-    //else
-    //  ena_log_daemon_audio = false;
-    //daemon_audio_data_get_num ++;
-    if (ena_log_daemon_cmd)
-      com_uti.logd ("adevice: " + adevice + "  samplerate: " + samplerate + "  channels: " + channels + "  buf_len: " + buf_len);
-
-    int rx_tmo = 1002;
-    String cmd = "g audio_data                                                    ";    // 64 bytes
-    int x = 0;
-    for (x = 0; x < ((1280/64) -1); x++)
-      cmd += "                                                                ";        // 64 bytes
-    int cmd_len = cmd.length ();
-    byte [] cmd_buf = com_uti.str_to_ba (cmd);
-    cmd_len = cmd_buf.length;
-
-    len = bytear_daemon_cmd (cmd_len, cmd_buf, buf_len, buffer, rx_tmo);
-
-    if (ena_log_daemon_cmd) {
-      if (len > 0)
-        com_uti.logd ("len: " + len + "  buffer[16]: " + buffer [16]);
-      else
-        com_uti.loge ("len: " + len);
-    }
-
-    return (len);
-  }
-*/
 
 
     // !! Use native_priority_set() instead !!
@@ -2794,7 +2942,7 @@ It should be noted that operation in this region is the same as it is for all RD
   public static boolean shim_files_possible_get () {
     if (com_uti.file_get ("/system/lib/libbt-hci.so"))
       return (true);
-    if (com_uti.file_get ("/system/vendor/lib/libbt-vendor.so") && ! chass_plug_aud.equals ("LG2"))   // Disable libbt-vendor for LG2 due to Audio enable issue !!!!
+    if (com_uti.file_get ("/system/vendor/lib/libbt-vendor.so"))// && ! chass_plug_aud.equals ("LG2"))   // Disable libbt-vendor for LG2 due to Audio enable issue !!!!
       return (true);
     return (false);
   }
@@ -2832,6 +2980,8 @@ It should be noted that operation in this region is the same as it is for all RD
       com_uti.loge ("Install SHIM ERROR");
       ret = -1;
     }
+
+com_uti.sys_run ("killall com.android.bluetooth", true);
 
     return (ret);
   }
@@ -2885,6 +3035,8 @@ It should be noted that operation in this region is the same as it is for all RD
       shim_remove_log ("Remove SHIM ERROR");
       ret = -1;
     }
+
+//com_uti.sys_run ("killall com.android.bluetooth", true);
 
 /*
     //shim_remove_log ("WARM RESTART !!");

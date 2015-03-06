@@ -3,23 +3,28 @@
 
 package fm.a2d.sf;
 
-public class gui_dlg {
-
-
-/*  Had: public class gui_gui implements gui_gap, gui_dlg.gui_dlg_lstnr {
-
 import android.app.AlertDialog;
 import android.app.Dialog;
 import android.app.DialogFragment;
+import android.content.Context;
 import android.content.DialogInterface;
 import android.os.Bundle;
 
-public class gui_dlg extends DialogFragment implements DialogInterface.OnClickListener {
+public class gui_dlg { //extends Dialog implements DialogInterface.OnClickListener {
+}
 
+//  Had: public class gui_gui implements gui_gap, gui_dlg.gui_dlg_lstnr {
+//       public class gui_dlg extends DialogFragment implements DialogInterface.OnClickListener {
+/*
   private gui_dlg_lstnr listener;
 
-  public static gui_dlg init (int icon, String title, String message, String positive, String neutral, String negative) {
-    gui_dlg frag = new gui_dlg ();
+  //public gui_dlg () {       //Context,boolean,OnCancelListener
+  //public gui_dlg () {       //Context,int
+  public gui_dlg (Context context) {       //Context
+  }
+
+  public static gui_dlg init (Context context, int icon, String title, String message, String positive, String neutral, String negative) {
+    gui_dlg frag = new gui_dlg (context);
     Bundle args = new Bundle ();
     args.putInt ("icon", icon);
     args.putString ("title", title);
@@ -27,7 +32,7 @@ public class gui_dlg extends DialogFragment implements DialogInterface.OnClickLi
     args.putString ("positive", positive);
     args.putString ("neutral", neutral);
     args.putString ("negative", negative);
-    frag.setArguments (args);
+//    frag.setArguments (args);
     return (frag);
   }
 
@@ -47,15 +52,15 @@ public class gui_dlg extends DialogFragment implements DialogInterface.OnClickLi
 
   @Override
   public Dialog onCreateDialog (Bundle savedInstanceState) {
-    int     icon    = getArguments ().getInt    ("icon");
-    String title    = getArguments ().getString ("title");
-    String message  = getArguments ().getString ("message");
-    String positive = getArguments ().getString ("positive");
-    String neutral  = getArguments ().getString ("neutral");
-    String negative = getArguments ().getString ("negative");
+//    int     icon    = getArguments ().getInt    ("icon");
+    String title    = "title";      //getArguments ().getString ("title");
+    String message  = "message";    //getArguments ().getString ("message");
+    String positive = "positive";   //getArguments ().getString ("positive");
+    String neutral  = "neutral";    //getArguments ().getString ("neutral");
+    String negative = "nagative";   //getArguments ().getString ("negative");
 
     return new AlertDialog.Builder (getActivity ())
-        .setIcon (icon)
+        //.setIcon (icon)
         .setMessage (message)
         .setTitle (title)
         .setPositiveButton (positive, this)
@@ -81,6 +86,7 @@ public class gui_dlg extends DialogFragment implements DialogInterface.OnClickLi
 
 }
 */
+
     // implements gui_dlg_lstnr :
 /*
   public void on_pos () {
@@ -142,6 +148,4 @@ public class gui_dlg extends DialogFragment implements DialogInterface.OnClickLi
       stop_gui_dlg_active = false;
   }
 */
-
-}
 

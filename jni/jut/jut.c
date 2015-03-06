@@ -1,5 +1,5 @@
 
-  #define LOGTAG "sjut...."
+  #define LOGTAG "sfjut..."
 
   #include <stdio.h>
   #include <errno.h>

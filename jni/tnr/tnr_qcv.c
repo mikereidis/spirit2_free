@@ -1,4 +1,3 @@
-
     // Spirit2 Tuner Plugin for "Qualcomm V4L" API:
 
     // See https://android.googlesource.com/kernel/msm/+/android-msm-dory-3.10-lollipop-wear-release/drivers/media/radio/radio-iris.c   radio-iris-transport.c 
@@ -286,10 +285,12 @@
 
   int chip_ctrl_get (int id) {
     v4l_ctrl.id = id;
+
+    errno = 0;
     int ret = ioctl (dev_hndl, VIDIOC_G_CTRL, & v4l_ctrl);
     int value = v4l_ctrl.value;
     if (ret < 0) {
-      loge ("chip_ctrl_get VIDIOC_G_CTRL errno: %d  id: %s (0x%x)", errno, id_get (id), id);
+      loge ("chip_ctrl_get VIDIOC_G_CTRL id: %s (0x%x)  errno: %d (%s)", id_get (id), id, errno, strerror (errno));
       return (-1);
     }
     else {
@@ -302,11 +303,10 @@
     v4l_ctrl.value = value;
     v4l_ctrl.id = id;
 
+    errno = 0;
     int ret = ioctl (dev_hndl, VIDIOC_S_CTRL, & v4l_ctrl);
-    if (ret < 0) {
-      loge ("chip_ctrl_set VIDIOC_S_CTRL Error id: 0x%x  value: %d  errno: %d", id, value, errno);
-      //return (-1);
-    }
+    if (ret < 0)
+      loge ("chip_ctrl_set VIDIOC_S_CTRL Error id: 0x%x  value: %d  errno: %d (%s)", id, value, errno, strerror (errno));
     else
       logd ("chip_ctrl_set VIDIOC_S_CTRL OK    id: 0x%x  value: %d", id, value);
     return (ret);
@@ -734,128 +734,32 @@ hd
         IRIS_EVT_NEW_ERT,
   };
 
-    // RDS:
-
-#ifdef  NOT_USED
-  int qcv_raw_rds_poll (unsigned char * rds_grpd)
-    char misc_buf [MISC_BUF_SIZE];
-    memset (misc_buf, 0, sizeof (misc_buf));
-    logd ("chip_imp_event_sg before iris_buf_get()");
-    ret = iris_buf_get (misc_buf, sizeof (misc_buf), BUF_EVENTS);   // Get events...
-    if (ret < 0) {
-      loge ("chip_imp_event_sg EVENTS errno: %d", errno);
-      return (-1);                                                      // No RDS
-    }
-    logd ("chip_imp_event_sg EVENTS success: %d", ret);
-    buf_display (misc_buf, ret);
-    int event = misc_buf [0];
-    switch (event) {
-      case IRIS_EVT_RADIO_READY:    // 0
-        logd ("Got IRIS_EVT_RADIO_READY");
-        break;
-      case IRIS_EVT_TUNE_SUCC:      // 1
-        logd ("Got IRIS_EVT_TUNE_SUCC");
-        break;
-      case IRIS_EVT_SEEK_COMPLETE:
-        logd ("Got IRIS_EVT_SEEK_COMPLETE");
-        break;
-      case IRIS_EVT_SCAN_NEXT:
-        logd ("Got IRIS_EVT_SCAN_NEXT");
-        break;
-      case IRIS_EVT_NEW_RAW_RDS:
-        logd ("Got IRIS_EVT_NEW_RAW_RDS");
-        iris_rds_buf_handle (BUF_RAW_RDS);
-        break;
-      case IRIS_EVT_NEW_RT_RDS:
-        logd ("Got IRIS_EVT_NEW_RT_RDS");
-        iris_rds_buf_handle (BUF_RT_RDS);
-        break;
-      case IRIS_EVT_NEW_PS_RDS:
-        logd ("Got IRIS_EVT_NEW_PS_RDS");
-        iris_rds_buf_handle (BUF_PS_RDS);
-        break;
-      case IRIS_EVT_ERROR:
-        logd ("Got IRIS_EVT_ERROR");
-        break;
-      case IRIS_EVT_BELOW_TH:
-        logd ("Got IRIS_EVT_BELOW_TH");
-        break;
-      case IRIS_EVT_ABOVE_TH:
-        logd ("Got IRIS_EVT_ABOVE_TH");
-        break;
-      case IRIS_EVT_STEREO:
-        logd ("Got IRIS_EVT_STEREO");
-        curr_stereo = 1;
-        break;
-      case IRIS_EVT_MONO:
-        logd ("Got IRIS_EVT_MONO");
-        curr_stereo = 0;
-        break;
-      case IRIS_EVT_RDS_AVAIL:
-        logd ("Got IRIS_EVT_RDS_AVAIL");
-        break;
-      case IRIS_EVT_RDS_NOT_AVAIL:
-        logd ("Got IRIS_EVT_RDS_NOT_AVAIL");    //????
-        break;
-      case IRIS_EVT_NEW_SRCH_LIST:
-        logd ("Got IRIS_EVT_NEW_SRCH_LIST");
-        break;
-      case 15:
-        logd ("Got IRIS_EVT_NEW_AF_LIST");
-        iris_rds_buf_handle (BUF_AF_LIST);
-        break;
-      case 16:
-        loge ("IRIS_EVT_TXRDSDAT");
-        break;
-      case 17:
-        loge ("Got IRIS_EVT_TXRDSDONE");
-        break;
-      case 18:
-        loge ("Got IRIS_EVT_RADIO_DISABLED");
-        //iris_rds_buf_handle (BUF_AF_LIST);    !! ??
-        break;
-      case 19:
-        loge ("Got IRIS_EVT_NEW_ODA");
-        break;
-      case 20:
-        loge ("Got IRIS_EVT_NEW_RT_PLUS,");
-        break;
-      case 21:
-        loge ("Got IRIS_EVT_NEW_ERT");
-        break;
-
-      default:
-        loge ("Unknown event: %d", event);
-        break;
-    }
-    return (-1);                                                        // No RDS
-#endif
-
+    // Chip API:
+                                                                        // Polling function called every event_sg_ms milliseconds. Not used remotely but could be in future.
 //#define  SUPPORT_RDS
 #ifdef  SUPPORT_RDS
   #include "rds_qcv.c"
 #else
-  int rds_poll (unsigned char * rds_grpd) {return (-1);}
+  int rds_poll (unsigned char * rds_grpd) {return (EVT_GET_NONE);}
 #endif
 
-    // Chip API:
-                                                                        // Polling function called every event_sg_ms milliseconds. Not used remotely but could be in future.
+/*
   int event_sg_count = 0;
-  int chip_imp_event_sg (unsigned char * rds_grpd) {
-    int ret = 0;
-    #ifdef  NOT_USED
-    ret = qcv_raw_rds_poll (rds_grpd);
-    #else
-    ret = rds_poll (rds_grpd);
-    #endif
-
+  void qcv_pwr_hack () {
     event_sg_count ++;
-    if (event_sg_count % 1800 == 0) {                                   // Every 180 seconds, re set the stereo setting to keep chip audio running (better alternative to blank checking) 
+    if (event_sg_count % 600 == 0) { //1800 == 0) {                                   // Every 180 seconds, re set the stereo setting to keep chip audio running (better alternative to blank checking) 
                                                                             // Was OK at 600 seconds (15 minute power timeout ?) but MotoG w/ CM12 was seen to blank after 5 minutes
                                                                         // ?? Is there some power control register to do this ? See /sys/devices/qcom,iris-fm.66/power/
-      logd ("chip_imp_stereo_sg (curr_stereo): %d", chip_imp_stereo_sg (curr_stereo));
+      //logd ("qcv_pwr_hack chip_imp_stereo_sg (curr_stereo): %d", chip_imp_stereo_sg (curr_stereo));
+      logd ("qcv_pwr_hack TX_SETPSREPEATCOUNT: %d", chip_ctrl_set (V4L2_CID_PRIVATE_IRIS_TX_SETPSREPEATCOUNT, 15));
     }
+  }
+*/
 
+  int chip_imp_event_sg (unsigned char * rds_grpd) {
+//    qcv_pwr_hack ();
+    int ret = 0;
+    ret = rds_poll (rds_grpd);
     return (ret);
   }
 
@@ -967,12 +871,90 @@ hd
 > 00000000 d rt_plus_carrier
 */
 
+  int sys_run (char * cmd) {
+    int ret = system (cmd);                                             // !! Binaries like ssd that write to stdout cause C system() to crash !
+    logd ("sys_run ret: %d  cmd: \"%s\"", ret, cmd);
+    return (ret);
+  }
+
+/*
+OM8:    sys/devices/qcom,iris-fm.68/power
+MOG:    sys/devices/qcom,iris-fm.64/power
+XZ1:    sys/devices/qcom,iris-fm.66/power
+XZ0/OXL:sys/devices/platform/iris_fm/power
+
+OM8:    sys/devices/fe02c000.sound/INT_FM_TX/power
+MOG:    sys/devices/sound-9302.43/INT_FM_TX/power
+XZ1:    sys/devices/fe02b000.sound/INT_FM_TX/power
+XZ0/OXL:sys/devices/platform/soc-audio.0/INT_FM_TX/power
+*/
+
+  void power_control_set (int on) {
+    if (file_get ("/sys/devices/platform/soc-audio.0/INT_FM_TX/power/control")) {
+      if (on)
+        sys_run ("echo   on > /sys/devices/platform/soc-audio.0/INT_FM_TX/power/control");
+      else
+        sys_run ("echo auto > /sys/devices/platform/soc-audio.0/INT_FM_TX/power/control");
+    }
+    else if (file_get ("/sys/devices/sound-9302.43/INT_FM_TX/power/control")) {
+      if (on)
+        sys_run ("echo   on > /sys/devices/sound-9302.43/INT_FM_TX/power/control");
+      else
+        sys_run ("echo auto > /sys/devices/sound-9302.43/INT_FM_TX/power/control");
+    }
+    else if (file_get ("/sys/devices/fe02b000.sound/INT_FM_TX/power/control")) {
+      if (on)
+        sys_run ("echo   on > /sys/devices/fe02b000.sound/INT_FM_TX/power/control");
+      else
+        sys_run ("echo auto > /sys/devices/fe02b000.sound/INT_FM_TX/power/control");
+    }
+    else if (file_get ("/sys/devices/fe02c000.sound/INT_FM_TX/power/control")) {
+      if (on)
+        sys_run ("echo   on > /sys/devices/fe02c000.sound/INT_FM_TX/power/control");
+      else
+        sys_run ("echo auto > /sys/devices/fe02c000.sound/INT_FM_TX/power/control");
+    }
+    else {
+      loge ("No power control");
+    }
+
+
+    if (file_get ("/sys/devices/platform/iris_fm/power/control")) {
+      if (on)
+        sys_run ("echo   on > /sys/devices/platform/iris_fm/power/control");
+      else
+        sys_run ("echo auto > /sys/devices/platform/iris_fm/power/control");
+    }
+    else if (file_get ("/sys/devices/qcom,iris-fm.64/power/control")) {
+      if (on)
+        sys_run ("echo   on > /sys/devices/qcom,iris-fm.64/power/control");
+      else
+        sys_run ("echo auto > /sys/devices/qcom,iris-fm.64/power/control");
+    }
+    else if (file_get ("/sys/devices/qcom,iris-fm.66/power/control")) {
+      if (on)
+        sys_run ("echo   on > /sys/devices/qcom,iris-fm.66/power/control");
+      else
+        sys_run ("echo auto > /sys/devices/qcom,iris-fm.66/power/control");
+    }
+    else if (file_get ("/sys/devices/qcom,iris-fm.68/power/control")) {
+      if (on)
+        sys_run ("echo   on > /sys/devices/qcom,iris-fm.68/power/control");
+      else
+        sys_run ("echo auto > /sys/devices/qcom,iris-fm.68/power/control");
+    }
+    else {
+      loge ("No power control");
+    }
+  }
+
   int chip_imp_api_state_sg (int state) {
     logd ("chip_imp_api_state_sg state: %d", state);
     if (state == GET)
       return (curr_api_state);
 
     if (state == 0) {
+      power_control_set (0);
       if (dev_hndl >= 0) {
         close (dev_hndl);
       }
@@ -1001,11 +983,14 @@ hd
       curr_api_state = 0;
     }
 
+
     if (! file_get ("/sys/module/radio_iris/") && ! file_get ("/sys/module/radio_iris/parameters/sig_blend") &&
         ! file_get ("/sys/module/radio_iris_transport/") && ! file_get ("/sys/module/radio_iris_transport/uevent")) {   // Xperia Z w/ CM11 only has these
       loge ("No /sys/module/radio_iris/ or /sys/module/radio_iris/parameters/sig_blend");
       curr_api_state = 0;
     }
+
+    power_control_set (1);
 
     return (curr_api_state);
   }
@@ -1036,9 +1021,9 @@ hd
     else
       logd ("chip_imp_state_sg PRIVATE_IRIS_STATE 1 success for: %d", new_state);
 
-    chip_ctrl_set (V4L2_CID_TUNE_POWER_LEVEL, 7);
+    chip_ctrl_set (V4L2_CID_TUNE_POWER_LEVEL, 7);                       // Maximum power for transmit
 
-    v4l_tuner.index = 0;                                                  // Tuner index = 0
+    v4l_tuner.index = 0;                                                // Tuner index = 0
     v4l_tuner.type = V4L2_TUNER_RADIO;
     memset (v4l_tuner.reserved, 0, sizeof (v4l_tuner.reserved));
     ret = ioctl (dev_hndl, VIDIOC_G_TUNER, & v4l_tuner);
@@ -1055,16 +1040,14 @@ hd
           v4l_tuner.type, v4l_tuner.capability, v4l_tuner.rangelow , v4l_tuner.rangehigh, v4l_tuner.rxsubchans, v4l_tuner.audmode, v4l_tuner.signal, v4l_tuner.afc);
     }
 
-    ret = chip_ctrl_get (V4L2_CID_PRIVATE_IRIS_ANTENNA);
+    chip_imp_mute_sg (1);                                               // Mute for now
 
-    curr_antenna = 2;
-    if (qcv_internal_antenna_get ())
-      curr_antenna = 3;
+    ret = chip_ctrl_get (V4L2_CID_PRIVATE_IRIS_ANTENNA);                // Log current setting
 
-    if (curr_antenna >= 2) {
-      ret = chip_ctrl_set (V4L2_CID_PRIVATE_IRIS_ANTENNA, curr_antenna - 2);                     // 0 = External/headset antenna for OneS/XL/Evo 4G/All others, 1 = internal for Xperia T - Z1
-     logd ("chip_imp_state_sg PRIVATE_IRIS_ANTENNA ret: %d  curr_antenna: %d", ret, curr_antenna);
-    }
+    curr_antenna = qcv_need_internal_antenna_get ();
+
+    ret = chip_ctrl_set (V4L2_CID_PRIVATE_IRIS_ANTENNA, curr_antenna);  // 0 = External/headset antenna for OneS/XL/Evo 4G/All others, 1 = internal for Xperia T - Z1
+    logd ("chip_imp_state_sg PRIVATE_IRIS_ANTENNA ret: %d  curr_antenna: %d", ret, curr_antenna);
 
     if (curr_rds_state) {
       if (chip_ctrl_set (V4L2_CID_PRIVATE_IRIS_RDSON, 1) < 0)           // 0 = OFF, 1 = ON
@@ -1096,6 +1079,20 @@ hd
     curr_state = 1;
     logd ("chip_imp_state_sg curr_state: %d", curr_state);
     return (curr_state);
+  }
+
+  int chip_imp_antenna_sg (int antenna) {
+    if (antenna == GET)
+      return (curr_antenna);
+
+    if (chip_ctrl_set (V4L2_CID_PRIVATE_IRIS_ANTENNA, antenna) < 0)     // 0 = common external, 1 = Sony Z/Z1 internal
+      loge ("chip_imp_antenna_sg ANTENNA error");
+    else
+      logd ("chip_imp_antenna_sg ANTENNA success");
+
+    curr_antenna = antenna;
+    logd ("chip_imp_antenna_sg curr_antenna: %d", curr_antenna);
+    return (curr_antenna);
   }
 
   int chip_imp_band_sg (int band) {
@@ -1172,6 +1169,7 @@ hd
   int chip_imp_mute_sg (int mute) {
     if (mute == GET)
       return (curr_mute);
+
     if (chip_ctrl_set (V4L2_CID_AUDIO_MUTE, mute) < 0)                  // 0 = unmute, 1 = mute
       loge ("chip_imp_mute_sg MUTE error");
     else
@@ -1180,6 +1178,20 @@ hd
     curr_mute = mute;
     logd ("chip_imp_mute_sg curr_mute: %d", curr_mute);
     return (curr_mute);
+  }
+
+  int chip_imp_softmute_sg (int softmute) {
+    if (softmute == GET)
+      return (curr_softmute);
+
+    if (chip_ctrl_set (V4L2_CID_PRIVATE_IRIS_SOFT_MUTE, softmute) < 0)  // 0 = softmute disable, 1 = default softmute enable
+      loge ("chip_imp_softmute_sg SOFT_MUTE error");
+    else
+      logd ("chip_imp_softmute_sg SOFT_MUTE success");
+
+    curr_softmute = softmute;
+    logd ("chip_imp_softmute_sg curr_softmute: %d", curr_softmute);
+    return (curr_softmute);
   }
 
   int chip_imp_stereo_sg (int stereo) {                                 //
@@ -1286,11 +1298,16 @@ hd
     v4l_tuner.index = 0;                                                // Tuner index = 0
     v4l_tuner.type = V4L2_TUNER_RADIO;
     memset (v4l_tuner.reserved, 0, sizeof (v4l_tuner.reserved));
+    errno = 0;
     int ret = ioctl (dev_hndl, VIDIOC_G_TUNER, & v4l_tuner);
     if (ret < 0) {
       static int times = 0;
-      if (times ++ % 10 == 0)
+      if (times ++ % 1 == 0)
         loge ("chip_imp_rssi_sg VIDIOC_G_TUNER errno: %d", errno);
+      if (errno == EINVAL) {
+        //chip_imp_api_state_sg (0);
+        //chip_imp_api_state_sg (1);
+      }
       return (curr_rssi);
     }
     static int timesb = 0;
@@ -1313,6 +1330,10 @@ hd
     int ret = ioctl (dev_hndl, VIDIOC_G_TUNER, & v4l_tuner);
     if (ret < 0) {
       loge ("chip_imp_pilot_sg VIDIOC_G_TUNER errno: %d", errno);
+      if (errno == EINVAL) {
+        //chip_imp_api_state_sg (0);
+        //chip_imp_api_state_sg (1);
+      }
       //if (errno == EINVAL) {
         curr_pilot  = 0;
         return (curr_pilot);
@@ -1362,31 +1383,33 @@ hd
     //      V4L2_CID_PRIVATE_IRIS_SRCHMODE      = (0x08000000 + 1),
     //      V4L2_CID_PRIVATE_SINR_SAMPLES,      // 0x08000030
 
+
+    // See gui_gui: // Codes 200 000 - 2xx xxx - 299 999 = get/set private Broadcom/Qualcomm control
+
   char * chip_imp_extension_sg (char * reg) {
     if (reg == GETP)
       return (curr_extension);
 
     int ret = -1;
-    //ret = reg_set (reg);
     strlcpy (curr_extension, reg, sizeof (curr_extension));
 
-    int full_val = atoi (reg);              // full_val = -2^31 ... +2^31 - 1       = Over 9 digits
-    int ctrl = (full_val / 1000) - 200;         // ctrl = hi 3 digits - 200     (control to write to)
-    int val  = (full_val % 1000);               // val  = lo 3 digits           (value to write)
-/*
-    long full_val = atol (reg);              // full_val = -2^31 ... +2^31 - 1       = Over 9 digits
-    long ctrl = ((full_val % 1000000) / 1000) - 200;         // ctrl = hi 3 digits - 200     (control to write to)
-    long val  = (full_val % 1000);               // val  = lo 3 digits           (value to write)
-*/
+    int full_val = atoi (reg);                                          // full_val = -2^31 ... +2^31 - 1       = Over 9 digits
+    int ctrl = 0;
+    if (full_val >= 300000)                                             // If set
+      ctrl = (full_val / 1000) - 300;                                   // ctrl = hi 3 digits - 400     (control to write to)
+    else
+      ctrl = (full_val / 1000) - 200;                                   // ctrl = hi 3 digits - 200     (control to write to)
+
+    int val  = (full_val % 1000);                                       // val  = lo 3 digits           (value to write)
 
     logd ("chip_imp_extension_sg reg: %s  full_val: %d  ctrl: %d  val: %d", reg, full_val, ctrl, val);
 
-    if (ctrl >= 1 && ctrl <= 999) {
+    if (ctrl >= 0 && ctrl <= 99) {
       ctrl += 0x08000000;
       int ret = chip_ctrl_get (ctrl);
       logd ("chip_imp_extension_sg get ret: %d  ctrl: %x", ret, ctrl);
 
-      if (val < 900 && val >= 0) {                                      // Val from 0 - 899 are for chip_ctrl_set, 900-999 are for get only
+      if (full_val >= 300000) {                                           // If set
         ret = chip_ctrl_set (ctrl, val);
         logd ("chip_imp_extension_sg set ret: %d  ctrl: %x", ret, ctrl);
       }

@@ -250,11 +250,11 @@ com_uti.logd ("FREQ CODE freq: " + freq + "  hci: " + hci + "  port: " + port);
           String new_chass_plug_aud = com_uti.daemon_set ("chass_plug_aud", m_com_api.chass_plug_aud);
           com_uti.logd ("m_com_api.chass_plug_aud: " + m_com_api.chass_plug_aud + "  new_chass_plug_aud: " + new_chass_plug_aud);
 
-/*                                                                        // Set Chassis Plugin Tuner:
+                                                                        // Set Chassis Plugin Tuner:
           m_com_api.service_update_send (null, "Setting Chassis Plugin Tuner", "2");
           String new_chass_plug_tnr = com_uti.daemon_set ("chass_plug_tnr", m_com_api.chass_plug_tnr);
           com_uti.logd ("m_com_api.chass_plug_tnr: " + m_com_api.chass_plug_tnr + "  new_chass_plug_tnr: " + new_chass_plug_tnr);
-*/
+
                                                                         // Set Tuner API Mode: UART, SHIM
           m_com_api.service_update_send (null, "Setting Tuner API Mode", "2");
           String new_tuner_api_mode = com_uti.daemon_set ("tuner_api_mode", m_com_api.tuner_api_mode);
