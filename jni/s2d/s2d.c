@@ -66,15 +66,15 @@
   int   curr_tuner_state_int        = 0;
 
   int   curr_tuner_antenna_int      = 0;
-  int   curr_tuner_band_int         =  0;
+  int   curr_tuner_band_int         = 0;
 
   int   curr_tuner_freq_int         = -7;
 
-  int   curr_tuner_freq_lo_int      =  87500;
-  int   curr_tuner_freq_hi_int      = 108000;
+//  int   curr_tuner_freq_lo_int      =  87500;
+//  int   curr_tuner_freq_hi_int      = 108000;
   //emph75
   //rbds
-  int   curr_tuner_freq_inc_int     = 100;                              // EU frequency increment = 100 KHz
+//  int   curr_tuner_freq_inc_int     = 100;                              // EU frequency increment = 100 KHz
 
   int   curr_tuner_vol_int          = -7;
 
@@ -233,7 +233,8 @@
 
     // Do nothing on callback; because we poll...
   void cb_tuner_change (char * key, char * val) {
-    //logd ("cb_tuner_change key: %s  val: %s", key, val);
+//IN USE
+//    logw ("cb_tuner_change key: %s  val: %s", key, val);
   }
 
     // Store the trimmed input string into the given output buffer, which must be large enough to store the result.  If it is too small, the output is truncated.
@@ -277,7 +278,7 @@
   }
 
   void imp_cb_tuner_pilot  (int new_pilot) {
-    //logd ("imp_cb_tuner_pilot  new_pilot: %d", new_pilot);
+    logw ("imp_cb_tuner_pilot  new_pilot: %d", new_pilot);
     if (curr_tuner_pilot_int != new_pilot) {
       curr_tuner_pilot_int = new_pilot;
       strlcpy (curr_tuner_pilot, itop (new_pilot), sizeof (curr_tuner_pilot));
@@ -286,12 +287,13 @@
   }
 
   void imp_cb_tuner_rds (rds_struct_t * new_rds) {
-    //logd ("imp_cb_tuner_rds rds_struct srds_ps: \"%s\"  srds_rt: \"%s\"  ct: \"%d\"  ptyn: \"%d\"", new_rds->srds_ps, new_rds->srds_rt, new_rds->ct, new_rds->ptyn);
-    //logd ("imp_cb_tuner_rds rds_struct: %p  freq: %d  pi: %d  tp: %d  srds_pt: %d  ta: %d  ms: %d  taf: %d  srds_af_num: %d", new_rds, freq, new_rds->srds_pi, new_rds->tp, new_rds->srds_pt, new_rds->ta, new_rds->ms, new_rds->taf, new_rds->srds_af_num);
+    //logw ("imp_cb_tuner_rds rds_struct srds_ps: \"%s\"  srds_rt: \"%s\"  ct: \"%d\"  ptyn: \"%d\"", new_rds->srds_ps, new_rds->srds_rt, new_rds->ct, new_rds->ptyn);
+    //logw ("imp_cb_tuner_rds rds_struct: %p  freq: %d  pi: %d  tp: %d  srds_pt: %d  ta: %d  ms: %d  taf: %d  srds_af_num: %d", new_rds, freq, new_rds->srds_pi, new_rds->tp, new_rds->srds_pt, new_rds->ta, new_rds->ms, new_rds->taf, new_rds->srds_af_num);
     //for (ctr = 0; ctr < RDS_MAX_TMC; ctr ++)
-    //  logd ("imp_cb_tuner_rds rds_struct tmc %d: %d", new_rds->tmc [ctr]);
+    //  logw ("imp_cb_tuner_rds rds_struct tmc %d: %d", new_rds->tmc [ctr]);
 
-    //logd ("imp_cb_tuner_rds freq: %d  rds_struct  pi: %d  srds_pt: %d srds_ps: \"%s\"  srds_rt: \"%s\"  srds_af_num: %d", freq, new_rds->srds_pi, new_rds->srds_pt, new_rds->srds_ps, new_rds->srds_rt, new_rds->srds_af_num);
+//IN USE
+//    logw ("imp_cb_tuner_rds rds_struct  pi: %d  srds_pt: %d srds_ps: \"%s\"  srds_rt: \"%s\"  srds_af_num: %d", new_rds->srds_pi, new_rds->srds_pt, new_rds->srds_ps, new_rds->srds_rt, new_rds->srds_af_num);
     int ctr = 0;
     for (ctr = 0; ctr < new_rds->srds_af_num; ctr ++)
       logv ("imp_cb_tuner_rds rds_struct srds_af %d: %d", new_rds->srds_af [ctr]);
@@ -312,9 +314,10 @@
       cb_tuner_change ("tuner_rds_ps", new_rds->srds_ps);
     }
 
-    //logd ("Radiotext: \"%s\"", new_rds->srds_rt);
-    //    space_trim (new_rds->srds_rt);
-    //logd ("Radiotext: \"%s\"", new_rds->srds_rt);
+//    logw ("Radiotext: \"%s\"", new_rds->srds_rt);
+    space_trim (new_rds->srds_rt);
+//    logw ("Radiotext: \"%s\"", new_rds->srds_rt);
+
     if (strcmp (curr_tuner_rds_rt, new_rds->srds_rt)) {
       strlcpy (curr_tuner_rds_rt, new_rds->srds_rt, sizeof (curr_tuner_rds_rt));
       cb_tuner_change ("tuner_rds_rt", new_rds->srds_rt);
@@ -322,7 +325,7 @@
   }
 
   void imp_cb_tuner_rssi (int new_rssi) {
-    //logd ("imp_cb_tuner_rssi new_rssi: %d", new_rssi);        // rssi: (760 - 347) / 19 = 21.74. Thus internal range thus is 0 - 46
+    logw ("imp_cb_tuner_rssi new_rssi: %d", new_rssi);        // rssi: (760 - 347) / 19 = 21.74. Thus internal range thus is 0 - 46
     char itoa_ret [MAX_ITOA_SIZE] = {0};
     if (curr_tuner_rssi_int != new_rssi) {
       curr_tuner_rssi_int = new_rssi;
@@ -332,11 +335,11 @@
   }
 
   void imp_cb_tuner_rds_af (int new_freq) {
-    logd ("imp_cb_tuner_rds_af new_freq: %d", new_freq);
+    logw ("imp_cb_tuner_rds_af new_freq: %d", new_freq);
   }
 
   void imp_cb_tuner_state (int new_state) {
-    logd ("imp_cb_tuner_state new_state: %d", new_state);
+    logw ("imp_cb_tuner_state new_state: %d", new_state);
     strlcpy (curr_tuner_state, "Stop", sizeof (curr_tuner_state));
     cb_tuner_change ("tuner_state", curr_tuner_state);
   }
@@ -416,12 +419,16 @@
 
     else if (! strcmp (key, "tuner_thresh")) {
       if (tnr_funcs)
-        strlcpy (curr_tuner_thresh, itoa (curr_tuner_thresh_int = tnr_funcs->tnr_tuner_thresh_sg(GET), itoa_ret, 10),  sizeof (curr_tuner_thresh));
+        strlcpy (curr_tuner_thresh, itoa (curr_tuner_thresh_int = tnr_funcs->tnr_tuner_thresh_sg (GET), itoa_ret, 10),  sizeof (curr_tuner_thresh));
       strlcpy (res_buf, curr_tuner_thresh,          res_max);
     }
     else if (! strcmp (key, "tuner_freq")) {
-      if (tnr_funcs)
-        strlcpy (curr_tuner_freq,   itoa (curr_tuner_freq_int   = tnr_funcs->tnr_tuner_freq_sg  (GET), itoa_ret, 10),  sizeof (curr_tuner_freq));
+      if (tnr_funcs) {
+        strlcpy (curr_tuner_freq,   itoa (curr_tuner_freq_int = tnr_funcs->tnr_tuner_freq_sg (GET), itoa_ret, 10),  sizeof (curr_tuner_freq));
+        logd ("key_get tuner_freq curr_tuner_freq: %d (%s)", curr_tuner_freq_int, curr_tuner_freq);
+      }
+      else
+        loge ("key_get tuner_freq curr_tuner_freq: %d (%s)", curr_tuner_freq_int, curr_tuner_freq);
       strlcpy (res_buf, curr_tuner_freq,            res_max);
     }
     else if (! strcmp (key, "tuner_vol")) {
@@ -442,11 +449,14 @@
 
     else if (! strcmp (key, "tuner_bulk")) {                        // Tuner Bulk:  Update freq, rssi, pilot from tuner plugin
 
+
+      //if (curr_tuner_rds_state_int) {     // Only access chip obsessively when RDS is enabled     DISABLED for now; needs work to get frequency updates to app
       if (tnr_funcs)
         strlcpy (curr_tuner_freq,   itoa (curr_tuner_freq_int   = tnr_funcs->tnr_tuner_freq_sg  (GET), itoa_ret, 10),  sizeof (curr_tuner_freq));
 
       if (tnr_funcs)
         strlcpy (curr_tuner_rssi,   itoa (curr_tuner_rssi_int   = tnr_funcs->tnr_tuner_rssi_sg  (GET), itoa_ret, 10),  sizeof (curr_tuner_rssi));
+      //}
 
 //!!!! May interfere with RDS on SSL, so disable for now !!  (used to interfere with BCH also)
       //if (tnr_funcs)
@@ -459,7 +469,7 @@
       strlcat (res_buf, curr_tuner_rssi,            res_max);
 
       strlcat (res_buf, "mArK",                     res_max);
-      strlcat (res_buf, curr_tuner_pilot,            res_max);
+      strlcat (res_buf, curr_tuner_pilot,           res_max);
                                                                         // Update PI, PT, PS, RT from memory
       strlcat (res_buf, "mArK",                     res_max);
       strlcat (res_buf, curr_tuner_rds_pi,          res_max);
@@ -580,6 +590,7 @@
 
         // Audio:
     else if (! strcmp (key, "audio_state")) {                       // Audio State
+      logd ("key_set audio_state -> tuner_mute: %d",  curr_tuner_mute_int = tnr_funcs->tnr_tuner_mute_sg (sval = 1));   // !!!! Mute to avoid phone call interference !!!!
       logd ("key_set audio_state: %s", audio_state_set (val));
     }
     else if (! strcmp (key, "audio_mode")) {                        // Audio Mode
@@ -605,11 +616,13 @@
         logd ("key_set tuner_band_sg Start: %d", ret = curr_tuner_band_int = tnr_funcs->tnr_tuner_band_sg (sval = 0));
       else if (! strcmp (val, "US"))                                // If US...
         logd ("key_set tuner_band_sg Stop: %d",  ret = curr_tuner_band_int = tnr_funcs->tnr_tuner_band_sg (sval = 1));
+      else if (! strcmp (val, "UU"))                                // If UU...
+        logd ("key_set tuner_band_sg Stop: %d",  ret = curr_tuner_band_int = tnr_funcs->tnr_tuner_band_sg (sval = 2));
       if (ret == sval) {
         strlcpy (curr_tuner_band, val,  sizeof (curr_tuner_band));
-        curr_tuner_freq_inc_int = 100;
+        /*curr_tuner_freq_inc_int = 100;
         if (sval == 1)
-          curr_tuner_freq_inc_int = 200;
+          curr_tuner_freq_inc_int = 200;*/
       }
     }
 
@@ -652,8 +665,13 @@
         logd ("key_set tuner_seek_state down: %d", ret = curr_tuner_seek_state_int = tnr_funcs->tnr_tuner_seek_state_sg (sval = 2));
       else if (! strcmp (val, "Stop"))
         logd ("key_set tuner_seek_state stop: %d", ret = curr_tuner_seek_state_int = tnr_funcs->tnr_tuner_seek_state_sg (sval = 0));
-      if (ret == sval)
-        strlcpy (curr_tuner_seek_state, val,  sizeof (curr_tuner_seek_state));
+
+      strlcpy (curr_tuner_seek_state, "Stop",  sizeof (curr_tuner_seek_state));
+
+      char itoa_ret [MAX_ITOA_SIZE] = {0};
+      if (ret >= 65000 && ret <= 108000) {
+        strlcpy (curr_tuner_freq, itoa (curr_tuner_freq_int = ret, itoa_ret, 10), sizeof (curr_tuner_freq));
+      }
     }
     else if (! strcmp (key, "tuner_rds_state")) {                   // If Tuner RDS State...
       if (! strcmp (val, "Start"))                                  // Start
@@ -672,18 +690,27 @@
         strlcpy (curr_tuner_rds_af_state, val,  sizeof (curr_tuner_rds_af_state));
     }
     else if (! strcmp (key, "tuner_stereo")) {                      // Tuner Stereo
-      if (! strcmp (val, "Stereo"))                                 // Stereo
-        logd ("key_set tuner_stereo_sg: %d", ret = curr_tuner_stereo_int = tnr_funcs->tnr_tuner_stereo_sg (sval = 1));
-      else if (! strcmp (val, "Mono"))                              // Mono
+      if (! strcmp (val, "Mono"))                                   // Mono
         logd ("key_set tuner_stereo_sg: %d", ret = curr_tuner_stereo_int = tnr_funcs->tnr_tuner_stereo_sg (sval = 0));
+      else if (! strcmp (val, "Blend"))                              // Blend
+        logd ("key_set tuner_stereo_sg: %d", ret = curr_tuner_stereo_int = tnr_funcs->tnr_tuner_stereo_sg (sval = 1));
+      else if (! strcmp (val, "Switch"))                            // Switch
+        logd ("key_set tuner_stereo_sg: %d", ret = curr_tuner_stereo_int = tnr_funcs->tnr_tuner_stereo_sg (sval = 2));
+      else if (! strcmp (val, "Stereo"))                            // Stereo
+        logd ("key_set tuner_stereo_sg: %d", ret = curr_tuner_stereo_int = tnr_funcs->tnr_tuner_stereo_sg (sval = 3));
       if (ret == sval)
         strlcpy (curr_tuner_stereo, val,  sizeof (curr_tuner_stereo));
     }
 
     else if (! strcmp (key, "tuner_freq")) {                        // Tuner Freq
       logd ("key_set tuner_freq_sg: %d", ret = curr_tuner_freq_int = tnr_funcs->tnr_tuner_freq_sg (sval = atoi (val)));
-      if (ret == sval)
+      logd ("key_set tuner_freq curr_tuner_freq: %d (%s)  ret: %d  sval: %d val: %s", curr_tuner_freq_int, curr_tuner_freq, ret, sval, val);
+      if (ret == sval) {
         strlcpy (curr_tuner_freq, val,  sizeof (curr_tuner_freq));
+        logd ("key_set tuner_freq curr_tuner_freq: %s", curr_tuner_freq);
+      }
+      else
+        loge ("key_set tuner_freq curr_tuner_freq: %s", curr_tuner_freq);
     }
     else if (! strcmp (key, "tuner_vol")) {                         // Tuner Vol
       logd ("key_set tuner_vol -> audio_ana_vol: %d", ret = curr_tuner_vol_int = audio_ana_vol_set (sval = atoi (val)));
@@ -829,26 +856,34 @@
   char * s2d_running_file = "/dev/s2d_running";
 
   int client_run () {
-    logd ("main client mode");
+    logd ("client_run");
     char store_line [DEF_BUF] = {0};
     char * line = store_line;
-    while (line != NULL) {
-      //line = readline (store_line);                                   // Caller must free malloc'd memory
-      line = fgets (store_line, sizeof (store_line), stdin);          // Never  use  gets()
+
+    while (line != NULL) {                                              // While command lines are being entered...
+      line = fgets (store_line, sizeof (store_line), stdin);            // Get line from standard input
       //logd ("line: %p", line);
 
-      if (line != NULL) {
-        int cmd_len = strlen (line);// + 1;
-        if (cmd_len > 0 && cmd_len < sizeof (store_line)) {
+      if (line != NULL) {                                               // If valid line...
+        int cmd_len = strlen (line);
+        if (cmd_len > 0 && cmd_len < sizeof (store_line)) {             // If line size valid...
           char * cmd_buf = line;
+          cmd_buf [cmd_len] = 0;                                        // Ensure ASCIIZ 0 to terminate
           if (cmd_buf [cmd_len - 1] == '\r' || cmd_buf [cmd_len - 1] == '\n')
-            cmd_buf [cmd_len - 1] = 0;
+            cmd_buf [cmd_len - 1] = 0;                                  // If line ends in newline/cr character, replace with ASCIIZ 0 to terminate
 
-          logd ("main To    gen_client_cmd cmd_len: %d  cmd_buf: \"%s\"", cmd_len, cmd_buf);
+          logd ("client_run to gen_client_cmd cmd_len: %d  cmd_buf: \"%s\"", cmd_len, cmd_buf);
           unsigned char res_buf [RES_DATA_MAX] = {0};
-
-          int res_len = gen_client_cmd (cmd_buf, cmd_len + 1, res_buf, sizeof (res_buf), s2d_port, 1000);  // Send command at line / store_line and get response to res_buf
-          logd ("main res_len: %d  res_buf: \"%s\"", res_len, res_buf);
+                                                                        // Send line as command (including a trailing ASCIIZ 0) and get response to res_buf
+          int res_len = gen_client_cmd (cmd_buf, cmd_len + 1, res_buf, sizeof (res_buf), s2d_port, 1000);
+          if (res_len > 0) {
+            logd           ("client_run gen_client_cmd res_len: %d  res_buf: \"%s\"",   res_len, res_buf);
+            printf ("Success client_run gen_client_cmd res_len: %d  res_buf: \"%s\"\n", res_len, res_buf);
+          }
+          else {
+            loge         ("client_run gen_client_cmd res_len: %d",   res_len);
+            printf ("Error client_run gen_client_cmd res_len: %d\n", res_len);
+          }
         }
       }
     }
@@ -891,7 +926,7 @@
   }
 
     // Main entrance:
-
+/*
   #include <sys/ioctl.h>
   #include <linux/videodev2.h>
 
@@ -931,7 +966,7 @@
     "RSSI_DELTA",
     "HLSI",             // 0x800001d
 
-        /*Diagnostic commands*/
+        // Diagnostic commands
     "SOFT_MUTE",
     "RIVA_ACCS_ADDR",
     "RIVA_ACCS_LEN",
@@ -1010,7 +1045,7 @@
         V4L2_CID_PRIVATE_SINR_THRESHOLD,
         V4L2_CID_PRIVATE_SINR_SAMPLES,          // 0x8000030
 
-        /*using private CIDs under userclass*/
+        // Using private CIDs under userclass
         V4L2_CID_PRIVATE_IRIS_READ_DEFAULT = 0x00980928,
         V4L2_CID_PRIVATE_IRIS_WRITE_DEFAULT,
         V4L2_CID_PRIVATE_IRIS_SET_CALIBRATION,
@@ -1052,7 +1087,7 @@
     return (value);
   }
 
-int curr_api_state = 0;
+  int curr_api_state = 0;
 
   int chip_imp_api_state_sg (int state) {
     logd ("chip_imp_api_state_sg state: %d", state);
@@ -1071,9 +1106,10 @@ int curr_api_state = 0;
     if (file_get ("/system/lib/modules/radio-iris-transport.ko"))
       util_insmod ("/system/lib/modules/radio-iris-transport.ko");
 
+    errno = 0;
     dev_hndl = open ("/dev/radio0", O_RDWR   | O_NONBLOCK);
     if (dev_hndl < 0) {
-      loge ("chip_imp_api_state_sg error opening qualcomm /dev/radio0: %d", errno);
+      loge ("chip_imp_api_state_sg error opening qualcomm /dev/radio0 errno: %d (%s)", errno, strerror (errno));
       curr_api_state = 0;
       return (curr_api_state);
     }
@@ -1106,12 +1142,13 @@ int curr_api_state = 0;
     chip_imp_api_state_sg (1);
     int id = 0;
     //for (id = 0x08000001; id <= 0x08000030; id ++) {
-for (id = 0x08000001; id <= 0x08000002; id ++) {
+    for (id = 0x08000001; id <= 0x08000002; id ++) {
       logd ("chip_ctrl_get id: %d  ret: %d", id, chip_ctrl_get (id));
     }
 
     chip_imp_api_state_sg (0);
   }
+*/
 
  //#include "aud_all.c"
  //#include "acdb.c"
@@ -1158,7 +1195,8 @@ for (id = 0x08000001; id <= 0x08000002; id ++) {
 
   int main (int argc, char ** argv) {
     int server_mode = 0;
-
+    int test_mode = 0;
+#ifdef  DISABLED_TESTING
 //qcv_test ();
 //return (0);
 
@@ -1209,7 +1247,7 @@ for (id = 0x08000001; id <= 0x08000002; id ++) {
       errno = 0;
       ret = ioctl (hndl, AUDIO_DEREGISTER_PMEM, & zero);
       if (ret < 0)
-        loge ("Ioctl errno: %s", strerror (errno));
+        loge ("Ioctl errno: %d (%s)", errno, strerror (errno));
       else
         loge ("Ioctl success");
 //return (0);
@@ -1217,7 +1255,7 @@ for (id = 0x08000001; id <= 0x08000002; id ++) {
       errno = 0;
       ret = ioctl (hndl, AUDIO_SET_ADM_TX_TOPOLOGY, & zero);
       if (ret < 0)
-        loge ("Ioctl errno: %s", strerror (errno));
+        loge ("Ioctl errno: %d (%s)", errno, strerror (errno));
       else
         loge ("Ioctl success");
 */
@@ -1225,21 +1263,21 @@ for (id = 0x08000001; id <= 0x08000002; id ++) {
       errno = 0;
       ret = ioctl (hndl, AUDIO_SET_AUDPROC_TX_CAL, & arg);
       if (ret < 0)
-        loge ("Ioctl errno: %s", strerror (errno));
+        loge ("Ioctl errno: %d (%s)", errno, strerror (errno));
       else
         logd ("Ioctl success");
 /*
       errno = 0;
       ret = ioctl (hndl, AUDIO_SET_AUDPROC_TX_VOL_CAL, & arg);
       if (ret < 0)
-        loge ("Ioctl errno: %s", strerror (errno));
+        loge ("Ioctl errno: %d (%s)", errno, strerror (errno));
       else
         loge ("Ioctl success");
 
       errno = 0;
       ret = ioctl (hndl, AUDIO_SET_AFE_TX_CAL, & arg);
       if (ret < 0)
-        loge ("Ioctl errno: %s", strerror (errno));
+        loge ("Ioctl errno: %d (%s)", errno, strerror (errno));
       else
         loge ("Ioctl success");
 */
@@ -1252,24 +1290,39 @@ ms_sleep (2000);
 
       return (0);
     }
-
-    if (argc > 1)                                                       // If server mode... (If 1 or more parameters)
+#endif
+    if (argc > 2)                                                       // If test   mode... (If 2 or more parameters)
+      test_mode = 1;
+    else if (argc > 1)                                                  // If server mode... (If 1 or more parameters)
       server_mode = 1;
+
 
     if (server_mode)                                                    // If server mode...
       strlcpy (LOGTAG, DMN_LOGTAG, sizeof (LOGTAG));                    // Server daemon logtag
     else
       strlcpy (LOGTAG, CLT_LOGTAG, sizeof (LOGTAG));                    // Client/tester logtag
 
-    logd ("main start: %s %s", binary_description, manifest_version);        // manifest_version automatically set during build
+    if (test_mode) {
+      printf ("1 main start: %s %s", binary_description, manifest_version);
+      printf ("%s", copyright);
+
+      //fprintf (2, "2 main start: %s %s", binary_description, manifest_version);
+      //fprintf (2, "%s", copyright);
+    }
+
+    logd ("main start: %s %s", binary_description, manifest_version);   // manifest_version automatically set during build
     logd (copyright);                                                   // Copyright
 
     utils_init ();
 
-    if (server_mode) {                                                  // If server mode...
-      return (server_run ());
+    if (test_mode) {                                                    // If test mode...
+      printf ("1 done");
+      //fprintf (2, "2 done");
+      return (0);
     }
-
-    return (client_run ());
+    else if (server_mode)                                               // Else if server mode...
+      return (server_run ());
+    else
+      return (client_run ());
   }
 

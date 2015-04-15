@@ -51,6 +51,7 @@
   <item></item>
   <item>EU</item>
   <item>US</item>
+  <item>UU</item>
   </string-array>
   <string-array name="tuner_stereo">
   <item></item>
@@ -79,6 +80,7 @@
   <item></item>
   <item>Digital</item>
   <item>Analog</item>
+  <item>TestMic</item>
   </string-array>
   <string-array name="audio_pseudo_source">
   <item></item>

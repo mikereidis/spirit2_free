@@ -2,10 +2,20 @@ LOCAL_PATH:= $(call my-dir)
 
     # s2d daemon:
 include $(CLEAR_VARS)
-LOCAL_MODULE    := libs2d
+LOCAL_MODULE    := s2d
+#LOCAL_MODULE_FILENAME  := libs2d
 LOCAL_SRC_FILES := s2d/s2d.c
 LOCAL_LDLIBS := -llog
+#LOCAL_LDLIBS := -llog --output /home/m/dev/s2/obj/local/armeabi/mys2d.so
 include $(BUILD_EXECUTABLE)
+#include $(BUILD_SHARED_LIBRARY)
+#include $(BUILD_STATIC_LIBRARY)
+
+#mv ../libs/armeabi/libs2d ../libs/armeabi/libs2d.so
+
+#$(NDK_APP_LIBS_OUT)/%/libs2d.so: $(NDK_APP_LIBS_OUT)/%/s2d
+#all: $(foreach _abi,$(APP_ABI),$(NDK_APP_LIBS_OUT)/$(_abi)/libs2d.so)
+#all: $(call host-mv, $<, $@)
 
     # 5 Tuner Plugins:
 
@@ -19,6 +29,7 @@ include $(CLEAR_VARS)
 LOCAL_SRC_FILES:= tnr/tnr_qcv.c
 LOCAL_MODULE:= libs2t_qcv
 LOCAL_LDLIBS := -llog
+#LOCAL_SHARED_LIBRARIES := libnativehelper libcutils
 include $(BUILD_SHARED_LIBRARY)
 
 include $(CLEAR_VARS)

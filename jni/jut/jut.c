@@ -32,14 +32,17 @@ static void *offload_thread_loop(void *context)
     utils_init ();
 
     int priority = 0;
+    errno = 0;
     priority = getpriority (PRIO_PROCESS, 0);
-    logd ("native_priority_set priority: %d  errno: %d", priority, errno);
+    logd ("native_priority_set priority: %d  errno: %d (%s)", priority, errno, strerror (errno));
 
+    errno = 0;
     priority = setpriority (PRIO_PROCESS, 0, new_priority);//-19);
-    logd ("native_priority_set priority: %d  errno: %d", priority, errno);
+    logd ("native_priority_set priority: %d  errno: %d (%s)", priority, errno, strerror (errno));
 
+    errno = 0;
     priority = getpriority (PRIO_PROCESS, 0);
-    logd ("native_priority_set priority: %d  errno: %d", priority, errno);
+    logd ("native_priority_set priority: %d  errno: %d (%s)", priority, errno, strerror (errno));
     return (0);
   }
 

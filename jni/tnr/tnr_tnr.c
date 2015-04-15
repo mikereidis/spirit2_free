@@ -18,7 +18,7 @@
 
   void (* cb_tuner_state)   (int reason);
   void (* cb_tuner_rssi)    (int new_level);
-  void (* cb_tuner_pilot)    (int is_stereo);
+  void (* cb_tuner_pilot)   (int is_stereo);
   void (* cb_tuner_rds)     (rds_struct_t * rds_struct);
   void (* cb_tuner_rds_af)  (int new_freq);
 
@@ -43,7 +43,7 @@
   int curr_mute         = 0;
   int curr_softmute     = 1;                                            // 1 for default SoftMute or RF Mute, which lowers audio volume when signal is weak. 0 to disable to listen to weak signals.
 
-  int curr_stereo       = 0;
+  int curr_stereo       = 1;
 
   int curr_seek_state   = 0;
   int curr_rds_state    = 1;                                            // Default 1 = RDS on
@@ -93,8 +93,8 @@
   int pre2_pilot  = 0;
 
     // General flags:
-  int stro_evt_enable = 1;//0;
-  int rssi_evt_enable = 1;//0;
+  int stro_evt_enable = 0;      // !! Too much activity on SSL / QCV        BCM never gets here ?
+  int rssi_evt_enable = 0;
 
     // Event flags requiring callback:
   int need_freq_chngd     = 0;
@@ -224,12 +224,12 @@
   #define   EVT_GET_RDS_RAW 7
 
   #define   EVT_GET_FREQ_OFFSET               0
-  #define   EVT_GET_FREQ_LO               65000
-  #define   EVT_GET_FREQ_HI              108000
+  //#define   EVT_GET_FREQ_LO               65000
+  //#define   EVT_GET_FREQ_HI              108000
 
   #define   EVT_GET_SEEK_FREQ_OFFSET    1000000
-  #define   EVT_GET_SEEK_FREQ_LO        1065000
-  #define   EVT_GET_SEEK_FREQ_HI        1108000
+  //#define   EVT_GET_SEEK_FREQ_LO        1065000
+  //#define   EVT_GET_SEEK_FREQ_HI        1108000
 
   int rds_total_polls = 0;
   int rds_data_polls = 0;

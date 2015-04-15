@@ -115,6 +115,17 @@ android:layout_gravity="center_vertical|center_horizontal"
       android:checked="false"
       />
 
+      <RadioButton
+      android:id="@+id/rb_band_uu"
+      android:contentDescription="Band Wide"
+      android:layout_weight="1"
+      android:layout_width="0dip"
+      android:layout_height="match_parent"
+      android:text="UU"
+      android:onClick="gap_gui_clicked"
+      android:checked="false"
+      />
+
     </RadioGroup>
 
   </LinearLayout>

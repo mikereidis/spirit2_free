@@ -27,19 +27,22 @@
 
   int band_set (int low , int high, int band) {
     logd ("band_set low: %d  high: %d  band: %d", low, high, band);
-    return (0);
+    return (band);
   }
+
   int freq_inc_set (int inc) {
-    logd ("freq_inc_set: %d", inc);
-    return (0);
+    logd ("freq_inc_set inc: %d", inc);
+    return (inc);
   }
-  int emph75_set (int emph75) {
-    logd ("emph75_set: %d", emph75);
-    return (0);
+
+  int emph75_set (int band) {
+    logd ("emph75_set band: %d", band);
+    return (band);
   }
-  int rbds_set (int rbds) {
-    logd ("rbds_set: %d",rbds);
-    return (rbds);
+
+  int rbds_set (int band) {
+    logd ("rbds_set band: %d", band);
+    return (band);
   }
 
 
@@ -106,19 +109,23 @@
     return (curr_antenna);
   }
 
-  int chip_imp_band_sg (int band) {
+  int chip_imp_band_sg (int band) {                                     //  0:EU    1:US    2:UU
     if (band == GET)
       return (curr_band);
 
     logd ("chip_imp_band_sg band: %d", band);
 
-    curr_freq_lo =  87500;
+    curr_band = band;
+
     curr_freq_hi = 108000;
 
-    if (band == 0)
+    curr_freq_lo = 87500;
+    if (band == 2)                                                      // If Wide
+      curr_freq_lo = 76000;//65000;
+
+    curr_freq_inc = 100;
+    if (band == 1)                                                      // If US
       curr_freq_inc = 200;
-    else
-      curr_freq_inc = 100;
 
     band_set (curr_freq_lo, curr_freq_hi, band);
 
@@ -193,7 +200,7 @@
       return (seek_stop ());
 
     curr_seek_state = 0;
-    return (curr_seek_state);
+    return (curr_freq_int);//curr_seek_state);
   }
 
   int chip_imp_rds_state_sg (int rds_state) {
@@ -261,7 +268,6 @@
     if (reg == GETP)
       return (curr_extension);
     int ret = -1;
-    //ret = reg_set (reg);
     strlcpy (curr_extension, reg, sizeof (curr_extension));
     return (curr_extension);
   }

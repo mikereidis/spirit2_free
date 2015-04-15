@@ -3,7 +3,7 @@ export MY_KEYSTORE_FILE="/home/mike/dev/key/spirit2_free_key"
 export MY_KEYSTORE_PASS="password"
 export MY_KEY_NAME="mikereidis_key"
 export WS="/home/mike/dev"
-export PROJ="so"
+export PROJ="sf"
 cd $WS/$PROJ
 
 rm -rf obj  # obj/local/armeabi/*
@@ -11,7 +11,7 @@ rm -rf libs # libs/armeabi/
 
 mkdir libs
 
-android update project --target android-20 --path . --name $PROJ
+android update project --target android-21 --path . --name $PROJ
 
 #mkdir -p res/raw
 #cp ../raw/spirit_sh ../$PROJ/res/raw/

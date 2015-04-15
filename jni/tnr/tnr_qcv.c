@@ -1,3 +1,4 @@
+
     // Spirit2 Tuner Plugin for "Qualcomm V4L" API:
 
     // See https://android.googlesource.com/kernel/msm/+/android-msm-dory-3.10-lollipop-wear-release/drivers/media/radio/radio-iris.c   radio-iris-transport.c 
@@ -82,11 +83,11 @@
 
 
   enum v4l2_cid_iris_private_iris_t {
-        V4L2_CID_PRIVATE_IRIS_SRCHMODE = (0x08000000 + 1),  // = 0
+        V4L2_CID_PRIVATE_IRIS_SRCHMODE = (0x08000000 + 1),                      // = 0
         V4L2_CID_PRIVATE_IRIS_SCANDWELL,
         V4L2_CID_PRIVATE_IRIS_SRCHON,           // = 1 ? Stuck searching ?
         V4L2_CID_PRIVATE_IRIS_STATE,            // = 1
-        V4L2_CID_PRIVATE_IRIS_TRANSMIT_MODE,    // 0x08000005 Tx only
+        V4L2_CID_PRIVATE_IRIS_TRANSMIT_MODE,    // 0x08000005 Tx only ??
         V4L2_CID_PRIVATE_IRIS_RDSGROUP_MASK,
         V4L2_CID_PRIVATE_IRIS_REGION,
 
@@ -94,7 +95,7 @@
         V4L2_CID_PRIVATE_IRIS_SRCH_PTY,
         V4L2_CID_PRIVATE_IRIS_SRCH_PI,
         V4L2_CID_PRIVATE_IRIS_SRCH_CNT,
-        V4L2_CID_PRIVATE_IRIS_EMPHASIS,
+        V4L2_CID_PRIVATE_IRIS_EMPHASIS,                                         // 0
         V4L2_CID_PRIVATE_IRIS_RDS_STD,          // 0x0800000d = 1
         V4L2_CID_PRIVATE_IRIS_SPACING,
         V4L2_CID_PRIVATE_IRIS_RDSON,            // 0x0800000f = 1
@@ -186,9 +187,39 @@
   //int tuner_cap_low = 0;  // Don't need for Qualcomm chip, hi only
 
   #ifndef DEF_BUF
-  #define DEF_BUF 512    // Raised from 256 so we can add headers to 255-256 byte buffers
+    #define DEF_BUF 512                                                 // Raised from 256 so we can add headers to 255-256 byte buffers
   #endif
 
+  #ifndef   VIDIOC_S_HW_FREQ_SEEK
+    #define VIDIOC_S_HW_FREQ_SEEK    _IOW('V', 82, struct v4l2_hw_freq_seek)
+  #endif
+
+  char * req_get (int req) {
+    switch (req) {
+      case VIDIOC_DQBUF:            return ("VIDIOC_DQBUF");
+      case VIDIOC_G_CTRL:           return ("VIDIOC_G_CTRL");
+      case VIDIOC_G_FREQUENCY:      return ("VIDIOC_G_FREQUENCY");
+      case VIDIOC_G_TUNER:          return ("VIDIOC_G_TUNER");
+      case VIDIOC_QUERYCAP:         return ("VIDIOC_QUERYCAP");
+      case VIDIOC_S_CTRL:           return ("VIDIOC_S_CTRL");
+      case VIDIOC_S_EXT_CTRLS:      return ("VIDIOC_S_EXT_CTRLS");
+      case VIDIOC_S_FREQUENCY:      return ("VIDIOC_S_FREQUENCY");
+      case VIDIOC_S_HW_FREQ_SEEK:   return ("VIDIOC_S_HW_FREQ_SEEK");
+      case VIDIOC_S_TUNER:          return ("VIDIOC_S_TUNER");
+    }
+    return ("Unknown !");
+  }
+
+  int qcv_ioctl_par (int fd, int req, void * par) {                         // (int d, int request, ...);
+    int ret = ioctl (fd, req, par);
+    if (ena_log_chip_access) {
+      if (req == VIDIOC_G_TUNER)
+        logd ("qcv_ioctl_par req: %s", req_get (req));
+      else
+        logd ("qcv_ioctl_par req: %s", req_get (req));
+    }
+    return (ret);
+  }
 
   int buf_display (char * buf, int size) {
     int ctr = 0;
@@ -231,7 +262,7 @@
     v4l2_buf.length = buf_len;//128;
     v4l2_buf.m.userptr = (unsigned long) buf;
 
-    ret = ioctl (dev_hndl, VIDIOC_DQBUF, & v4l2_buf);
+    ret = qcv_ioctl_par (dev_hndl, VIDIOC_DQBUF, & v4l2_buf);
     if (ret < 0) {
       return (-1);
     }
@@ -287,7 +318,7 @@
     v4l_ctrl.id = id;
 
     errno = 0;
-    int ret = ioctl (dev_hndl, VIDIOC_G_CTRL, & v4l_ctrl);
+    int ret = qcv_ioctl_par (dev_hndl, VIDIOC_G_CTRL, & v4l_ctrl);
     int value = v4l_ctrl.value;
     if (ret < 0) {
       loge ("chip_ctrl_get VIDIOC_G_CTRL id: %s (0x%x)  errno: %d (%s)", id_get (id), id, errno, strerror (errno));
@@ -304,7 +335,7 @@
     v4l_ctrl.id = id;
 
     errno = 0;
-    int ret = ioctl (dev_hndl, VIDIOC_S_CTRL, & v4l_ctrl);
+    int ret = qcv_ioctl_par (dev_hndl, VIDIOC_S_CTRL, & v4l_ctrl);
     if (ret < 0)
       loge ("chip_ctrl_set VIDIOC_S_CTRL Error id: 0x%x  value: %d  errno: %d (%s)", id, value, errno, strerror (errno));
     else
@@ -349,7 +380,7 @@
   }
 
   int vol_get () {
-    int vol = curr_vol;//257 * reg_get (0xf8 | 0x00010000);
+    int vol = curr_vol;
     logd ("chip_imp_vol_get: %d", vol);
     return (vol);
   }
@@ -365,9 +396,10 @@
     v4l_freq.tuner = 0;                                                   // Tuner index = 0
     v4l_freq.type = V4L2_TUNER_RADIO;
     memset (v4l_freq.reserved, 0, sizeof (v4l_freq.reserved));
-    ret = ioctl (dev_hndl, VIDIOC_G_FREQUENCY, & v4l_freq);
+    errno = 0;
+    ret = qcv_ioctl_par (dev_hndl, VIDIOC_G_FREQUENCY, & v4l_freq);
     if (ret < 0) {
-      loge ("freq_get VIDIOC_G_FREQUENCY errno: %d", errno);
+      loge ("freq_get VIDIOC_G_FREQUENCY errno: %d (%s)", errno, strerror (errno));
       return (-1);
     }
     freq = v4l_freq.frequency / 16;
@@ -378,8 +410,6 @@
   }
 
     // Seek:
-
-  #define VIDIOC_S_HW_FREQ_SEEK    _IOW('V', 82, struct v4l2_hw_freq_seek)
 
   enum search_t {
 	SEEK,
@@ -394,11 +424,6 @@
 
   int seek_stop () {
     logd ("seek_stop");
-    //ret = ioctl (dev_hndl, Si4709_IOC_SEEK_CANCEL);   // !!!!
-    //if (ret < 0)
-    //  loge ("seek_stop IOCTL Si4709_SEEK_CANCEL error: %d", ret);
-    //else
-    //  logd ("seek_stop IOCTL Si4709_SEEK_CANCEL success");*/
 
     curr_seek_state = 0;
     return (curr_seek_state);
@@ -407,34 +432,60 @@
 
     // Band stuff:
 
-  int band_set (int low , int high, int band) {                 // ? Do we need to stop/restart RDS power in reg 0x00 ? Or rbds_set to flush ?
-    logd ("band_set low: %d  high: %d  band: %d", low, high, band);
-/*                .id            = V4L2_CID_PRIVATE_IRIS_REGION,
+/*              .id            = V4L2_CID_PRIVATE_IRIS_REGION,
                 .type          = V4L2_CTRL_TYPE_INTEGER,
                 .name          = "radio standard",
                 .minimum       = 0,
                 .maximum       = 2,
                 .step          = 1,
                 .default_value = 0,
-*/
+enum iris_region_t {
+	IRIS_REGION_US,
+	IRIS_REGION_EU,
+	IRIS_REGION_JAPAN,
+	IRIS_REGION_JAPAN_WIDE,
+	IRIS_REGION_OTHER   };  */
+
+  int band_set (int low , int high, int band) {                 // ? Do we need to stop/restart RDS power in reg 0x00 ? Or rbds_set to flush ?
+    logd ("band_set low: %d  high: %d  band: %d", low, high, band);
     int ret = 0;
     if (dev_hndl <= 0) {
       loge ("dev_hndl <= 0");
       return (-1);
     }
+    #define TUNE_MULT  16
+    v4l_tuner.index = 0;                                                // Tuner index = 0
+    v4l_tuner.type = V4L2_TUNER_RADIO;
+    v4l_tuner.rangelow = (low * TUNE_MULT);
+    v4l_tuner.rangehigh = (high * TUNE_MULT);
+    memset (v4l_tuner.reserved, 0, sizeof (v4l_tuner.reserved));
+    if (curr_stereo)
+      v4l_tuner.audmode = V4L2_TUNER_MODE_STEREO;
+    else
+      v4l_tuner.audmode = V4L2_TUNER_MODE_MONO;
+    errno = 0;
+    ret = qcv_ioctl_par (dev_hndl, VIDIOC_S_TUNER, & v4l_tuner);
+    if (ret < 0)
+      loge ("band_set VIDIOC_S_TUNER errno: %d (%s)", errno, strerror (errno));
+    else
+      logd ("band_set VIDIOC_S_TUNER success");
+
     int v4reg = 1;    // EU
-    if (low < 87500)
-      v4reg = 2;      // Japan
-    else if (band)
+    if (low < 87500 || band == 2)
+      v4reg = 0;//2;//4;//3;    // Japan Wide       2;      // Japan
+    else if (band == 1)
       v4reg = 0;      // US
-    if (chip_ctrl_set (V4L2_CID_PRIVATE_IRIS_REGION, v4reg) < 0)
+    if (chip_ctrl_set (V4L2_CID_PRIVATE_IRIS_REGION, v4reg) < 0) {
       loge ("band_set PRIVATE_IRIS_REGION error band: %d", band);
+      return (-1);
+    }
     else
       logd ("band_set PRIVATE_IRIS_REGION success band: %d", band);
-    return (0);
+    return (band);
   }
+
   int freq_inc_set (int inc) {
-    logd ("freq_inc_set: %d", inc);
+    logd ("freq_inc_set inc: %d", inc);
     int ret = 0;
     if (dev_hndl <= 0) {
       loge ("dev_hndl <= 0");
@@ -445,94 +496,46 @@
       v4spac = 2;
     else if (inc <= 100)
       v4spac = 1;
-    if (chip_ctrl_set (V4L2_CID_PRIVATE_IRIS_SPACING, v4spac) < 0)
+    if (chip_ctrl_set (V4L2_CID_PRIVATE_IRIS_SPACING, v4spac) < 0) {
       loge ("freq_inc_set PRIVATE_IRIS_SPACING error inc: %d", inc);
+      return (-1);
+    }
     else
       logd ("freq_inc_set PRIVATE_IRIS_SPACING success inc: %d", inc);
-    return (0);
+    return (inc);
   }
-  int emph75_set (int emph75) {
-    logd ("emph75_set: %d", emph75);
+
 /*                .id            = V4L2_CID_PRIVATE_IRIS_EMPHASIS,
                 .type          = V4L2_CTRL_TYPE_BOOLEAN,
                 .name          = "Emphasis",
                 .minimum       = 0,
                 .maximum       = 1,
-                .default_value = 0,
-*/
+                .default_value = 0, */
+
+  int emph75_set (int band) {
+    logd ("emph75_set band: %d", band);
     if (dev_hndl <= 0) {
       loge ("dev_hndl <= 0");
       return (-1);
     }
     int v4emph = 0;
-    if (emph75 == 0)
+    if (band == 1)                                                      // If US...
       v4emph = 1;
-    if (chip_ctrl_set (V4L2_CID_PRIVATE_IRIS_EMPHASIS, v4emph) < 0)
-      loge ("chip_emph75_set PRIVATE_IRIS_EMPHASIS error emph75: %d", emph75);
+    if (chip_ctrl_set (V4L2_CID_PRIVATE_IRIS_EMPHASIS, v4emph) < 0) {
+      loge ("chip_emph75_set PRIVATE_IRIS_EMPHASIS error band: %d", band);
+      return (-1);
+    }
     else
-      logd ("chip_emph75_set PRIVATE_IRIS_EMPHASIS success emph75: %d", emph75);
-    return (0);
+      logd ("chip_emph75_set PRIVATE_IRIS_EMPHASIS success band: %d", band);
+    return (band);
   }
-  int rbds_set (int rbds) {
-    logd ("rbds_set: %d",rbds);
-    return (rbds);
+
+  int rbds_set (int band) {
+    logd ("rbds_set band: %d", band);
+    return (band);
   }
 
     // Disabled internal functions:
-
-      /*  int chip_info_log () {
-  
-    int ret = ioctl (rad_hndl, VIDIOC_QUERYCAP, & v4l_cap);
-    if (ret < 0) {
-      logd ("chip_get VIDIOC_QUERYCAP error: %d", ret);
-      close (rad_hndl);
-      return (0);
-    }
-    logd ("chip_get VIDIOC_QUERYCAP ret: %d  cap: 0x%x  drv: %s  card: %s  bus: %s  ver: 0x%x", ret, v4l_cap.capabilities, v4l_cap.driver, v4l_cap.card, v4l_cap.bus_info, v4l_cap.version);
-        // chip_get VIDIOC_QUERYCAP ret: 0  cap: 0x00050000  drv: radio-tavarua  card: Qualcomm FM Radio Transceiver  bus: I2C       ver: 0x0
-        // chip_get VIDIOC_QUERYCAP ret: 0  cap: 0x00050000  drv: radio-tavarua  card: Qualcomm FM Radio Transceiver  bus: I2C       ver: 0x2010204
-        // chip_get VIDIOC_QUERYCAP ret: 0  cap: 0x010d0d00  drv: CG2900 Driver  card: CG2900 FM Radio                bus: platform  ver: 0x10100
-  
-      // M8 w/ CM11:
-        //v4_get VIDIOC_QUERYCAP ret: 0  cap: 0x50000  drv: radio-iris  card: Qualcomm FM Radio Transceiver  bus:   ver: 0x30400
-  
-  
-    if ( ! (v4l_cap.capabilities & V4L2_CAP_TUNER) ) {
-      logd ("chip_get no V4L2_CAP_TUNER !!!!");
-    }*/
-  
-  // #define V4L2_CAP_RDS_CAPTURE            0x00000100  /* RDS data capture */
-      // #define V4L2_CAP_VIDEO_OUTPUT_OVERLAY   0x00000200  /* Can do video output overlay */
-  // #define V4L2_CAP_HW_FREQ_SEEK           0x00000400  /* Can do hardware frequency seek  */
-  // #define V4L2_CAP_RDS_OUTPUT             0x00000800  /* Is an RDS encoder */
-  
-  // #define V4L2_CAP_TUNER                  0x00010000  /* has a tuner */
-  // #define V4L2_CAP_AUDIO                  0x00020000  /* has audio support */
-  // #define V4L2_CAP_RADIO                  0x00040000  /* is a radio device */
-  // #define V4L2_CAP_MODULATOR              0x00080000  /* has a modulator */
-  
-  // #define V4L2_CAP_READWRITE              0x01000000  /* read/write systemcalls */
-  // #define V4L2_CAP_ASYNCIO                0x02000000  /* async I/O */
-  // #define V4L2_CAP_STREAMING              0x04000000  /* streaming I/O ioctls */
-  
-  // #define V4L2_CAP_DEVICE_CAPS            0x80000000  /* sets device capabilities field */
-  
-  /*  int rds_ready_get () {
-      status_rssi_t sr = {0};
-      int ret = ioctl (dev_hndl, Si4709_IOC_STATUS_RSSI_GET, & sr);
-      if (ret < 0) {
-        loge ("rds_ready_get IOCTL                    Si4709_IOC_STATUS_RSSI_GET error: %d   rds_ready: %d  rds_synced: %d  seek_tune_complete: %d  seekfail_bandlimit: %d\
-            afc_railed: %d  block_error_a: %d stereo: %d  rssi: %d", ret, sr.rdsr, sr.rdss, sr.stc, sr.sfbl, sr.afcrl, sr.blera, sr.st, sr.rssi);
-        return (0);
-      }
-      if (sls_status_chip_imp_rssi_sg_cnt ++ % 1200 == 0)                           // Every 2 minutes
-        logd ("rds_ready_get                          Si4709_IOC_STATUS_RSSI_GET success: %d  rds_ready: %d  rds_synced: %d  seek_tune_complete: %d  seekfail_bandlimit: %d\
-            afc_railed: %d  block_err_a: %d stereo: %d  rssi: %d", ret, sr.rdsr, sr.rdss, sr.stc, sr.sfbl, sr.afcrl, sr.blera, sr.st, sr.rssi);
-      if (sr.rdsr)                                                          // If RDS data ready...
-        return (1);
-      return (0);
-    }*/
-  
 
   int rds_pi_set (int pi) {
     if (chip_ctrl_set (V4L2_CID_RDS_TX_PI, pi) < 0)
@@ -544,6 +547,7 @@
     need_pi_chngd = 1;
     return (0);
   }
+
   int rds_pt_set (int pt) {
     if (chip_ctrl_set (V4L2_CID_RDS_TX_PTY, pt) < 0)
       loge ("rds_pt_set RDS_TX_PTY error pt: %d", pt);
@@ -616,9 +620,10 @@ hd
     v4l2_ctls.count      = 1;//15;//1;//15;//
     v4l2_ctls.controls   = & ext_ctl;
 
-    int ret = ioctl (dev_hndl, VIDIOC_S_EXT_CTRLS, & v4l2_ctls);
+    errno = 0;
+    int ret = qcv_ioctl_par (dev_hndl, VIDIOC_S_EXT_CTRLS, & v4l2_ctls);
     if (ret < 0)
-      loge ("rds_ps_set error ps: %s  ret: %d  errno: %d", ps, ret, errno);
+      loge ("rds_ps_set error ps: %s  ret: %d  errno: %d (%s)", ps, ret, errno, strerror (errno));
     else
       logd ("rds_ps_set success ps: %s  ret: %d", ps, ret);
     return (0);
@@ -636,9 +641,10 @@ hd
     v4l2_ctls.count      = 1;//15;//
     v4l2_ctls.controls   = & ext_ctl;
 
-    int ret = ioctl (dev_hndl, VIDIOC_S_EXT_CTRLS, & v4l2_ctls);
+    errno = 0;
+    int ret = qcv_ioctl_par (dev_hndl, VIDIOC_S_EXT_CTRLS, & v4l2_ctls);
     if (ret < 0)
-      loge ("rds_rt_set error rt: %s  ret: %d  errno: %d", rt, ret, errno);
+      loge ("rds_rt_set error rt: %s  ret: %d  errno: %d (%s)", rt, ret, errno, strerror (errno));
     else
       logd ("rds_rt_set success rt: %s  ret: %d", rt, ret);
     return (0);
@@ -889,26 +895,30 @@ XZ1:    sys/devices/fe02b000.sound/INT_FM_TX/power
 XZ0/OXL:sys/devices/platform/soc-audio.0/INT_FM_TX/power
 */
 
-  void power_control_set (int on) {
-    if (file_get ("/sys/devices/platform/soc-audio.0/INT_FM_TX/power/control")) {
+  int power_control_set (int on) {
+
+logd ("power_control_set() DISABLED; doesn't seem to help");
+return (0);
+
+    if (file_get ("/sys/devices/platform/soc-audio.0/INT_FM_TX/power/control")) {       // OXL/XZ0
       if (on)
         sys_run ("echo   on > /sys/devices/platform/soc-audio.0/INT_FM_TX/power/control");
       else
         sys_run ("echo auto > /sys/devices/platform/soc-audio.0/INT_FM_TX/power/control");
     }
-    else if (file_get ("/sys/devices/sound-9302.43/INT_FM_TX/power/control")) {
+    else if (file_get ("/sys/devices/sound-9302.43/INT_FM_TX/power/control")) {         // MOG
       if (on)
         sys_run ("echo   on > /sys/devices/sound-9302.43/INT_FM_TX/power/control");
       else
         sys_run ("echo auto > /sys/devices/sound-9302.43/INT_FM_TX/power/control");
     }
-    else if (file_get ("/sys/devices/fe02b000.sound/INT_FM_TX/power/control")) {
+    else if (file_get ("/sys/devices/fe02b000.sound/INT_FM_TX/power/control")) {        // XZ1
       if (on)
         sys_run ("echo   on > /sys/devices/fe02b000.sound/INT_FM_TX/power/control");
       else
         sys_run ("echo auto > /sys/devices/fe02b000.sound/INT_FM_TX/power/control");
     }
-    else if (file_get ("/sys/devices/fe02c000.sound/INT_FM_TX/power/control")) {
+    else if (file_get ("/sys/devices/fe02c000.sound/INT_FM_TX/power/control")) {        // OM8
       if (on)
         sys_run ("echo   on > /sys/devices/fe02c000.sound/INT_FM_TX/power/control");
       else
@@ -919,25 +929,25 @@ XZ0/OXL:sys/devices/platform/soc-audio.0/INT_FM_TX/power
     }
 
 
-    if (file_get ("/sys/devices/platform/iris_fm/power/control")) {
+    if (file_get ("/sys/devices/platform/iris_fm/power/control")) {                     // OXL/XZ0
       if (on)
         sys_run ("echo   on > /sys/devices/platform/iris_fm/power/control");
       else
         sys_run ("echo auto > /sys/devices/platform/iris_fm/power/control");
     }
-    else if (file_get ("/sys/devices/qcom,iris-fm.64/power/control")) {
+    else if (file_get ("/sys/devices/qcom,iris-fm.64/power/control")) {                 // MOG
       if (on)
         sys_run ("echo   on > /sys/devices/qcom,iris-fm.64/power/control");
       else
         sys_run ("echo auto > /sys/devices/qcom,iris-fm.64/power/control");
     }
-    else if (file_get ("/sys/devices/qcom,iris-fm.66/power/control")) {
+    else if (file_get ("/sys/devices/qcom,iris-fm.66/power/control")) {                 // XZ1
       if (on)
         sys_run ("echo   on > /sys/devices/qcom,iris-fm.66/power/control");
       else
         sys_run ("echo auto > /sys/devices/qcom,iris-fm.66/power/control");
     }
-    else if (file_get ("/sys/devices/qcom,iris-fm.68/power/control")) {
+    else if (file_get ("/sys/devices/qcom,iris-fm.68/power/control")) {                 // OM8
       if (on)
         sys_run ("echo   on > /sys/devices/qcom,iris-fm.68/power/control");
       else
@@ -946,7 +956,94 @@ XZ0/OXL:sys/devices/platform/soc-audio.0/INT_FM_TX/power
     else {
       loge ("No power control");
     }
+    return (0);
   }
+
+  // #define V4L2_CAP_RDS_CAPTURE            0x00000100  /* RDS data capture */
+      // #define V4L2_CAP_VIDEO_OUTPUT_OVERLAY   0x00000200  /* Can do video output overlay */
+  // #define V4L2_CAP_HW_FREQ_SEEK           0x00000400  /* Can do hardware frequency seek  */
+  // #define V4L2_CAP_RDS_OUTPUT             0x00000800  /* Is an RDS encoder */
+  
+  // #define V4L2_CAP_TUNER                  0x00010000  /* has a tuner */
+  // #define V4L2_CAP_AUDIO                  0x00020000  /* has audio support */
+  // #define V4L2_CAP_RADIO                  0x00040000  /* is a radio device */
+  // #define V4L2_CAP_MODULATOR              0x00080000  /* has a modulator */
+  
+  // #define V4L2_CAP_READWRITE              0x01000000  /* read/write systemcalls */
+  // #define V4L2_CAP_ASYNCIO                0x02000000  /* async I/O */
+  // #define V4L2_CAP_STREAMING              0x04000000  /* streaming I/O ioctl's */
+  
+  // #define V4L2_CAP_DEVICE_CAPS            0x80000000  /* sets device capabilities field */
+  
+   int chip_version_get () {
+
+    errno = 0;  
+    int ret = qcv_ioctl_par (dev_hndl, VIDIOC_QUERYCAP, & v4l_cap);
+    if (ret < 0) {
+      loge ("chip_get VIDIOC_QUERYCAP error: %d", ret);
+      //close (dev_hndl);
+      return (-1);
+    }
+    logd ("chip_get VIDIOC_QUERYCAP ret: %d  cap: 0x%x  drv: %s  card: %s  bus: %s  ver: 0x%x", ret, v4l_cap.capabilities, v4l_cap.driver, v4l_cap.card, v4l_cap.bus_info, v4l_cap.version);
+        // chip_get VIDIOC_QUERYCAP ret: 0  cap: 0x00050000  drv: radio-tavarua  card: Qualcomm FM Radio Transceiver  bus: I2C       ver: 0x0
+        // chip_get VIDIOC_QUERYCAP ret: 0  cap: 0x00050000  drv: radio-tavarua  card: Qualcomm FM Radio Transceiver  bus: I2C       ver: 0x2010204
+        // chip_get VIDIOC_QUERYCAP ret: 0  cap: 0x010d0d00  drv: CG2900 Driver  card: CG2900 FM Radio                bus: platform  ver: 0x10100
+
+        // M8 w/ CM11:
+        //v4_get VIDIOC_QUERYCAP ret: 0  cap: 0x50000  drv: radio-iris  card: Qualcomm FM Radio Transceiver  bus:   ver: 0x30400
+
+    if ( ! (v4l_cap.capabilities & V4L2_CAP_TUNER) )
+      logd ("chip_get no V4L2_CAP_TUNER !!!!");
+
+      return (v4l_cap.version);
+    }
+/*all shell "getprop dev ; logcat -d -v time | grep -e chip_get" 
+oxl
+03-13 03:36:45.185 D/s2tnrqcv(23676): chip_get VIDIOC_QUERYCAP ret: 0  cap: 0x50000  drv: radio-iris  card: Qualcomm FM Radio Transceiver  bus:   ver: 0x0
+xz0
+03-13 03:36:44.602 D/s2tnrqcv(11948): chip_get VIDIOC_QUERYCAP ret: 0  cap: 0x50000  drv: radio-iris  card: Qualcomm FM Radio Transceiver  bus:   ver: 0x30400
+mog
+03-13 03:36:45.123 D/s2tnrqcv(11680): chip_get VIDIOC_QUERYCAP ret: 0  cap: 0x50000  drv: radio-iris  card: Qualcomm FM Radio Transceiver  bus:   ver: 0x3042a
+xz1
+03-13 03:36:44.803 D/s2tnrqcv(14422): chip_get VIDIOC_QUERYCAP ret: 0  cap: 0x50000  drv: radio-iris  card: Qualcomm FM Radio Transceiver  bus:   ver: 0x30400
+om8
+03-13 03:36:44.736 D/s2tnrqcv(11619): chip_get VIDIOC_QUERYCAP ret: 0  cap: 0x50000  drv: radio-iris  card: Qualcomm FM Radio Transceiver  bus:   ver: 0x30400
+
+qall shell "getprop dev ; getprop | grep fm ; lsmod ; ls -l /system/etc/init.qcom.fm.sh" 
+oxl
+[hw.fm.init]: [1]
+[hw.fm.mode]: [normal]
+[hw.fm.version]: [0]
+[init.svc.fm_dl]: [stopped]
+cat: /proc/modules: No such file or directory
+-rw-r--r-- root     root         3140 2015-03-12 01:09 init.qcom.fm.sh
+xz0
+[hw.fm.init]: [1]
+[hw.fm.mode]: [normal]
+[hw.fm.version]: [197632]
+[init.svc.fm_dl]: [stopped]
+radio_iris_transport 3606 0 - Live 0x00000000
+wlan 2708287 0 - Live 0x00000000 (C)
+-rw-r--r-- root     root         3073 2008-08-01 08:00 init.qcom.fm.sh
+mog
+[hw.fm.mode]: [normal]
+[hw.fm.version]: [197674]
+cat: /proc/modules: No such file or directory
+/system/etc/init.qcom.fm.sh: No such file or directory
+xz1
+[hw.fm.init]: [1]
+[hw.fm.mode]: [normal]
+[hw.fm.version]: [197632]
+[init.svc.fm_dl]: [stopped]
+-rw-r--r-- root     root         3073 2015-03-12 04:46 init.qcom.fm.sh
+om8
+[hw.fm.init]: [1]
+[hw.fm.mode]: [normal]
+[hw.fm.version]: [197632]
+[init.svc.fm_dl]: [stopped]
+cat: /proc/modules: No such file or directory
+/system/etc/init.qcom.fm.sh: No such file or directory
+*/  
 
   int chip_imp_api_state_sg (int state) {
     logd ("chip_imp_api_state_sg state: %d", state);
@@ -962,19 +1059,75 @@ XZ0/OXL:sys/devices/platform/soc-audio.0/INT_FM_TX/power
       return (curr_api_state);
     }
 
-    if (file_get ("/system/lib/modules/radio-iris-transport.ko"))
-      util_insmod ("/system/lib/modules/radio-iris-transport.ko");
-
+    errno = 0;
     dev_hndl = open ("/dev/radio0", O_RDWR   | O_NONBLOCK);
     if (dev_hndl < 0) {
-      loge ("chip_imp_api_state_sg error opening qualcomm /dev/radio0: %d", errno);
+      loge ("chip_imp_api_state_sg error opening qualcomm /dev/radio0 errno: %d (%s)", errno, strerror (errno));
       curr_api_state = 0;
       return (curr_api_state);
     }
     logd ("chip_imp_api_state_sg qualcomm /dev/radio0: %d", dev_hndl);
 
+int disable_official_qualcomm = 1;
+
+if (disable_official_qualcomm) {
     // Need 5 - 20 ms delay when module is inserted on Xperia Z1. For a safety factor of 5, delay for 100 ms. This avoid 10s timeout and first start failure, sometimes recoverably
     quiet_ms_sleep (100);   // Need delay even when module already loaded ??
+}
+else {
+
+    // Copy "official" Qualcomm way to load module, in case it helps with power issue: (It did not)
+
+    int ver = chip_version_get ();
+    if (ver < 0) {
+      loge ("chip_imp_api_state_sg error chip_version_get: %d  errno: %d (%s)", errno, strerror (errno));
+      curr_api_state = 0;
+      close (dev_hndl);
+      dev_hndl = -1;
+      return (curr_api_state);
+    }
+
+    //char ver_str [40] = {0};
+    //sprintf (ver_str, "%d", ver);
+    //property_set ("hw.fm.version", ver_str);
+    char cmd_str [DEF_BUF] = {0};
+    sprintf (cmd_str, "setprop hw.fm.version  %d", ver);
+    sys_run (cmd_str);
+
+    //Set the mode for soc downloader
+    //property_set ("hw.fm.mode", "normal");
+    //property_set ("ctl.start", "fm_dl");
+    sys_run ("setprop hw.fm.mode normal");
+    sys_run ("setprop ctl.start fm_dl");
+
+    //sys_run ("setprop hw.fm.mode normal ; setprop hw.fm.version 0 ; start fm_dl",);
+    //sys_run ("setprop hw.fm.mode normal ; setprop hw.fm.version 0 ; setprop ctl.start fm_dl");
+
+    //sched_yield();
+    quiet_ms_sleep (100);
+
+    char value [4] = "z";//'z';//0;    //char prop_buf [DEF_BUF] = "";
+    int retries = 0;
+    int init_success = 0;
+    for (retries = 0; retries < 20; retries ++) {                       // Wait up to 2 seconds
+      __system_property_get ("hw.fm.init", value);
+      if (value [0] == '1') {
+        init_success = 1;
+        break;
+      }
+      else {
+        quiet_ms_sleep (100);
+      }
+    }
+    if (init_success == 1)
+      logd ("chip_imp_api_state_sg init success after retries: %d", retries);
+    else
+      logw ("chip_imp_api_state_sg error %c after retries: %d", value [4], retries);
+}
+
+    // If all else fails, do it manually:
+    if (file_get ("/system/lib/modules/radio-iris-transport.ko"))
+      util_insmod ("/system/lib/modules/radio-iris-transport.ko");
 
     curr_api_state = 1;
 
@@ -1026,9 +1179,11 @@ XZ0/OXL:sys/devices/platform/soc-audio.0/INT_FM_TX/power
     v4l_tuner.index = 0;                                                // Tuner index = 0
     v4l_tuner.type = V4L2_TUNER_RADIO;
     memset (v4l_tuner.reserved, 0, sizeof (v4l_tuner.reserved));
-    ret = ioctl (dev_hndl, VIDIOC_G_TUNER, & v4l_tuner);
+
+    errno = 0;
+    ret = qcv_ioctl_par (dev_hndl, VIDIOC_G_TUNER, & v4l_tuner);
     if (ret < 0) {
-      loge ("chip_imp_state_sg VIDIOC_G_TUNER errno: %d", errno);
+      loge ("chip_imp_state_sg VIDIOC_G_TUNER errno: %d (%s)", errno, strerror (errno));
       if (errno == EINVAL) {
         curr_state = 0;
         loge ("chip_imp_state_sg EINVAL curr_state: %d", curr_state);
@@ -1055,19 +1210,19 @@ XZ0/OXL:sys/devices/platform/soc-audio.0/INT_FM_TX/power
       else
         logd ("chip_imp_state_sg PRIVATE_IRIS_RDSON 1 success");
 
-      if (curr_mode) {                                                  // For Transmit
+      if (curr_mode) {                                                  // If Transmit
         rds_pi_set (34357);                                             // WSTX
         rds_pt_set (9);                                                 // Varied/Top 40
         rds_ps_set ("SpiritTx");
         rds_rt_set ("rt34567890123456rt34567890123456rt34567890123456rt34567890123456");
       }
-      else {
-        chip_ctrl_set (V4L2_CID_PRIVATE_IRIS_RDSGROUP_PROC, -1);
+      else {                                                            // Else if receive...
+        chip_ctrl_set (V4L2_CID_PRIVATE_IRIS_RDSGROUP_PROC, -1);        // 3 Sets:
         chip_ctrl_set (V4L2_CID_PRIVATE_IRIS_PSALL, -1);
         chip_ctrl_set (V4L2_CID_PRIVATE_IRIS_RDSD_BUF, 128);
             // Test ??
-        chip_ctrl_get (V4L2_CID_PRIVATE_IRIS_RDSGROUP_PROC);              // 0x08000010 = 56 = 0x38 = 0x07 << RDS_CONFIG_OFFSET (3)
-        chip_ctrl_get (V4L2_CID_PRIVATE_IRIS_PSALL);                      // 0x8000014 = 56, ? Bug, copied RDSGROUP_PROC instead of boolean "pass all ps strings"
+        chip_ctrl_get (V4L2_CID_PRIVATE_IRIS_RDSGROUP_PROC);            // 3 Gets to log:   // 0x08000010 = 56 = 0x38 = 0x07 << RDS_CONFIG_OFFSET (3)
+        chip_ctrl_get (V4L2_CID_PRIVATE_IRIS_PSALL);                                        // 0x8000014 = 56, ? Bug, copied RDSGROUP_PROC instead of boolean "pass all ps strings"
         chip_ctrl_get (V4L2_CID_PRIVATE_IRIS_RDSD_BUF);
       }
     }
@@ -1095,19 +1250,23 @@ XZ0/OXL:sys/devices/platform/soc-audio.0/INT_FM_TX/power
     return (curr_antenna);
   }
 
-  int chip_imp_band_sg (int band) {
+  int chip_imp_band_sg (int band) {                                     //  0:EU    1:US    2:UU
     if (band == GET)
       return (curr_band);
 
     logd ("chip_imp_band_sg band: %d", band);
 
-    curr_freq_lo =  87500;
+    curr_band = band;
+
     curr_freq_hi = 108000;
 
-    if (band == 0)
+    curr_freq_lo = 87500;
+    if (band == 2)                                                      // If Wide
+      curr_freq_lo = 76000;//65000;
+
+    curr_freq_inc = 100;
+    if (band == 1)                                                      // If US
       curr_freq_inc = 200;
-    else
-      curr_freq_inc = 100;
 
     band_set (curr_freq_lo, curr_freq_hi, band);
 
@@ -1130,9 +1289,11 @@ XZ0/OXL:sys/devices/platform/soc-audio.0/INT_FM_TX/power
     v4l_freq.type = V4L2_TUNER_RADIO;
     v4l_freq.frequency = freq * 16;                                     // in units of 62.5 Hz ALWAYS for FM tuner. 62.5 KHz is too coarse for FM -> 250 KHz, Need 50 KHz
     memset (v4l_freq.reserved, 0, sizeof (v4l_freq.reserved));
-    ret = ioctl (dev_hndl, VIDIOC_S_FREQUENCY, & v4l_freq);
+
+    errno = 0;
+    ret = qcv_ioctl_par (dev_hndl, VIDIOC_S_FREQUENCY, & v4l_freq);
     if (ret < 0) {
-      loge ("chip_imp_freq_sg VIDIOC_S_FREQUENCY errno: %d  freq: %d  v4l_freq.frequency: %d", errno, freq, v4l_freq.frequency);
+      loge ("chip_imp_freq_sg VIDIOC_S_FREQUENCY errno: %d (%s)  freq: %d  v4l_freq.frequency: %d", errno, strerror (errno), freq, v4l_freq.frequency);
       return (curr_freq_int);
     }
     curr_freq_int = freq;
@@ -1158,9 +1319,19 @@ XZ0/OXL:sys/devices/platform/soc-audio.0/INT_FM_TX/power
     return (curr_vol);
   }
 
+    //../fm/qcom/fmradio/FmReceiver.java:   private static final int FM_RX_RSSI_LEVEL_VERY_WEAK   = -105;
+    //../fm/qcom/fmradio/FmReceiver.java:   private static final int FM_RX_RSSI_LEVEL_WEAK        = -100;
+    //../fm/qcom/fmradio/FmReceiver.java:   private static final int FM_RX_RSSI_LEVEL_STRONG      = -96;
+    //../fm/qcom/fmradio/FmReceiver.java:   private static final int FM_RX_RSSI_LEVEL_VERY_STRONG = -90;
   int chip_imp_thresh_sg (int thresh) {
     if (thresh == GET)
       return (curr_thresh);
+
+    if (chip_ctrl_set (V4L2_CID_PRIVATE_IRIS_SIGNAL_TH, thresh - 105) < 0)
+      loge ("chip_imp_mute_sg SIGNAL_TH error");
+    else
+      logd ("chip_imp_mute_sg SIGNAL_TH success");
+
     curr_thresh = thresh;
     logd ("chip_imp_thresh_sg curr_thresh: %d", curr_thresh);
     return (curr_thresh);
@@ -1201,14 +1372,17 @@ XZ0/OXL:sys/devices/platform/soc-audio.0/INT_FM_TX/power
     int ret = 0;
     v4l_tuner.index = 0;                                                // Tuner index = 0
     v4l_tuner.type = V4L2_TUNER_RADIO;
+    v4l_tuner.rangelow  = curr_freq_lo * TUNE_MULT;
+    v4l_tuner.rangehigh = curr_freq_hi * TUNE_MULT;
     memset (v4l_tuner.reserved, 0, sizeof (v4l_tuner.reserved));
     if (stereo)
       v4l_tuner.audmode = V4L2_TUNER_MODE_STEREO;
     else
       v4l_tuner.audmode = V4L2_TUNER_MODE_MONO;
-    ret = ioctl (dev_hndl, VIDIOC_S_TUNER, & v4l_tuner);
+    errno = 0;
+    ret = qcv_ioctl_par (dev_hndl, VIDIOC_S_TUNER, & v4l_tuner);
     if (ret < 0)
-      loge ("chip_imp_stereo_sg VIDIOC_S_TUNER errno: %d", errno);
+      loge ("chip_imp_stereo_sg VIDIOC_S_TUNER errno: %d (%s)", errno, strerror (errno));
     else
       logd ("chip_imp_stereo_sg VIDIOC_S_TUNER success");
 
@@ -1243,7 +1417,7 @@ XZ0/OXL:sys/devices/platform/soc-audio.0/INT_FM_TX/power
     if (seek_state == 2)
       seek_up = 0;
 
-    int orig_freq = freq_get ();
+    int last_freq = freq_get ();                                        // Save original frequency as last_freq
     v4l_seek.tuner = 0;                                                 // Tuner index = 0
     v4l_seek.type = V4L2_TUNER_RADIO;
     memset (v4l_seek.reserved, 0, sizeof (v4l_seek.reserved));
@@ -1251,33 +1425,38 @@ XZ0/OXL:sys/devices/platform/soc-audio.0/INT_FM_TX/power
     v4l_seek.seek_upward = seek_up;                                     // ? always down ? If non-zero, seek upward from the current frequency, else seek downward.
     v4l_seek.spacing = 0;//curr_freq_inc * 1000;                        // ? 0 ok
 
-    ret = ioctl (dev_hndl, VIDIOC_S_HW_FREQ_SEEK, & v4l_seek);
+    ret = qcv_ioctl_par (dev_hndl, VIDIOC_S_HW_FREQ_SEEK, & v4l_seek);  // Start the seek
     if (ret < 0)
       loge ("chip_imp_seek_state_sg VIDIOC_S_HW_FREQ_SEEK error: %d", ret);
     else
       logd ("chip_imp_seek_state_sg VIDIOC_S_HW_FREQ_SEEK success");
 
-    ms_sleep (303);                                                     // Wait a bit to ensure change  (100 ms OK normally, 500 for change end ?
+    ms_sleep (303);                                                     // Wait a bit to ensure frequency should have changed  (100 ms OK normally, 500 for change end ?)
 
     int ctr = 0, new_freq = 0;
-    for (ctr = 0; ctr < 50 && new_freq != orig_freq; ctr ++) {          // 5 seconds max
-      if (new_freq >= 50000 && new_freq <= 150000)
-        orig_freq = new_freq;
+    for (ctr = 0; ctr < 50 && new_freq != last_freq; ctr ++) {          // For 50 tries / 5 seconds max...
+      if (new_freq >= 50000 && new_freq <= 150000)                      // If new_freq seems valid...
+        last_freq = new_freq;                                           // Set new last_freq
       ms_sleep (101);
-      new_freq = freq_get ();
+      new_freq = freq_get ();                                           // Get new_freq
+      logd ("chip_imp_seek_state_sg ctr: %d  last_freq: %d  new_freq: %d", ctr, last_freq, new_freq);
     }
-    logd ("chip_imp_seek_state_sg complete tenths of a second: %d  orig_freq: %d", ctr, orig_freq);
 
-    curr_freq_int = new_freq;
+    curr_freq_int = new_freq;                                           // Save new frequency
 
     curr_seek_state = 0;
     rds_init ();
-    return (curr_seek_state);
+    return (curr_freq_int);                                             // More useful to return newly seeked frequency than curr_seek_state which has changed to 0 / Stop now anyway
   }
 
   int chip_imp_rds_state_sg (int rds_state) {
     if (rds_state == GET)
       return (curr_rds_state);
+
+    if (chip_ctrl_set (V4L2_CID_PRIVATE_IRIS_RDSON, rds_state) < 0)     // 0 = OFF, 1 = ON
+      loge ("chip_imp_rds_state_sg PRIVATE_IRIS_RDSON error");
+    else
+      logd ("chip_imp_rds_state_sg PRIVATE_IRIS_RDSON success");
 
     curr_rds_state = rds_state;
     logd ("chip_imp_rds_state_sg curr_rds_state: %d", curr_rds_state);
@@ -1287,6 +1466,11 @@ XZ0/OXL:sys/devices/platform/soc-audio.0/INT_FM_TX/power
   int chip_imp_rds_af_state_sg (int rds_af_state) {
     if (rds_af_state == GET)
       return (curr_rds_af_state);
+
+    if (chip_ctrl_set (V4L2_CID_PRIVATE_IRIS_AF_JUMP, rds_af_state) < 0)// 0 = OFF, 1 = ON
+      loge ("chip_imp_rds_af_state_sg PRIVATE_IRIS_AF_JUMP error");
+    else
+      logd ("chip_imp_rds_af_state_sg PRIVATE_IRIS_AF_JUMP success");
 
     curr_rds_af_state = rds_af_state;
     logd ("chip_imp_rds_af_state_sg curr_rds_af_state: %d", curr_rds_af_state);
@@ -1298,12 +1482,13 @@ XZ0/OXL:sys/devices/platform/soc-audio.0/INT_FM_TX/power
     v4l_tuner.index = 0;                                                // Tuner index = 0
     v4l_tuner.type = V4L2_TUNER_RADIO;
     memset (v4l_tuner.reserved, 0, sizeof (v4l_tuner.reserved));
+
     errno = 0;
-    int ret = ioctl (dev_hndl, VIDIOC_G_TUNER, & v4l_tuner);
-    if (ret < 0) {
+    int ret = qcv_ioctl_par (dev_hndl, VIDIOC_G_TUNER, & v4l_tuner);
+    if (ret < 0) {                                                      // If error...
       static int times = 0;
       if (times ++ % 1 == 0)
-        loge ("chip_imp_rssi_sg VIDIOC_G_TUNER errno: %d", errno);
+        loge ("chip_imp_rssi_sg VIDIOC_G_TUNER errno: %d (%s)", errno, strerror (errno));
       if (errno == EINVAL) {
         //chip_imp_api_state_sg (0);
         //chip_imp_api_state_sg (1);
@@ -1311,7 +1496,8 @@ XZ0/OXL:sys/devices/platform/soc-audio.0/INT_FM_TX/power
       return (curr_rssi);
     }
     static int timesb = 0;
-    if (timesb ++ % 10 == 0)
+    int factor = 10;
+    if (timesb ++ % factor == 0)
       if (ena_log_tnr_extra)
         logd ("chip_imp_rssi_sg VIDIOC_G_TUNER success name: %s  type: %d  cap: 0x%x  lo: %d  hi: %d  sc: %d  am: %d  sig: %d  afc: %d", v4l_tuner.name,
             v4l_tuner.type, v4l_tuner.capability, v4l_tuner.rangelow , v4l_tuner.rangehigh, v4l_tuner.rxsubchans, v4l_tuner.audmode, v4l_tuner.signal, v4l_tuner.afc);
@@ -1327,9 +1513,11 @@ XZ0/OXL:sys/devices/platform/soc-audio.0/INT_FM_TX/power
     v4l_tuner.index = 0;                                                  // Tuner index = 0
     v4l_tuner.type = V4L2_TUNER_RADIO;
     memset (v4l_tuner.reserved, 0, sizeof (v4l_tuner.reserved));
-    int ret = ioctl (dev_hndl, VIDIOC_G_TUNER, & v4l_tuner);
+
+    errno = 0;
+    int ret = qcv_ioctl_par (dev_hndl, VIDIOC_G_TUNER, & v4l_tuner);
     if (ret < 0) {
-      loge ("chip_imp_pilot_sg VIDIOC_G_TUNER errno: %d", errno);
+      loge ("chip_imp_pilot_sg VIDIOC_G_TUNER errno: %d (%s)", errno, strerror (errno));
       if (errno == EINVAL) {
         //chip_imp_api_state_sg (0);
         //chip_imp_api_state_sg (1);

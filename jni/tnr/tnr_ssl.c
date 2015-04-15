@@ -122,7 +122,7 @@
   #define DE_TIME_CONSTANT_75   0          // US
   
   
-  // ****************IOCTLS******************
+  // ****************ioctl's******************
   #define Si4709_IOC_MAGIC  0xFA                                          // magic #
   #define Si4709_IOC_NR_MAX 40                                            // max seq no
   
@@ -153,7 +153,7 @@
   #define Si4709_IOC_RDS_ENABLE                       _IO(Si4709_IOC_MAGIC, 23)
   #define Si4709_IOC_RDS_DISABLE                      _IO(Si4709_IOC_MAGIC, 24)
   #define Si4709_IOC_RDS_TIMEOUT_SET                  _IOW(Si4709_IOC_MAGIC, 25, u32)
-  #define Si4709_IOC_SEEK_CANCEL                      _IO(Si4709_IOC_MAGIC, 26)                 // VNVS:START 13-OCT'09---- Added IOCTLs for reading the device-id,chip-id,power configuration, system configuration2 registers
+  #define Si4709_IOC_SEEK_CANCEL                      _IO(Si4709_IOC_MAGIC, 26)                 // VNVS:START 13-OCT'09---- Added ioctl's for reading the device-id,chip-id,power configuration, system configuration2 registers
   #define Si4709_IOC_DEVICE_ID_GET                    _IOR(Si4709_IOC_MAGIC, 27,device_id_t)
   #define Si4709_IOC_CHIP_ID_GET                      _IOR(Si4709_IOC_MAGIC, 28,chip_id_t)
   #define Si4709_IOC_SYS_CONFIG2_GET                  _IOR(Si4709_IOC_MAGIC, 29,sys_config2)
@@ -169,92 +169,145 @@
   #define Si4709_IOC_RESET_RDS_DATA                   _IO(Si4709_IOC_MAGIC, 39)
   #define Si4709_IOC_SEEK_FULL                        _IOR(Si4709_IOC_MAGIC, 40, u32)           // !! New
 
+  char * req_get (int req) {
+    switch (req) {
+      case Si4709_IOC_BAND_SET:         return ("Si4709_IOC_BAND_SET");
+      case Si4709_IOC_CHAN_GET:         return ("Si4709_IOC_CHAN_GET");
+      case Si4709_IOC_CHAN_SELECT:      return ("Si4709_IOC_CHAN_SELECT");
+      case Si4709_IOC_CHAN_SPACING_SET: return ("Si4709_IOC_CHAN_SPACING_SET");
+      case Si4709_IOC_CUR_RSSI_GET:     return ("Si4709_IOC_CUR_RSSI_GET");
+      case Si4709_IOC_DE_SET:           return ("Si4709_IOC_DE_SET");
+      case Si4709_IOC_DSMUTE_OFF:       return ("Si4709_IOC_DSMUTE_OFF");
+      case Si4709_IOC_DSMUTE_ON:        return ("Si4709_IOC_DSMUTE_ON");
+      case Si4709_IOC_MONO_SET:         return ("Si4709_IOC_MONO_SET");
+      case Si4709_IOC_MUTE_OFF:         return ("Si4709_IOC_MUTE_OFF");
+      case Si4709_IOC_MUTE_ON:          return ("Si4709_IOC_MUTE_ON");
+      case Si4709_IOC_POWERDOWN:        return ("Si4709_IOC_POWERDOWN");
+      case Si4709_IOC_POWERUP:          return ("Si4709_IOC_POWERUP");
+      case Si4709_IOC_RDS_DATA_GET:     return ("Si4709_IOC_RDS_DATA_GET");
+      case Si4709_IOC_RDS_DISABLE:      return ("Si4709_IOC_RDS_DISABLE");
+      case Si4709_IOC_RDS_ENABLE:       return ("Si4709_IOC_RDS_ENABLE");
+      case Si4709_IOC_SEEK_CANCEL:      return ("Si4709_IOC_SEEK_CANCEL");
+      case Si4709_IOC_SEEK_DOWN:        return ("Si4709_IOC_SEEK_DOWN");
+      case Si4709_IOC_SEEK_UP:          return ("Si4709_IOC_SEEK_UP");
+      case Si4709_IOC_STATUS_RSSI_GET:  return ("Si4709_IOC_STATUS_RSSI_GET");
+      case Si4709_IOC_STEREO_SET:       return ("Si4709_IOC_STEREO_SET");
+      case Si4709_IOC_VOLEXT_DISB:      return ("Si4709_IOC_VOLEXT_DISB");
+      case Si4709_IOC_VOLEXT_ENB:       return ("Si4709_IOC_VOLEXT_ENB");
+      case Si4709_IOC_VOLUME_SET:       return ("Si4709_IOC_VOLUME_SET");
+    }
+    return ("Unknown !");
+  }
+
+  int ssl_ioctl_par (int fd, int req, void * par) {                     // (int d, int request, ...);
+    int ret = ioctl (fd, req, par);
+    if (ena_log_chip_access)
+      logd ("ssl_ioctl_par req: %s", req_get (req));
+    return (ret);
+  }
+
+  int ssl_ioctl (int fd, int req) {                                     // (int d, int request, ...);
+    int ret = ioctl (fd, req);
+    if (ena_log_chip_access)
+      logd ("ssl_ioctl req: %s", req_get (req));
+    return (ret);
+  }
+
   int band_set (int low , int high, int band) {                 // ? Do we need to stop/restart RDS power in reg 0x00 ? Or rbds_set to flush ?
     logd ("band_set low: %d  high: %d  band: %d", low, high, band);
     int ssl_band = 0;
-    if (low < 87500)
-      //ssl_band = BAND_76000_108000_kHz;
-      ssl_band = BAND_76000_90000_kHz;
+    if (low < 87500 || band == 2)
+      ssl_band = BAND_76000_108000_kHz;
+      //ssl_band = BAND_76000_90000_kHz;
     else
       ssl_band = BAND_87500_108000_kHz;
-    int ret = ioctl (dev_hndl, Si4709_IOC_BAND_SET, & ssl_band);
+    errno = 0;
+    int ret = ssl_ioctl_par (dev_hndl, Si4709_IOC_BAND_SET, & ssl_band);
     if (ret < 0) {
-      loge ("band_set IOCTL Si4709_BAND_SET error: %d %d", ret, errno);
+      loge ("band_set ioctl Si4709_BAND_SET ret: %d  errno: %d (%s)", ret, errno, strerror (errno));
       return (-1);
     }
-    logd ("band_set IOCTL Si4709_BAND_SET success");
-    return (0);
+    logd ("band_set ioctl Si4709_BAND_SET success");
+    return (band);
   }
+
   int freq_inc_set (int inc) {
     logd ("freq_inc_set: %d", inc);
     inc /= 10;
-    int ret = ioctl (dev_hndl, Si4709_IOC_CHAN_SPACING_SET, & inc);
+    errno = 0;
+    int ret = ssl_ioctl_par (dev_hndl, Si4709_IOC_CHAN_SPACING_SET, & inc);
     if (ret < 0) {
-      loge ("freq_inc_set IOCTL Si4709_IOC_CHAN_SPACING_SET error: %d %d", ret, errno);
+      loge ("freq_inc_set ioctl Si4709_IOC_CHAN_SPACING_SET ret: %d  errno: %d (%s)", ret, errno, strerror (errno));
       return (-1);
     }
-    logd ("freq_inc_set IOCTL Si4709_IOC_CHAN_SPACING_SET success");
-    return (0);
+    logd ("freq_inc_set ioctl Si4709_IOC_CHAN_SPACING_SET success");
+    return (inc);
   }
-  int emph75_set (int emph75) {
+
+  int emph75_set (int band) {
     int sil_emph = 0;
-    logd ("emph75_set: %d", emph75);
-    if (emph75)
+    logd ("emph75_set band: %d", band);
+    if (band == 1)                                                      // If US...
       sil_emph = DE_TIME_CONSTANT_75;
     else
       sil_emph = DE_TIME_CONSTANT_50;
-    int ret = ioctl (dev_hndl, Si4709_IOC_DE_SET, & sil_emph);
+    errno = 0;
+    int ret = ssl_ioctl_par (dev_hndl, Si4709_IOC_DE_SET, & sil_emph);
     if (ret < 0) {
-      loge ("emph75_set IOCTL Si4709_IOC_DE_SET error: %d %d", ret, errno);
+      loge ("emph75_set ioctl Si4709_IOC_DE_SET ret: %d  errno: %d (%s)", ret, errno, strerror (errno));
       return (-1);
     }
-    logd ("emph75_set IOCTL Si4709_IOC_DE_SET success");
-    return (0);
+    logd ("emph75_set ioctl Si4709_IOC_DE_SET success");
+    return (band);
   }
-  int rbds_set (int rbds) {
-    logd ("rbds_set: %d",rbds);
-    return (rbds);
+
+  int rbds_set (int band) {
+    logd ("rbds_set band: %d", band);
+    return (band);
   }
 
   int pwr_off () {
     int ret = 0;
     logd ("pwr_off");
     if (curr_rds_state) {
-      ret = ioctl (dev_hndl, Si4709_IOC_RDS_DISABLE);
+      errno = 0;
+      ret = ssl_ioctl (dev_hndl, Si4709_IOC_RDS_DISABLE);
       if (ret < 0)
-        loge ("pwr_off IOCTL Si4709_IOC_RDS_DISABLE error: %d %d", ret, errno);
+        loge ("pwr_off ioctl Si4709_IOC_RDS_DISABLE ret: %d  errno: %d (%s)", ret, errno, strerror (errno));
       else
-        logd ("pwr_off IOCTL Si4709_IOC_RDS_DISABLE success");
+        logd ("pwr_off ioctl Si4709_IOC_RDS_DISABLE success");
     }
 
     chip_imp_mute_sg (1);                                               // Mute
 
-    ret = ioctl (dev_hndl, Si4709_IOC_POWERDOWN);
+    errno = 0;
+    ret = ssl_ioctl (dev_hndl, Si4709_IOC_POWERDOWN);
     if (ret < 0)
-     loge ("pwr_off IOCTL Si4709_IOC_POWERDOWN error: %d %d", ret, errno);
+     loge ("pwr_off ioctl Si4709_IOC_POWERDOWN ret: %d  errno: %d (%s)", ret, errno, strerror (errno));
     else
-      logd ("pwr_off IOCTL Si4709_IOC_POWERDOWN success");
+      logd ("pwr_off ioctl Si4709_IOC_POWERDOWN success");
     curr_state = 0;
     return (curr_state);
   }
+
   int vol_get () {
-    int vol = curr_vol;//257 * reg_get (0xf8 | 0x00010000);
+    int vol = curr_vol;
     logd ("chip_imp_vol_get: %d", vol);
     return (vol);
   }
 
   int freq_get () {//freq_sg
-    int freq = 88500;
-    int ret = ioctl (dev_hndl, Si4709_IOC_CHAN_GET, & freq);
+    int ssl_freq = 8850;
+    errno = 0;
+    int ret = ssl_ioctl_par (dev_hndl, Si4709_IOC_CHAN_GET, & ssl_freq);
     if (ret < 0) {
-      loge ("freq_get IOCTL Si4709_IOC_CHAN_GET error: %d %d", ret, errno);
+      loge ("freq_get ioctl Si4709_IOC_CHAN_GET ret: %d  errno: %d (%s)", ret, errno, strerror (errno));
       return (-1);
     }
-    freq *= 10;
-    curr_freq_int = freq;
+    curr_freq_int = ssl_freq * 10;
     if (ena_log_tnr_extra)
-      logd ("freq_get IOCTL Si4709_IOC_CHAN_GET success: %d", freq);
-    return (freq);
+      logd ("freq_get ioctl Si4709_IOC_CHAN_GET success: %d", curr_freq_int);
+    return (curr_freq_int);
   }
 
   int sls_status_chip_imp_pilot_sg_cnt = 0;
@@ -263,11 +316,12 @@
 
   int seek_stop () {
     logd ("seek_stop");
-    int ret = ioctl (dev_hndl, Si4709_IOC_SEEK_CANCEL);
+    errno = 0;
+    int ret = ssl_ioctl (dev_hndl, Si4709_IOC_SEEK_CANCEL);
     if (ret < 0)
-      loge ("seek_stop IOCTL Si4709_SEEK_CANCEL error: %d %d", ret, errno);
+      loge ("seek_stop ioctl Si4709_SEEK_CANCEL ret: %d  errno: %d (%s)", ret, errno, strerror (errno));
     else
-      logd ("seek_stop IOCTL Si4709_SEEK_CANCEL success");
+      logd ("seek_stop ioctl Si4709_SEEK_CANCEL success");
 
     curr_seek_state = 0;
     return (curr_seek_state);
@@ -298,105 +352,6 @@
   }
 
 /* Kernel symbols GS2/Note1:
-
-> 00000000 t iris_vidioc_g_fmt_type_private
-> 00000000 t iris_q_event
-> 00000000 t iris_vidioc_s_frequency
-> 00000000 t iris_vidioc_g_frequency
-> 00000000 t iris_search
-> 00000000 t iris_vidioc_g_tuner
-> 00000000 t iris_fops_release
-> 00000000 t iris_vidioc_dqbuf
-> 00000000 t iris_vidioc_queryctrl
-> 00000000 t iris_q_evt_data
-> 00000000 t iris_vidioc_s_hw_freq_seek
-> 00000000 t iris_vidioc_querycap
-> 00000000 t iris_vidioc_s_tuner
-> 00000000 t iris_vidioc_g_ext_ctrls
-> 00000000 t iris_vidioc_g_ctrl
-> 00000000 t iris_vidioc_s_ext_ctrls
-> 00000000 t iris_vidioc_s_ctrl
-> 00000000 t iris_remove
-> 00000000 r iris_fm_match
-> 00000000 r iris_fops
-> 00000000 r iris_ioctl_ops
-> 00000000 t iris_radio_init
-> 00000000 t iris_probe
-> 00000000 t iris_radio_exit
-> 00000000 d iris_fm
-> 00000000 d iris_driver
-> 00000000 d iris_viddev_template
-> 00000000 d iris_v4l2_queryctrl
-
-> 00000000 T radio_hci_register_dev
-> 00000000 T radio_hci_unregister_dev
-> 00000000 t radio_hci_cmd_task
-> 00000000 T radio_hci_send_cmd
-> 00000000 t radio_hci_req_complete
-> 00000000 T radio_hci_event_packet
-> 00000000 t radio_hci_rx_task
-> 00000000 T radio_hci_recv_frame
-> 00000000 t radio_hci_smd_destruct
-> 00000000 t radio_hci_smd_send_frame
-> 00000000 t radio_hci_smd_recv_event
-> 00000000 t radio_hci_smd_notify_cmd
-
-> 00000000 t hci_set_fm_recv_conf
-> 00000000 t hci_set_fm_trans_conf
-> 00000000 t hci_fm_rds_grps_process
-> 00000000 t hci_fm_do_calibration_req
-> 00000000 t hci_fm_get_ch_det_th
-> 00000000 t hci_get_fm_trans_conf_req
-> 00000000 t hci_fm_disable_trans_req
-> 00000000 t hci_fm_enable_trans_req
-> 00000000 t hci_fm_get_station_dbg_param_req
-> 00000000 t hci_fm_get_feature_lists_req
-> 00000000 t hci_fm_reset_req
-> 00000000 t hci_fm_cancel_search_req
-> 00000000 t hci_fm_get_af_list_req
-> 00000000 t hci_fm_get_radio_text_req
-> 00000000 t hci_fm_get_program_service_req
-> 00000000 t hci_fm_get_sig_threshold_req
-> 00000000 t hci_fm_get_station_param_req
-> 00000000 t hci_get_fm_recv_conf_req
-> 00000000 t hci_fm_disable_recv_req
-> 00000000 t hci_fm_enable_recv_req
-> 00000000 t hci_fm_tune_station_req
-> 00000000 t hci_fm_set_cal_req_proc
-> 00000000 t hci_fm_tone_generator
-> 00000000 t hci_fm_set_event_mask
-> 00000000 t hci_fm_set_sig_threshold_req
-> 00000000 t hci_fm_rds_grp_process_req
-> 00000000 t hci_fm_set_antenna_req
-> 00000000 t hci_fm_do_cal_req
-> 00000000 t hci_fm_srch_station_list_req
-> 00000000 t hci_fm_srch_rds_stations_req
-> 00000000 t hci_fm_search_stations_req
-> 00000000 t hci_set_fm_trans_conf_req
-> 00000000 t hci_set_fm_stereo_mode_req
-> 00000000 t hci_fm_rds_grp_mask_req
-> 00000000 t hci_set_fm_mute_mode_req
-> 00000000 t hci_set_fm_recv_conf_req
-> 00000000 t hci_fm_set_ch_det_th
-> 00000000 T hci_fm_do_calibration
-> 00000000 T hci_fm_smd_register
-> 00000000 T hci_fm_smd_deregister
-
-> 00000000 t hci_read_grp_counters_req
-> 00000000 t hci_set_notch_filter_req
-> 00000000 t hci_def_data_read_req
-> 00000000 t hci_def_data_write_req
-> 00000000 t hci_trans_rt_req
-> 00000000 t hci_trans_ps_req
-
-> 00000000 t update_spur_table
-> 00000000 t send_disable_event
-> 00000000 d rds_buf
-> 00000000 d sig_blend
-> 00000000 d ert_carrier
-> 00000000 d rt_plus_carrier
-
-
 
 lsmod
 Si4709_driver 27844 1 - Live 0x00000000
@@ -551,12 +506,14 @@ sys/bus/i2c/drivers/Si4709
     if (file_get ("/system/lib/modules/Si4709_driver.ko"))
       util_insmod ("/system/lib/modules/Si4709_driver.ko");
 
+    errno = 0;
     dev_hndl = open ("/dev/fmradio", O_RDONLY);
     if (dev_hndl < 0) {
-      logd ("chip_imp_api_state_sg error opening samsung /dev/fmradio: %d", errno);
+      logd ("chip_imp_api_state_sg error opening samsung /dev/fmradio errno: %d (%s)", errno, strerror (errno));
+      errno = 0;
       dev_hndl = open ("/dev/radio0", O_RDONLY);
       if (dev_hndl < 0) {
-        loge ("chip_imp_api_state_sg error opening samsung /dev/fmradio or /dev/radio0: %d", errno);
+        loge ("chip_imp_api_state_sg error opening samsung /dev/radio0 errno: %d (%s)", errno, strerror (errno));
         curr_api_state = 0;
         return (curr_api_state);
       }
@@ -584,32 +541,35 @@ sys/bus/i2c/drivers/Si4709
       return (pwr_off ());
 
     int ret = 0;
-    ret = ioctl (dev_hndl, Si4709_IOC_POWERUP);
+    errno = 0;
+    ret = ssl_ioctl (dev_hndl, Si4709_IOC_POWERUP);
     if (ret < 0) {
-        loge ("chip_imp_state_sg IOCTL Si4709_IOC_POWERUP error: %d %d", ret, errno);
+        loge ("chip_imp_state_sg ioctl Si4709_IOC_POWERUP ret: %d  errno: %d (%s)", ret, errno, strerror (errno));
         curr_state = 0;
         loge ("chip_imp_state_sg curr_state: %d", curr_state);
         return (curr_state);
     }
 
-    logd ("chip_imp_state_sg IOCTL Si4709_IOC_POWERUP success");
+    logd ("chip_imp_state_sg ioctl Si4709_IOC_POWERUP success");
     //chip_info_log ();
 
     chip_imp_mute_sg (1);                                               // Mute for now
 
     if (curr_rds_state) {
-      ret = ioctl (dev_hndl, Si4709_IOC_RDS_ENABLE);
+      errno = 0;
+      ret = ssl_ioctl (dev_hndl, Si4709_IOC_RDS_ENABLE);
       if (ret < 0)
-        loge ("sl_chip_imp_state_sg IOCTL Si4709_IOC_RDS_ENABLE error: %d %d", ret, errno);
+        loge ("sl_chip_imp_state_sg ioctl Si4709_IOC_RDS_ENABLE ret: %d  errno: %d (%s)", ret, errno, strerror (errno));
       else
-        logd ("sl_chip_imp_state_sg IOCTL Si4709_IOC_RDS_ENABLE success");
+        logd ("sl_chip_imp_state_sg ioctl Si4709_IOC_RDS_ENABLE success");
     }
     else {
-      ret = ioctl (dev_hndl, Si4709_IOC_RDS_DISABLE);
+      errno = 0;
+      ret = ssl_ioctl (dev_hndl, Si4709_IOC_RDS_DISABLE);
       if (ret < 0)
-        loge ("sl_chip_imp_state_sg IOCTL Si4709_IOC_RDS_DISABLE error: %d %d", ret, errno);
+        loge ("sl_chip_imp_state_sg ioctl Si4709_IOC_RDS_DISABLE ret: %d  errno: %d (%s)", ret, errno, strerror (errno));
       else
-        logd ("sl_chip_imp_state_sg IOCTL Si4709_IOC_RDS_DISABLE success");
+        logd ("sl_chip_imp_state_sg ioctl Si4709_IOC_RDS_DISABLE success");
     }
 
     //chip_imp_band_sg (0);
@@ -641,19 +601,23 @@ sys/bus/i2c/drivers/Si4709
     return (curr_antenna);
   }
 
-  int chip_imp_band_sg (int band) {
+  int chip_imp_band_sg (int band) {                                     //  0:EU    1:US    2:UU
     if (band == GET)
       return (curr_band);
 
     logd ("chip_imp_band_sg band: %d", band);
 
-    curr_freq_lo =  87500;
+    curr_band = band;
+
     curr_freq_hi = 108000;
 
-    if (band == 0)
+    curr_freq_lo = 87500;
+    if (band == 2)                                                      // If Wide
+      curr_freq_lo = 76000;//65000;
+
+    curr_freq_inc = 100;
+    if (band == 1)                                                      // If US
       curr_freq_inc = 200;
-    else
-      curr_freq_inc = 100;
 
     band_set (curr_freq_lo, curr_freq_hi, band);
 
@@ -671,14 +635,15 @@ sys/bus/i2c/drivers/Si4709
       return (freq_get ());
 
     logd ("chip_imp_freq_sg: %d", freq);
-    freq = freq / 10 ;
-    int ret = ioctl (dev_hndl, Si4709_IOC_CHAN_SELECT, & freq);
+    int ssl_freq = freq / 10 ;
+    errno = 0;
+    int ret = ssl_ioctl_par (dev_hndl, Si4709_IOC_CHAN_SELECT, & ssl_freq);
     if (ret < 0) {
-      loge ("chip_imp_freq_sg IOCTL Si4709_IOC_CHAN_SELECT error: %d %d", ret, errno);
+      loge ("chip_imp_freq_sg ioctl Si4709_IOC_CHAN_SELECT ret: %d  errno: %d (%s)", ret, errno, strerror (errno));
       return (curr_freq_int);
     }
     curr_freq_int = freq;
-    logd ("chip_imp_freq_sg IOCTL Si4709_IOC_CHAN_SELECT success");
+    logd ("chip_imp_freq_sg ioctl Si4709_IOC_CHAN_SELECT success");
     rds_init ();
     return (curr_freq_int);
   }
@@ -690,15 +655,16 @@ sys/bus/i2c/drivers/Si4709
     int ret = 0;
 
     int vol_ext = 0;                                                    // 0 = Default
-    if (vol_ext == 2 || file_get ("/sdcard/spirit/ssl_volext_ena"))            // If Volume Extension enabled...       GS3: IOCTL Si4709_IOC_VOLEXT error: -1 25  vol_ext: 0
-      ret = ioctl (dev_hndl, Si4709_IOC_VOLEXT_ENB);
+    errno = 0;
+    if (vol_ext == 2 || file_get ("/sdcard/spirit/ssl_volext_ena"))            // If Volume Extension enabled...       GS3: ioctl Si4709_IOC_VOLEXT error: -1 25  vol_ext: 0
+      ret = ssl_ioctl (dev_hndl, Si4709_IOC_VOLEXT_ENB);
     else if (vol_ext == 1 || file_get ("/sdcard/spirit/ssl_volext_dis"))       // Else if Volume Extension disabled...
-      ret = ioctl (dev_hndl, Si4709_IOC_VOLEXT_DISB);
+      ret = ssl_ioctl (dev_hndl, Si4709_IOC_VOLEXT_DISB);
 
     if (ret < 0)
-      loge ("chip_imp_vol_sg IOCTL Si4709_IOC_VOLEXT error: %d %d  vol_ext: %d", ret, errno, vol_ext);
+      loge ("chip_imp_vol_sg ioctl Si4709_IOC_VOLEXT ret: %d  errno: %d (%s)  vol_ext: %d", ret, errno, strerror (errno), vol_ext);
     else if (vol_ext >= 1)
-      logd ("chip_imp_vol_sg IOCTL Si4709_IOC_VOLEXT success vol_ext: %d", vol_ext);
+      logd ("chip_imp_vol_sg ioctl Si4709_IOC_VOLEXT success vol_ext: %d", vol_ext);
 
     uint8_t vol_reg = vol / 4096;                                         // vol_reg = 0 - 15 from vol = 0 - 65535
     if (vol && ! vol_reg)
@@ -707,11 +673,12 @@ sys/bus/i2c/drivers/Si4709
       vol_reg = 15;
     logd ("chip_imp_vol_sg: %d  %d", vol, vol_reg);
 
-    ret = ioctl (dev_hndl, Si4709_IOC_VOLUME_SET, & vol_reg);
+    errno = 0;
+    ret = ssl_ioctl_par (dev_hndl, Si4709_IOC_VOLUME_SET, & vol_reg);
     if (ret < 0)
-      loge ("chip_imp_vol_sg IOCTL Si4709_VOLUME_SET error: %d %d", ret, errno);
+      loge ("chip_imp_vol_sg ioctl Si4709_VOLUME_SET ret: %d  errno: %d (%s)", ret, errno, strerror (errno));
     else
-      logd ("chip_imp_vol_sg IOCTL Si4709_VOLUME_SET success");
+      logd ("chip_imp_vol_sg ioctl Si4709_VOLUME_SET success");
 
     curr_vol = vol;
     logd ("chip_imp_vol_sg curr_vol: %d", curr_vol);
@@ -721,6 +688,15 @@ sys/bus/i2c/drivers/Si4709
   int chip_imp_thresh_sg (int thresh) {
     if (thresh == GET)
       return (curr_thresh);
+
+    errno = 0;
+    int ret = ssl_ioctl_par (dev_hndl, Si4709_IOC_RSSI_SEEK_TH_SET, & thresh);
+    if (ret < 0)
+      loge ("chip_imp_thresh_sg ioctl Si4709_RSSI_SEEK_TH_SET ret: %d  errno: %d (%s)", ret, errno, strerror (errno));
+    else
+      logd ("chip_imp_thresh_sg ioctl Si4709_RSSI_SEEK_TH_SET success");
+
+
     curr_thresh = thresh;
     logd ("chip_imp_thresh_sg curr_thresh: %d", curr_thresh);
     return (curr_thresh);
@@ -733,13 +709,13 @@ sys/bus/i2c/drivers/Si4709
     int ret = 0;
     errno = 0;
     if (mute)
-      ret = ioctl (dev_hndl, Si4709_IOC_MUTE_ON);
+      ret = ssl_ioctl (dev_hndl, Si4709_IOC_MUTE_ON);
     else
-      ret = ioctl (dev_hndl, Si4709_IOC_MUTE_OFF);
+      ret = ssl_ioctl (dev_hndl, Si4709_IOC_MUTE_OFF);
     if (ret < 0)
-      loge ("chip_imp_mute_sg IOCTL Si4709_IOC_MUTE error: %d  errno: %d (%s)", ret, errno, strerror (errno));
+      loge ("chip_imp_mute_sg ioctl Si4709_IOC_MUTE error: %d  errno: %d (%s)", ret, errno, strerror (errno));
     else
-      logd ("chip_imp_mute_sg IOCTL Si4709_IOC_MUTE success");
+      logd ("chip_imp_mute_sg ioctl Si4709_IOC_MUTE success");
 
     curr_mute = mute;
     logd ("chip_imp_mute_sg curr_mute: %d", curr_mute);
@@ -753,32 +729,33 @@ sys/bus/i2c/drivers/Si4709
     int ret = 0;
     errno = 0;
     if (softmute)
-      ret = ioctl (dev_hndl, Si4709_IOC_DSMUTE_ON);
+      ret = ssl_ioctl (dev_hndl, Si4709_IOC_DSMUTE_ON);                 // !!!! Backwards on GS3 !!!!
     else
-      ret = ioctl (dev_hndl, Si4709_IOC_DSMUTE_OFF);
+      ret = ssl_ioctl (dev_hndl, Si4709_IOC_DSMUTE_OFF);
     if (ret < 0)
-      loge ("chip_imp_softmute_sg IOCTL Si4709_IOC_DSMUTE error: %d  errno: %d (%s)", ret, errno, strerror (errno));
+      loge ("chip_imp_softmute_sg ioctl Si4709_IOC_DSMUTE error: %d  errno: %d (%s)", ret, errno, strerror (errno));
     else
-      logd ("chip_imp_softmute_sg IOCTL Si4709_IOC_DSMUTE success");
+      logd ("chip_imp_softmute_sg ioctl Si4709_IOC_DSMUTE success");
 
     curr_softmute = softmute;
     logd ("chip_imp_softmute_sg curr_softmute: %d", curr_softmute);
     return (curr_softmute);
   }
 
-  int chip_imp_stereo_sg (int stereo) {                                        //
+  int chip_imp_stereo_sg (int stereo) {                                 //
     if (stereo == GET)
       return (curr_stereo);
 
     int ret = 0;
+    errno = 0;
     if (stereo)
-      ret = ioctl (dev_hndl, Si4709_IOC_STEREO_SET);
+      ret = ssl_ioctl (dev_hndl, Si4709_IOC_STEREO_SET);
     else
-      ret = ioctl (dev_hndl, Si4709_IOC_MONO_SET);
+      ret = ssl_ioctl (dev_hndl, Si4709_IOC_MONO_SET);
     if (ret < 0)
-      loge ("chip_imp_stereo_sg IOCTL Si4709_IOC_STEREO_SET/Si4709_IOC_MONO_SET error: %d %d", ret, errno);
+      loge ("chip_imp_stereo_sg ioctl Si4709_IOC_STEREO_SET/Si4709_IOC_MONO_SET ret: %d  errno: %d (%s)", ret, errno, strerror (errno));
     else
-      logd ("chip_imp_stereo_sg IOCTL Si4709_IOC_STEREO_SET/Si4709_IOC_MONO_SET success");
+      logd ("chip_imp_stereo_sg ioctl Si4709_IOC_STEREO_SET/Si4709_IOC_MONO_SET success");
 
     curr_stereo = stereo;
     logd ("chip_imp_stereo_sg curr_stereo: %d", curr_stereo);
@@ -809,14 +786,15 @@ sys/bus/i2c/drivers/Si4709
           this_freq = curr_freq_hi;
         chip_imp_freq_sg (this_freq);                                   // Set new frequency
       }
+      errno = 0;
       if (seek_up)
-        ret = ioctl (dev_hndl, Si4709_IOC_SEEK_UP, & freq);
+        ret = ssl_ioctl_par (dev_hndl, Si4709_IOC_SEEK_UP, & freq);
       else
-        ret = ioctl (dev_hndl, Si4709_IOC_SEEK_DOWN, & freq);
+        ret = ssl_ioctl_par (dev_hndl, Si4709_IOC_SEEK_DOWN, & freq);
       if (ret < 0)
-        loge ("chip_imp_seek_state_sg IOCTL Si4709_SEEK error: %d %d", ret, errno);
+        loge ("chip_imp_seek_state_sg ioctl Si4709_SEEK ret: %d  errno: %d (%s)", ret, errno, strerror (errno));
       else
-        logd ("chip_imp_seek_state_sg IOCTL Si4709_SEEK success freq: %d", freq);
+        logd ("chip_imp_seek_state_sg ioctl Si4709_SEEK success freq: %d", freq);
       if (freq)
         break;
     }
@@ -825,8 +803,7 @@ sys/bus/i2c/drivers/Si4709
 
     curr_seek_state = 0;                                                // !!!! Still running ????      SSL only
     rds_init ();
-    return (curr_seek_state);
-
+    return (curr_freq_int);//curr_seek_state);
   }
 
   int chip_imp_rds_state_sg (int rds_state) {
@@ -848,11 +825,12 @@ sys/bus/i2c/drivers/Si4709
 
   int chip_imp_rssi_sg (int fake_rssi) {
     rssi_snr_t rssi_snr = {0};
-    int ret = ioctl (dev_hndl, Si4709_IOC_CUR_RSSI_GET, & rssi_snr);
+    errno = 0;
+    int ret = ssl_ioctl_par (dev_hndl, Si4709_IOC_CUR_RSSI_GET, & rssi_snr);
     if (ret < 0)
-      loge ("chip_imp_rssi_sg IOCTL Si4709_IOC_CUR_RSSI_GET error: %d %d", ret, errno);
+      loge ("chip_imp_rssi_sg ioctl Si4709_IOC_CUR_RSSI_GET ret: %d  errno: %d (%s)", ret, errno, strerror (errno));
     else if (ena_log_tnr_extra)
-      logd ("chip_imp_rssi_sg IOCTL Si4709_IOC_CUR_RSSI_GET success: %d %d %d", rssi_snr.curr_rssi, rssi_snr.curr_rssi_th, rssi_snr.curr_snr);
+      logd ("chip_imp_rssi_sg ioctl Si4709_IOC_CUR_RSSI_GET success: %d %d %d", rssi_snr.curr_rssi, rssi_snr.curr_rssi_th, rssi_snr.curr_snr);
 
     curr_rssi = rssi_snr.curr_rssi;
     return (curr_rssi);
@@ -864,15 +842,16 @@ sys/bus/i2c/drivers/Si4709
 
 
     status_rssi_t sr = {0};
-    int ret = ioctl (dev_hndl, Si4709_IOC_STATUS_RSSI_GET, & sr);
+    errno = 0;
+    int ret = ssl_ioctl_par (dev_hndl, Si4709_IOC_STATUS_RSSI_GET, & sr);
     if (ret < 0) {
-      loge ("chip_imp_pilot_sg IOCTL                    Si4709_IOC_STATUS_RSSI_GET error: %d %d  rds_ready: %d  rds_synced: %d  seek_tune_complete: %d  seekfail_bandlimit: %d\
-          afc_railed: %d  block_error_a: %d stereo: %d  rssi: %d", ret, errno, sr.rdsr, sr.rdss, sr.stc, sr.sfbl, sr.afcrl, sr.blera, sr.st, sr.rssi);
+      loge ("chip_imp_pilot_sg ioctl Si4709_IOC_STATUS_RSSI_GET ret: %d  errno: %d (%s)  rds_ready: %d  rds_synced: %d  seek_tune_complete: %d  seekfail_bandlimit: %d\
+          afc_railed: %d  block_error_a: %d stereo: %d  rssi: %d", ret, errno, strerror (errno), sr.rdsr, sr.rdss, sr.stc, sr.sfbl, sr.afcrl, sr.blera, sr.st, sr.rssi);
      curr_pilot  = 0;
      return (curr_pilot);
     }
     if (sls_status_chip_imp_pilot_sg_cnt ++ % 1200 == 0)                           // Every 2 minutes
-      logd ("chip_imp_pilot_sg                          Si4709_IOC_STATUS_RSSI_GET success: %d  rds_ready: %d  rds_synced: %d  seek_tune_complete: %d  seekfail_bandlimit: %d\
+      logd ("chip_imp_pilot_sg Si4709_IOC_STATUS_RSSI_GET success: %d  rds_ready: %d  rds_synced: %d  seek_tune_complete: %d  seekfail_bandlimit: %d\
           afc_railed: %d  block_err_a: %d stereo: %d  rssi: %d", ret, sr.rdsr, sr.rdss, sr.stc, sr.sfbl, sr.afcrl, sr.blera, sr.st, sr.rssi);
     if (sr.st)                                                            // If stereo detected
       return (curr_pilot = 1);
@@ -917,7 +896,6 @@ sys/bus/i2c/drivers/Si4709
     if (reg == GETP)
       return (curr_extension);
     int ret = -1;
-    //ret = reg_set (reg);
     strlcpy (curr_extension, reg, sizeof (curr_extension));
     return (curr_extension);
   }

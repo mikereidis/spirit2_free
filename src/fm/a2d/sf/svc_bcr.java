@@ -30,7 +30,7 @@ public class svc_bcr extends BroadcastReceiver {                        // !! Op
   @Override
   public void onReceive (Context context, Intent intent) {
     try {
-      com_uti.logd ("gui_act.m_com_api: " + gui_act.m_com_api + "  tuner_state: " + gui_act.m_com_api.tuner_state);
+      com_uti.logd ("gui_act.m_com_api: " + gui_act.m_com_api);
 
       if (gui_act.m_com_api == null) {
         gui_act.m_com_api = new com_api (context);                      // !! Operates in same process as gui_act !!
@@ -41,7 +41,8 @@ public class svc_bcr extends BroadcastReceiver {                        // !! Op
         com_uti.loge ("gui_act.m_com_api == null, no action");
         return;
       }
-      //com_uti.logv ("tuner_state: " + gui_act.m_com_api.tuner_state);
+
+      com_uti.logd ("tuner_state: " + gui_act.m_com_api.tuner_state);
 
       String action = intent.getAction ();
       com_uti.logd ("context: " + context + "  intent: " + intent + "  action: " + action);
@@ -55,8 +56,10 @@ public class svc_bcr extends BroadcastReceiver {                        // !! Op
 
                                                                         // Get this at bootup
       if (action.equals (android.media.AudioManager.ACTION_AUDIO_BECOMING_NOISY)) {
-        com_uti.logd ("Wired Headset/Antenna Unplugged");               // Note duplication in svc_svc w/ m_hdst_plgd
-        gui_act.m_com_api.key_set ("audio_state", "Pause");
+        com_uti.logd ("Wired Headset/Antenna Unplugged audio_state: " + gui_act.m_com_api.audio_state);               // Note duplication in svc_aud w/ m_hdst_plgd
+
+        if (gui_act.m_com_api.audio_state.equals ("Start"))             // !! Otherwise get pause timeout when pulling wired headset during phone call
+          gui_act.m_com_api.key_set ("audio_state", "Pause");
       }
       else if (action.equals (Intent.ACTION_MEDIA_BUTTON)) {
         handle_key_event (context, (KeyEvent) intent.getExtras ().get (Intent.EXTRA_KEY_EVENT));

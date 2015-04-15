@@ -56,8 +56,8 @@ public class gui_act extends Activity {                                 // publi
         com_uti.logd ("m_com_api: " + m_com_api);
     }
 
-    m_com_api.chass_plug_aud = com_uti.chass_plug_aud_get (m_context);  // Setup Audio Plugin
-    m_com_api.chass_plug_tnr = com_uti.chass_plug_tnr_get (m_context);  // Setup Tuner Plugin
+//    m_com_api.chass_plug_aud = com_uti.chass_plug_aud_get (m_context);  // Setup Audio Plugin
+//    m_com_api.chass_plug_tnr = com_uti.chass_plug_tnr_get (m_context);  // Setup Tuner Plugin
   }
 
   @Override
@@ -92,7 +92,10 @@ public class gui_act extends Activity {                                 // publi
 
     setVolumeControlStream (svc_aud.audio_stream);                      // setVolumeControlStream() must be done from an Activity ? Then what stream is used from widget start ?
 
-    gap_bcr_start ();                                               // Start Common API Broadcast Receiver
+    gap_bcr_start ();                                                   // Start Common API Broadcast Receiver
+
+//    m_com_api.chass_plug_aud = com_uti.chass_plug_aud_get (m_context);  // Setup Audio Plugin
+//    m_com_api.chass_plug_tnr = com_uti.chass_plug_tnr_get (m_context);  // Setup Tuner Plugin
 
     gui_start ();                                                       // Start GUI
 
@@ -245,9 +248,11 @@ public class gui_act extends Activity {                                 // publi
   @Override
   protected Dialog onCreateDialog (int id, Bundle args) {               // Create a dialog by calling specific *_dialog_create function    ; Triggered by showDialog (int id);
     com_uti.logd ("id: " + id + "  args: " + args);
-    Dialog ret = m_gui_gap.gap_dialog_create (id, args);
-    com_uti.logd ("dialog: " + ret);
-    return (ret);
+    Dialog dlg_ret = null;
+    if (m_gui_gap != null)
+      dlg_ret = m_gui_gap.gap_dialog_create (id, args);
+    com_uti.logd ("dlg_ret: " + dlg_ret);
+    return (dlg_ret);
   }
 
 

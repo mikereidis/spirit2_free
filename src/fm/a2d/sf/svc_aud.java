@@ -51,14 +51,14 @@ public class svc_aud implements svc_aap, AudioManager.OnAudioFocusChangeListener
 
   private int           audiotrack_sessid_int = 0;
 
-  private boolean       pcm_write_thread_active = false;
-  private boolean       pcm_read_thread_active  = false;
+  private boolean       thread_pcm_write_active = false;
+  private boolean       thread_pcm_read_active  = false;
 
   private AudioRecord   m_audiorecord = null;
-  private Thread        pcm_read_thread         = null;
+  private Thread        thread_pcm_read         = null;
 
   private AudioTrack    m_audiotrack            = null;
-  private Thread        pcm_write_thread        = null;
+  private Thread        thread_pcm_write        = null;
 
   private boolean       m_hdst_plgd = false;
   private BroadcastReceiver m_hdst_lstnr = null;
@@ -116,7 +116,7 @@ public class svc_aud implements svc_aap, AudioManager.OnAudioFocusChangeListener
   private long                  write_stats_seconds     = 60;           // Every 60 seconds
   private long                  read_stats_seconds      = 60;           // Every 60 seconds
 
-  private boolean               pcm_write_thread_waiting= false;
+  private boolean               thread_pcm_write_waiting= false;
 
   //private int                   pcm_priority            = -19;//-20;//-19;                                 // For both read & write
 
@@ -130,8 +130,6 @@ public class svc_aud implements svc_aap, AudioManager.OnAudioFocusChangeListener
 
   private int                   m_aud_src = 0;
 
-  private boolean               s2_tx = false;
-
     // Code:
 
   public svc_aud (Context c, svc_acb cb_aud, com_api svc_com_api) {                              // Constructor
@@ -142,9 +140,6 @@ public class svc_aud implements svc_aap, AudioManager.OnAudioFocusChangeListener
     m_context = c;
     m_com_api = svc_com_api;
     com_uti.logd ("");
-
-    s2_tx = com_uti.s2_tx_get ();
-    com_uti.logd ("s2_tx: " + s2_tx);
 
     m_AM = (AudioManager) c.getSystemService (Context.AUDIO_SERVICE);
 
@@ -178,22 +173,26 @@ public class svc_aud implements svc_aap, AudioManager.OnAudioFocusChangeListener
 
     API level 17 / 4.2+ */
 
-    String hw_rate_str = "";
-    String hw_size_str = "";
-    try {
-      hw_rate_str = m_AM.getProperty (AudioManager.PROPERTY_OUTPUT_SAMPLE_RATE);
-      hw_size_str = m_AM.getProperty (AudioManager.PROPERTY_OUTPUT_FRAMES_PER_BUFFER);
-    }
-    catch (Throwable e) {
-      com_uti.loge ("AudioManager.getProperty Throwable e: " + e);
-      e.printStackTrace ();
-    }
-    try {
-      m_samplerate = Integer.parseInt (hw_rate_str);
-    }
-    catch (Throwable e) {
-      com_uti.loge ("Rate Throwable e: " + e);
-      e.printStackTrace ();
+    m_samplerate = 44100;   // Default
+
+    if (com_uti.android_version >= 17) {
+      String hw_rate_str = "";
+      String hw_size_str = "";
+      try {
+        hw_rate_str = m_AM.getProperty (AudioManager.PROPERTY_OUTPUT_SAMPLE_RATE);
+        hw_size_str = m_AM.getProperty (AudioManager.PROPERTY_OUTPUT_FRAMES_PER_BUFFER);
+      }
+      catch (Throwable e) {
+        com_uti.loge ("AudioManager.getProperty Throwable e: " + e);
+        e.printStackTrace ();
+      }
+      try {
+        m_samplerate = Integer.parseInt (hw_rate_str);
+      }
+      catch (Throwable e) {
+        com_uti.loge ("Rate Throwable e: " + e);
+        e.printStackTrace ();
+      }
     }
     com_uti.logd ("m_samplerate 1: " + m_samplerate);
 
@@ -327,8 +326,7 @@ public class svc_aud implements svc_aap, AudioManager.OnAudioFocusChangeListener
   }
 
   public String audio_sessid_get () {                                   // Handle audio session changes: Called by svc_svc:service_update_send() (could be svc_tnr:service_update_send())
-    //com_uti.logd ("s2_tx: " + s2_tx);                                 // Called regularly
-    if (s2_tx) {
+    if (com_uti.s2_tx_apk ()) {
       return ("0");
     }
     int new_audiotrack_sessid_int = 0;
@@ -428,45 +426,47 @@ public class svc_aud implements svc_aap, AudioManager.OnAudioFocusChangeListener
   }
 
     // Player and overall audio state control:
+  private int service_timeout_audio_state = 6;
 
   public String audio_state_set (String desired_state) {                // Called only by onAudioFocusChange(Start/Stop/Pause),
                                                                             //       svc_svc:audio_state_set    (Start/Stop/Pause) (via onStartCommand()),
                                                                             //       svc_svc:tuner_state_set    (Stop),
                                                                             //       svc_svc:cb_tuner_state     (Start)
     String last_audio_state = m_com_api.audio_state;
-    com_uti.logd ("s2_tx: " + s2_tx + "  desired_state: " + desired_state + "  last_audio_state: " + last_audio_state);
+    com_uti.logd ("desired_state: " + desired_state + "  last_audio_state: " + last_audio_state);
     boolean success = true;                                             // Default = success
 
-    if (desired_state.equals ("Start")) {                     // START:
-      m_com_api.service_update_send (null, "Starting Audio", "6");      // Send Phase Update
-      if (s2_tx)                                                        // If Transmit... !! Don't check state, see audio re-kicking requirement in svc_rcc:rds_update_do() !!!
+    if (desired_state.equals ("Start")) {                               // START:
+      m_com_api.service_update_send (null, "Starting Audio", "" + service_timeout_audio_state);      // Send Phase Update
+
+      if (m_com_api.tuner_mode.equals ("Transmit"))                     // If Transmit... !! Don't check state, see audio re-kicking requirement in svc_rcc:rds_update_do() !!!
         transmit_audio_start ();
       else if (m_com_api.audio_state.equals ("Stop") || m_com_api.audio_state.equals ("Pause"))
         receive_audio_start ();                                         // If receive and Audio State = Stop or Pause (If Start or Starting then do nothing)
       else {
-        com_uti.loge ("desired_state: " + desired_state + "  m_com_api.audio_state: " + m_com_api.audio_state);
+        //com_uti.logw ("desired_state: " + desired_state + "  m_com_api.audio_state: " + m_com_api.audio_state);
         return (m_com_api.audio_state);
       }
     }
-    else if (desired_state.equals ("Stop")) {                 // STOP:
-      m_com_api.service_update_send (null, "Stopping Audio", "6");      // Send Phase Update
-      if (s2_tx)                                                        // If Transmit...
+    else if (desired_state.equals ("Stop")) {                           // STOP:
+      m_com_api.service_update_send (null, "Stopping Audio", "" + service_timeout_audio_state);      // Send Phase Update
+      if (m_com_api.tuner_mode.equals ("Transmit"))                     // If Transmit...
         transmit_audio_stop ();
       else if (m_com_api.audio_state.equals ("Start") || m_com_api.audio_state.equals ("Pause"))
         receive_audio_stop ();                                          // If receive and Audio State = Start or Pause (If Stop or Starting then do nothing)
       else {
-        com_uti.loge ("desired_state: " + desired_state + "  m_com_api.audio_state: " + m_com_api.audio_state);
+        //com_uti.logw ("desired_state: " + desired_state + "  m_com_api.audio_state: " + m_com_api.audio_state);
         return (m_com_api.audio_state);
       }
     }
-    else if (desired_state.equals ("Pause")) {                // PAUSE:
-      m_com_api.service_update_send (null, "Pausing Audio", "6");       // Send Phase Update
-      if (s2_tx)                                                        // If Transmit...
+    else if (desired_state.equals ("Pause")) {                          // PAUSE:
+      m_com_api.service_update_send (null, "Pausing Audio", "" + service_timeout_audio_state);       // Send Phase Update
+      if (m_com_api.tuner_mode.equals ("Transmit"))                     // If Transmit...
         transmit_audio_pause ();
       else if (m_com_api.audio_state.equals ("Start"))
         receive_audio_pause ();                                         // If receive and Audio State = Start (If Pause or Stop or Starting then do nothing)
       else {
-        com_uti.loge ("desired_state: " + desired_state + "  m_com_api.audio_state: " + m_com_api.audio_state);
+        //com_uti.logw ("desired_state: " + desired_state + "  m_com_api.audio_state: " + m_com_api.audio_state);
         return (m_com_api.audio_state);
       }
     }
@@ -613,9 +613,10 @@ public class svc_aud implements svc_aap, AudioManager.OnAudioFocusChangeListener
 
   private boolean restart_audio_on_focus_regain = false;
   public void onAudioFocusChange (int focusChange) {
-    //com_uti.logd ("s2_tx: " + s2_tx);
-    //if (s2_tx)
-    //  return;
+    if (m_com_api.tuner_mode.equals ("Transmit")) {
+      com_uti.loge ("TX !!!!!!!!!");
+      return;
+    }
     com_uti.logd ("focusChange: " + focusChange + "  audio_state: " + m_com_api.audio_state + "  restart_audio_on_focus_regain: " + restart_audio_on_focus_regain);
     switch (focusChange) {
       case AudioManager.AUDIOFOCUS_GAIN:                                // Gain
@@ -664,8 +665,8 @@ public class svc_aud implements svc_aap, AudioManager.OnAudioFocusChangeListener
     // PCM:
 
   public String audio_record_state_set (String new_record_state) {
-    com_uti.logd ("s2_tx: " + s2_tx + "  new_record_state: " + new_record_state);
-    if (s2_tx)
+    com_uti.logd ("new_record_state: " + new_record_state);
+    if (com_uti.s2_tx_apk ())
       return ("Stop");
     String str = "";
     return (m_com_api.audio_record_state);
@@ -708,9 +709,9 @@ public class svc_aud implements svc_aap, AudioManager.OnAudioFocusChangeListener
 
 
     // pcm_read -> pcm_write
-  private final Runnable pcm_write_run = new Runnable () {
+  private final Runnable run_pcm_write = new Runnable () {
     public void run () {
-      com_uti.logd ("pcm_write_run");
+      com_uti.logd ("run_pcm_write");
       //native_priority_set (pcm_priority);
                                                                         // Setup temp vars before loop to minimize garbage collection   (!! but aud_mod() has this issue)
       byte [] aud_buf;
@@ -725,39 +726,39 @@ public class svc_aud implements svc_aap, AudioManager.OnAudioFocusChangeListener
 
       try {
 
-        while (pcm_write_thread_active) {                               // While PCM Write Thread should be active...
+        while (thread_pcm_write_active) {                               // While PCM Write Thread should be active...
 
 // GET read audio buffer to write
           bufs = aud_buf_tail - aud_buf_head;
-          //com_uti.loge ("pcm_write_run bufs: " + bufs + "  tail: " + aud_buf_tail + "  head: " + aud_buf_head);
+          //com_uti.loge ("run_pcm_write bufs: " + bufs + "  tail: " + aud_buf_tail + "  head: " + aud_buf_head);
 
           if (bufs < 0)
             bufs += aud_buf_num;                                        // Fix underflow
           if (bufs < min_pcm_write_bufs) {                              // If minimum number of buffers is not ready... (Currently at least 2)
             try {
-              pcm_write_thread_waiting = true;
+              thread_pcm_write_waiting = true;
               //Thread.sleep (1);                                       // Wait ms milliseconds
               //Thread.sleep (2000);                                    // Wait ms milliseconds   More efficient
               //Thread.sleep (3);                                       // Wait ms milliseconds    3 matches Spirit1
               Thread.sleep (100);       // 100 ms compromise ?
-              pcm_write_thread_waiting = false;
+              thread_pcm_write_waiting = false;
             }
             catch (InterruptedException e) {
-              pcm_write_thread_waiting = false;
+              thread_pcm_write_waiting = false;
               //Thread.currentThread().interrupt();
               //e.printStackTrace ();
             }
             continue;                                                   // Restart loop
           }
                                                                         // Here when at least 2 buffers are ready to write, so we write the 1st at the head...
-          //com_uti.loge ("pcm_write_run ready to write bufs: " + bufs + "  tail: " + aud_buf_tail + "  head: " + aud_buf_head);
+          //com_uti.loge ("run_pcm_write ready to write bufs: " + bufs + "  tail: " + aud_buf_tail + "  head: " + aud_buf_head);
           len = aud_buf_len [aud_buf_head];                             // Length of head buffer in bytes
           aud_buf = aud_buf_data [aud_buf_head];                        // Pointer to head buffer
           if (aud_buf == null) {
-            com_uti.loge ("pcm_write_run len: " + len + "  len_written: " + len_written + "  aud_buf: " + aud_buf);
+            com_uti.loge ("run_pcm_write len: " + len + "  len_written: " + len_written + "  aud_buf: " + aud_buf);
             continue;
           }
-          //com_uti.loge ("pcm_write_run ready to write bufs: " + bufs + "  len: " + len + "  tail: " + aud_buf_tail + "  head: " + aud_buf_head);
+          //com_uti.loge ("run_pcm_write ready to write bufs: " + bufs + "  len: " + len + "  tail: " + aud_buf_tail + "  head: " + aud_buf_head);
 
 // RECORD audio buffer before aud_mod() for audio output device write
 
@@ -769,12 +770,12 @@ public class svc_aud implements svc_aap, AudioManager.OnAudioFocusChangeListener
           total_ms_time  = curr_ms_time  = -1;                          // 
 
           len_written = 0;
-          while (pcm_write_thread_active && len_written < len && total_ms_time < 3000) {    // While reading active and not written all and less than 3 seconds total has elapsed...
+          while (thread_pcm_write_active && len_written < len && total_ms_time < 3000) {    // While reading active and not written all and less than 3 seconds total has elapsed...
             if (total_ms_time >= 0) {                                   // If already looped
-              com_uti.logd ("pcm_write_run len_written < len  total_ms_time: " + total_ms_time + "  curr_ms_time: " + curr_ms_time + "  len: " + len + "  new_len: " + new_len + "  len_written: " + len_written + "  aud_buf: " + aud_buf);
+              com_uti.logd ("run_pcm_write len_written < len  total_ms_time: " + total_ms_time + "  curr_ms_time: " + curr_ms_time + "  len: " + len + "  new_len: " + new_len + "  len_written: " + len_written + "  aud_buf: " + aud_buf);
               com_uti.quiet_ms_sleep (30);                              // Wait for about 6 KBytes worth of audio to be de-buffered
             }
-            if (! pcm_write_thread_active)
+            if (! thread_pcm_write_active)
               break;
             curr_ms_start = com_uti.tmr_ms_get ();                      // Start current write timer
             new_len = m_audiotrack.write (aud_buf, len_written, len - len_written);  // Write head buffer to audiotrack  All parameters in bytes (but could be all in shorts)
@@ -782,11 +783,11 @@ public class svc_aud implements svc_aap, AudioManager.OnAudioFocusChangeListener
               len_written += new_len;                                   // If we wrote, update total length written
             total_ms_time = com_uti.tmr_ms_get () - total_ms_start;     // Calculate time taken for total write
             curr_ms_time  = com_uti.tmr_ms_get () - curr_ms_start;      // Calculate time taken for current write
-            if (curr_ms_time >= 500)                                    // If current write has taken too long...   GS1 sees 350 ms sometimes   ; Saw 431 on OM7
-              com_uti.loge ("pcm_write_run m_audiotrack.write too long total_ms_time: " + total_ms_time + "  curr_ms_time: " + curr_ms_time + "  len: " + len + "  new_len: " + new_len + "  len_written: " + len_written + "  aud_buf: " + aud_buf);
+            if (curr_ms_time >= 700)                                    // If current write has taken too long...   GS1 sees 350 ms sometimes   ; Saw 431 on OM7    ; 564 on OXL
+              com_uti.loge ("run_pcm_write m_audiotrack.write too long total_ms_time: " + total_ms_time + "  curr_ms_time: " + curr_ms_time + "  len: " + len + "  new_len: " + new_len + "  len_written: " + len_written + "  aud_buf: " + aud_buf);
           }
 
-          if (com_uti.ena_log_pcm_stat && writes_processed % ((2 * write_stats_seconds * m_samplerate * m_channels) / len) == 0)   // Every stats_seconds
+          if (len != 0 && com_uti.ena_log_pcm_stat && writes_processed % ((2 * write_stats_seconds * m_samplerate * m_channels) / len) == 0)   // Every stats_seconds
             pcm_stat_logs ("Write", m_channels, len, aud_buf);
           writes_processed ++;                                          // Log and update stats
 
@@ -795,15 +796,15 @@ public class svc_aud implements svc_aap, AudioManager.OnAudioFocusChangeListener
             aud_buf_head &= aud_buf_num - 1;
           continue;                                                     // Restart loop
 
-        }   // while (pcm_write_thread_active && len_written < len && ms_time < 3000) {
+        }   // while (thread_pcm_write_active && len_written < len && ms_time < 3000) {
 
                                                                         // Here when thread is finished...
-        com_uti.logd ("pcm_write_run done writes_processed: " + writes_processed);
+        com_uti.logd ("run_pcm_write done writes_processed: " + writes_processed);
 
           audio_record_state_set ("Stop");                              // Ensure we finish any recording in progress
       }
       catch (Throwable e) {
-        com_uti.loge ("pcm_write_run throwable: " + e);
+        com_uti.loge ("run_pcm_write throwable: " + e);
         e.printStackTrace ();
       }                                                                 // Fall through to terminate if exception
       return;
@@ -814,13 +815,25 @@ public class svc_aud implements svc_aap, AudioManager.OnAudioFocusChangeListener
   private boolean is_analog_audio_mode () {
     return (m_com_api.audio_mode.equals ("Analog"));
   }
+  private boolean is_digital_audio_mode () {
+    return (m_com_api.audio_mode.equals ("Digital"));
+  }
+  private boolean is_testmic_audio_mode () {
+    return (m_com_api.audio_mode.equals ("TestMic"));
+  }
 
-  private final Runnable pcm_read_run = new Runnable () {               // Read/Input thread
+
+  private long time_of_last_blank = 0;
+  private int  num_audio_low = 0;
+
+  private final Runnable run_pcm_read = new Runnable () {               // Read/Input thread
     public void run () {
-      com_uti.logd ("pcm_read_run");
+      com_uti.logd ("run_pcm_read");
 
       //native_priority_set (pcm_priority);
 
+      long time_since_last_blank = 0;
+      long time_current = 0;
                                                                         // Setup temp vars before loop to minimize garbage collection
       byte [] aud_buf;
       int bufs = 0;
@@ -831,9 +844,9 @@ public class svc_aud implements svc_aap, AudioManager.OnAudioFocusChangeListener
       try {
         buf_errs = 0;                                                   // Init stats, pointers, etc
         aud_buf_tail = aud_buf_head = 0;                                // Drop all buffers
-        com_uti.logd ("pcm_read_run m_samplerate: " +  m_samplerate + "  m_channels: " + m_channels);
+        com_uti.logd ("run_pcm_read m_samplerate: " +  m_samplerate + "  m_channels: " + m_channels);
 
-        while (pcm_read_thread_active) {                                // While PCM Read Thread should be active...
+        while (thread_pcm_read_active) {                                // While PCM Read Thread should be active...
 
           bufs = aud_buf_tail - aud_buf_head;
           if (bufs < 0)                                                 // If underflowed...
@@ -844,8 +857,8 @@ public class svc_aud implements svc_aap, AudioManager.OnAudioFocusChangeListener
             max_bufs = bufs;                                            // Save new max
 
           if (bufs >= (aud_buf_num * 3) / 4) {                          // If 75% or more or buffers still in progress (If write thread is getting backed up)
-            //if (pcm_write_thread != null && pcm_write_thread_waiting)
-            //  pcm_write_thread.interrupt ();                            // Wake up pcm_write_thread sooner than usual
+            //if (thread_pcm_write != null && thread_pcm_write_waiting)
+            //  thread_pcm_write.interrupt ();                            // Wake up thread_pcm_write sooner than usual
             //com_uti.ms_sleep (300);                                     // Sleep to let write thread process.   0.1s/0.3s = 20/60KBytes @ 48k stereo  (2.5/8 8k buffers)
 
             com_uti.loge ("Low on aud_buf");
@@ -871,7 +884,7 @@ public class svc_aud implements svc_aap, AudioManager.OnAudioFocusChangeListener
 
 // m_audiorecord = ???
 
-          if (len <= 0) {
+          if (len <= 0) {                                               // If no audio data...
             if (len == android.media.AudioRecord.ERROR_INVALID_OPERATION ) {  // -3
               com_uti.logd ("get expected interruption error due to shutdown: " + len + "  tail index: " + aud_buf_tail);       // 
               break;
@@ -880,18 +893,67 @@ public class svc_aud implements svc_aap, AudioManager.OnAudioFocusChangeListener
             com_uti.loge ("get error: " + len + "  tail index: " + aud_buf_tail);       // 
             com_uti.ms_sleep (101);//0);                                    // Wait for errors to clear
 /*
-02-04 03:40:55.369 D/s2svcaud(21385): pcm_read_stop: pcm_read_stop pcm_read_thread_active: true
+02-04 03:40:55.369 D/s2svcaud(21385): pcm_read_stop: pcm_read_stop thread_pcm_read_active: true
 02-04 03:40:55.369 E/s2svcaud(21385): run: get error: -3  tail index: 5
 02-04 03:40:55.374 E/s2comuti(21385): ms_sleep: ms: 101
 02-04 03:40:55.374 E/s2comuti(21385): ms_sleep: Exception e: java.lang.InterruptedException
-02-04 03:40:55.374 D/s2svcaud(21385): run: pcm_read_run reads_processed: 2149  writes_processed: 2149  buf_errs: 0  max_bufs: 3
+02-04 03:40:55.374 D/s2svcaud(21385): run: run_pcm_read reads_processed: 2149  writes_processed: 2149  buf_errs: 0  max_bufs: 3
 */
           }
-          else {
+          else {                                                        // Else if we have audio data...
             if (com_uti.ena_log_pcm_stat && reads_processed % ((2 * read_stats_seconds * m_samplerate * m_channels) / len) == 0)   // Every stats_seconds
               pcm_stat_logs ("Read ", m_channels, len, aud_buf);
 
-            //aud_mod (len, aud_buf);                                     // Modify / amplify audio
+            if (len > 1000 && m_com_api.chass_plug_aud.equals ("QCV")) {// Detect all 0's in audio to kickstart QCV audio (by doing any FM chip function)
+              for (ctr = 0; ctr < len; ctr ++) {
+                if (aud_buf [ctr] != 0)                                 // If data
+                  break;
+              }
+              if (ctr < len) {                                          // If data...
+                //short [] sa = com_uti.ba_to_sa (aud_buf);
+                //for (int idx = 0; idx < len / 2; idx ++)
+                //  if (sa [idx] > 255
+                for (ctr = 0; ctr < len; ctr += 2) {
+                  if (aud_buf [ctr + 1] != 0 && aud_buf [ctr + 1] != 0xff && aud_buf [ctr + 1] != -1) { // If significant data
+                    num_audio_low = 0;
+                    break;
+                  }
+                }
+                if (ctr >= len) {                                       // If no significant data...
+                  num_audio_low ++;
+                  if (num_audio_low >= 4) {                             // If 4 consecutive...
+                    com_uti.logw ("power hack unmute YES 4 consecutive low");
+                  }
+                  else {
+                    ctr = 0;                                            // Set ctr to 0 to avoid triggering fix
+                    if (num_audio_low >= 3)
+                      com_uti.logw ("power hack unmute num_audio_low: " + num_audio_low);
+                    else if (num_audio_low >= 2)
+                      com_uti.logd ("power hack unmute num_audio_low: " + num_audio_low);
+                    else
+                      com_uti.logd ("power hack unmute num_audio_low: " + num_audio_low);
+
+                    num_audio_low = 0;
+                  }
+                }
+              }
+              else {                                                    // Else if no data...
+                num_audio_low = 0;
+              }
+
+
+              if (ctr >= len) {                                         // If no data or 4 consecutive little data...
+                time_current = com_uti.tmr_ms_get ();
+                time_since_last_blank = time_current - time_of_last_blank;
+                if (time_since_last_blank > 10000) {
+                  com_uti.logw ("power hack unmute time_of_last_blank: " + time_of_last_blank + "  time_current: " + time_current);
+                  time_of_last_blank = time_current;
+                  com_uti.daemon_set ("tuner_mute", "Unmute");
+                }
+              }
+            }
+
+            //aud_mod (len, aud_buf);                                   // Modify / amplify audio
 
             if (aud_buf_tail < 0 || aud_buf_tail > aud_buf_num - 1)     // Protect from ArrayIndexOutOfBoundsException
               aud_buf_tail &= aud_buf_num - 1;
@@ -904,22 +966,22 @@ public class svc_aud implements svc_aap, AudioManager.OnAudioFocusChangeListener
             reads_processed ++;
 
             bufs = aud_buf_tail - aud_buf_head;
-            //com_uti.loge ("pcm_read_run bufs: " + bufs + "  tail: " + aud_buf_tail + "  head: " + aud_buf_head);
+            //com_uti.loge ("run_pcm_read bufs: " + bufs + "  tail: " + aud_buf_tail + "  head: " + aud_buf_head);
             if (bufs < 0)
               bufs += aud_buf_num;                                      // Fix underflow
             if (bufs >= min_pcm_write_bufs)                          // If minimum number of buffers is ready... (Currently at least 2)
-              if (pcm_write_thread != null && pcm_write_thread_waiting)
-                pcm_write_thread.interrupt ();                          // Wake up pcm_write_thread sooner than usual
+              if (thread_pcm_write != null && thread_pcm_write_waiting)
+                thread_pcm_write.interrupt ();                          // Wake up thread_pcm_write sooner than usual
           }
         }
 
       }
       catch (Throwable e) {
-        com_uti.loge ("pcm_read_run throwable: " + e);
+        com_uti.loge ("run_pcm_read throwable: " + e);
         e.printStackTrace ();
       }                                                                 // Fall through to terminate if exception
 
-      com_uti.logd ("pcm_read_run reads_processed: " + reads_processed + "  writes_processed: " + writes_processed + "  buf_errs: " + buf_errs + "  max_bufs: " + max_bufs);
+      com_uti.logd ("run_pcm_read reads_processed: " + reads_processed + "  writes_processed: " + writes_processed + "  buf_errs: " + buf_errs + "  max_bufs: " + max_bufs);
 
       return;
     }
@@ -954,17 +1016,17 @@ public class svc_aud implements svc_aap, AudioManager.OnAudioFocusChangeListener
   }
 
   public String audio_stereo_set (String new_audio_stereo) {            // Must restart audio for stereo change to take effect
-    com_uti.logd ("s2_tx: " + s2_tx + "  new_audio_stereo: " + new_audio_stereo);
-    if (s2_tx)
-      return (new_audio_stereo);
+    //com_uti.logd ("s2_tx: " + s2_tx + "  new_audio_stereo: " + new_audio_stereo);
+    //if (s2_tx)
+    //  return (new_audio_stereo);
     m_com_api.audio_stereo = new_audio_stereo;                          // Set new audio stereo
     com_uti.logd ("Set new audio_stereo: " + m_com_api.audio_stereo);
     return (m_com_api.audio_stereo);
   }
 
   public String audio_mode_set (String new_audio_mode) {                // Must restart audio for mode change to take effect
-    com_uti.logd ("s2_tx: " + s2_tx + "  Start  new_audio_mode: " + new_audio_mode + "  m_com_api.audio_mode: " + m_com_api.audio_mode + "  m_com_api.audio_state: " + m_com_api.audio_state);
-    if (s2_tx)
+    com_uti.logd ("new_audio_mode: " + new_audio_mode + "  m_com_api.audio_mode: " + m_com_api.audio_mode + "  m_com_api.audio_state: " + m_com_api.audio_state);
+    if (com_uti.s2_tx_apk ())
       return (new_audio_mode);
 
     if (! m_com_api.audio_state.equals ("Start")) {           // If Audio is not started we do not need to do anything except store mode for next audio start
@@ -1016,9 +1078,6 @@ public class svc_aud implements svc_aap, AudioManager.OnAudioFocusChangeListener
 
     enable_stockmode    =   com_uti.file_get ("/sdcard/spirit/enable_stockmode");
 
-//if (m_com_api.chass_plug_aud.equals ("QCV"))
-//  enable_stockmode = true;
-
     if (enable_stockmode) {
       com_uti.logd ("enable_stockmode");
       enable_pcmwrite       = false;
@@ -1027,42 +1086,13 @@ public class svc_aud implements svc_aap, AudioManager.OnAudioFocusChangeListener
       enable_daemonvolume   = false;
 
       com_uti.setDeviceConnectionState (fm_device, com_uti.DEVICE_STATE_AVAILABLE, "");   // Works on MOG only     com_uti.DEVICE_OUT_FM
-
-    //com_uti.setDeviceConnectionState (0x80000000 | 0x200000, com_uti.DEVICE_STATE_AVAILABLE, "");
-    //com_uti.setDeviceConnectionState (0x80000000 |   0x2000, com_uti.DEVICE_STATE_AVAILABLE, "");
-    //com_uti.setDeviceConnectionState (0x80000000 |   0x8000, com_uti.DEVICE_STATE_AVAILABLE, "");
     }
-/*
-03-02 03:37:56.972 D/s2svcaud(11696): mode_audio_start: enable_stockmode
-03-02 03:37:56.982 D/s2comuti(11696): setDeviceConnectionState: device: 1048576  state: 1  address: ''
-03-02 03:37:56.982 D/s2comuti(11696): output_audio_routing_get: output getDeviceConnectionState: ---- --00 -000 0001 0000 0000 0000 0111   ret_bits hex: 00010007    decimal: 65543
-03-02 03:37:56.992 D/s2comuti(11696): input_audio_routing_get:   input getDeviceConnectionState: ---- ---- -000 -000 0000 0001 1101 0100   ret_bits hex: 000001D4    decimal: 468
-03-02 03:37:56.992 D/audio_hw_primary(  295): adev_set_parameters: enter: connect=1048576
 
-03-02 03:37:56.992 E/audio_a2dp_hw(  295): adev_set_parameters: ERROR: set param called even when stream out is null
-
-03-02 03:37:57.002 D/audio_hw_primary(  295): out_set_parameters: enter: usecase(1: low-latency-playback) kvpairs: handle_fm=1048580
-03-02 03:37:57.002 D/audio_hw_fm(  295): audio_extn_fm_set_parameters: FM usecase
-03-02 03:37:57.002 D/audio_hw_fm(  295): fm_start: enter
-03-02 03:37:57.002 D/audio_hw_primary(  295): select_devices: out_snd_device(4: headphones) in_snd_device(0: )
-03-02 03:37:57.002 W/msm8974_platform(  295): Codec backend bitwidth 16, samplerate 48000
-03-02 03:37:57.002 D/hardware_info(  295): hw_info_append_hw_type : device_name = headphones
-03-02 03:37:57.002 D/audio_hw_primary(  295): select_devices: done
-03-02 03:37:57.012 D/audio_hw_fm(  295): fm_set_volume: (0.004660)
-03-02 03:37:57.012 D/audio_hw_fm(  295): fm_set_volume: Setting FM volume to 39 
-03-02 03:37:57.012 D/audio_hw_fm(  295): fm_start: exit: status(0)
-03-02 03:37:57.022 D/audio_hw_primary(  295): out_set_parameters: enter: usecase(1: low-latency-playback) kvpairs: routing=4
-03-02 03:37:57.022 D/s2comuti(11696): setDeviceConnectionState: ret: 0
-03-02 03:37:57.032 D/s2comuti(11696): output_audio_routing_get: output getDeviceConnectionState: ---- --00 -001 0001 0000 0000 0000 0111   ret_bits hex: 00110007    decimal: 1114119
-03-02 03:37:57.032 D/s2comuti(11696): input_audio_routing_get:   input getDeviceConnectionState: ---- ---- -000 -000 0000 0001 1101 0100   ret_bits hex: 000001D4    decimal: 468
-03-02 03:37:57.032 D/s2comapi(11696): service_update_send: phase: Success Starting Audio  cdown: 0
-
-*/
 
         // START pcm_write:
     if (enable_pcmwrite) {
-      if (pcm_write_thread_active)
-        com_uti.loge ("pcm_write_thread_active");
+      if (thread_pcm_write_active)
+        com_uti.loge ("thread_pcm_write_active");
       com_uti.logd ("m_samplerate: " + m_samplerate + "  m_channels: " + m_channels + "  m_audio_bufsize: " + m_audio_bufsize + "  m_audiotrack: " + m_audiotrack + "  m_audiorecord: " + m_audiorecord);
       try {
         m_audiotrack = new AudioTrack (audio_stream, m_samplerate, chan_out_get (m_channels), AudioFormat.ENCODING_PCM_16BIT, m_audio_bufsize, AudioTrack.MODE_STREAM);
@@ -1071,19 +1101,19 @@ public class svc_aud implements svc_aap, AudioManager.OnAudioFocusChangeListener
         else {
           m_audiotrack.play ();                                         // Start output
 
-          pcm_write_thread = new Thread (pcm_write_run, "pcm_write");
-          com_uti.logd ("pcm_write_thread: " + pcm_write_thread);
-          if (pcm_write_thread == null)
-            com_uti.loge ("pcm_write_thread == null");
+          thread_pcm_write = new Thread (run_pcm_write, "pcm_write");
+          com_uti.logd ("thread_pcm_write: " + thread_pcm_write);
+          if (thread_pcm_write == null)
+            com_uti.loge ("thread_pcm_write == null");
           else {
-            pcm_write_thread_active = true;
-            java.lang.Thread.State thread_state = pcm_write_thread.getState ();
+            thread_pcm_write_active = true;
+            java.lang.Thread.State thread_state = thread_pcm_write.getState ();
             if (thread_state == java.lang.Thread.State.NEW || thread_state == java.lang.Thread.State.TERMINATED) {
-              //com_uti.logd ("thread priority: " + pcm_write_thread.getPriority ());   // Get 5
-              pcm_write_thread.start ();
+              //com_uti.logd ("thread priority: " + thread_pcm_write.getPriority ());   // Get 5
+              thread_pcm_write.start ();
             }
             else
-              com_uti.loge ("pcm_write_thread thread_state: " + thread_state);
+              com_uti.loge ("thread_pcm_write thread_state: " + thread_state);
           }
         }
       }
@@ -1093,10 +1123,11 @@ public class svc_aud implements svc_aap, AudioManager.OnAudioFocusChangeListener
       }
     }
 
+
         // START pcm_read:
     if (enable_pcmread) {
-      if (pcm_read_thread_active)
-        com_uti.loge ("pcm_read_thread_active");
+      if (thread_pcm_read_active)
+        com_uti.loge ("thread_pcm_read_active");
       com_uti.logd ("m_samplerate: " + m_samplerate + "  m_channels: " + m_channels + "  m_audio_bufsize: " + m_audio_bufsize + "  m_audiotrack: " + m_audiotrack + "  m_audiorecord: " + m_audiorecord);
       try {
         m_audiorecord = audio_record_get ();
@@ -1110,20 +1141,20 @@ public class svc_aud implements svc_aap, AudioManager.OnAudioFocusChangeListener
           com_uti.logd ("audiorecord_sessid_int: " + audiorecord_sessid_int);
           audiorecord_info_log ();
 
-          pcm_read_thread = new Thread (pcm_read_run, "pcm_read");
-          com_uti.logd ("pcm_read_thread: " + pcm_read_thread);
-          if (pcm_read_thread == null)
-            com_uti.loge ("pcm_read_thread == null");
+          thread_pcm_read = new Thread (run_pcm_read, "pcm_read");
+          com_uti.logd ("thread_pcm_read: " + thread_pcm_read);
+          if (thread_pcm_read == null)
+            com_uti.loge ("thread_pcm_read == null");
           else {
-            pcm_read_thread_active = true;
+            thread_pcm_read_active = true;
 
-            java.lang.Thread.State thread_state = pcm_read_thread.getState ();
+            java.lang.Thread.State thread_state = thread_pcm_read.getState ();
             if (thread_state == java.lang.Thread.State.NEW || thread_state == java.lang.Thread.State.TERMINATED) {
-              //com_uti.logd ("thread priority: " + pcm_read_thread.getPriority ());   // Get 5
-              pcm_read_thread.start ();
+              //com_uti.logd ("thread priority: " + thread_pcm_read.getPriority ());   // Get 5
+              thread_pcm_read.start ();
             }
             else
-              com_uti.loge ("pcm_read_thread thread_state: " + thread_state);
+              com_uti.loge ("thread_pcm_read thread_state: " + thread_state);
           }
         }
       }
@@ -1133,15 +1164,19 @@ public class svc_aud implements svc_aap, AudioManager.OnAudioFocusChangeListener
       }
     }
 
+
         // SETUP audio_mode in daemon and start audio from daemon:
         // If analog mode or if digital mode with a pseudo-source (non-direct) and not microphone test mode...
     if (enable_daemonaudio) {
-      if (is_analog_audio_mode () || (m_aud_src <= 8 && ! com_uti.file_get ("/sdcard/spirit/aud_mic"))) {
+      if (is_analog_audio_mode () || (m_aud_src <= 8 && is_digital_audio_mode ())) {
 
         if (is_analog_audio_mode ())                                    // If Analog, set daemon to analog...
           com_uti.daemon_set ("audio_mode", "Analog");
         else                                                            // Else if Digital, set daemon to digital...
           com_uti.daemon_set ("audio_mode", "Digital");
+
+        if (is_digital_audio_mode () && com_uti.android_version >= 21 && m_com_api.chass_plug_aud.equals ("OM7") && com_uti.file_get ("/system/framework/htcirlibs.jar")) // If HTC One M7 GPE       (Stock Android 5 too ????)
+          com_uti.quiet_ms_sleep (2000);                                // !! Else get microphone 1500 ms not enough sometimes
 
         com_uti.daemon_set ("audio_state", "Start");                    // Analog: Enable audio directly to output. Digital: Switch from microphone to FM
       }
@@ -1166,11 +1201,11 @@ public class svc_aud implements svc_aap, AudioManager.OnAudioFocusChangeListener
     com_uti.logd ("m_audiotrack: " + m_audiotrack + "  m_audiorecord: " + "  m_com_api.audio_state: " + m_com_api.audio_state);
 
         // STOP pcm_read:
-    com_uti.logd ("pcm_read_thread: " + pcm_read_thread + "  pcm_read_thread_active: " + pcm_read_thread_active);
-    if (pcm_read_thread_active) {
-      pcm_read_thread_active = false;
-      if (pcm_read_thread != null)
-        pcm_read_thread.interrupt ();
+    com_uti.logd ("thread_pcm_read: " + thread_pcm_read + "  thread_pcm_read_active: " + thread_pcm_read_active);
+    if (thread_pcm_read_active) {
+      thread_pcm_read_active = false;
+      if (thread_pcm_read != null)
+        thread_pcm_read.interrupt ();
 
       if (m_audiorecord != null) {
         m_audiorecord.stop ();                                        // No pause for audioRecord, only stop
@@ -1180,11 +1215,11 @@ public class svc_aud implements svc_aap, AudioManager.OnAudioFocusChangeListener
     }
 
         // STOP pcm_write:
-    com_uti.logd ("pcm_write_thread: " + pcm_write_thread + "  pcm_write_thread_active: " + pcm_write_thread_active);
-    if (pcm_write_thread_active) {
-      pcm_write_thread_active = false;
-      if (pcm_write_thread != null)
-        pcm_write_thread.interrupt ();
+    com_uti.logd ("thread_pcm_write: " + thread_pcm_write + "  thread_pcm_write_active: " + thread_pcm_write_active);
+    if (thread_pcm_write_active) {
+      thread_pcm_write_active = false;
+      if (thread_pcm_write != null)
+        thread_pcm_write.interrupt ();
     }
     if (m_audiotrack != null)
       m_audiotrack.pause ();                                            // Pause Audiotrack
@@ -1193,12 +1228,19 @@ public class svc_aud implements svc_aap, AudioManager.OnAudioFocusChangeListener
     if (enable_stockmode)                                               // For stock mode:
        com_uti.setDeviceConnectionState (fm_device, com_uti.DEVICE_STATE_UNAVAILABLE, "");
 
+    boolean muted = false;
     if (enable_daemonaudio) {
         // If analog mode or...
         // If digital mode with a pseudo-source and not in the special microphone test mode...
-      if (is_analog_audio_mode () || (m_aud_src <= 8 && ! com_uti.file_get ("/sdcard/spirit/aud_mic")))
+      if (is_analog_audio_mode () || (m_aud_src <= 8 && is_digital_audio_mode ())) {
         com_uti.daemon_set ("audio_state", "Stop");                     // Analog: Disable audio directly to output. Digital: Switch from FM to microphone (or at least turn FM path off, if needed)
+        muted = true;
+      }
     }
+    if (! muted)
+      com_uti.daemon_set ("tuner_mute", "Mute");  // !!!! Ensure tuner is muted to avoid phone call interference !!!! Unmuted when audio restarts
+
+
 
     //if (enable_daemonvolume)
     //  com_uti.logd ("Could/should restore volume here: " + volume_restore ());  // Restore system and chip tuner volume as needed
@@ -1294,10 +1336,10 @@ public class svc_aud implements svc_aap, AudioManager.OnAudioFocusChangeListener
 
   public String audio_output_set (String new_audio_output, boolean restart_param) {
 
-    com_uti.logd ("s2_tx: " + s2_tx + "  m_hdst_plgd: " + m_hdst_plgd + "  restart_param: " + restart_param + "  api audio_state: " + m_com_api.audio_state + "  api audio_output: " + m_com_api.audio_output + "  new_audio_output: " + new_audio_output
+    com_uti.logd ("m_hdst_plgd: " + m_hdst_plgd + "  restart_param: " + restart_param + "  api audio_state: " + m_com_api.audio_state + "  api audio_output: " + m_com_api.audio_output + "  new_audio_output: " + new_audio_output
               + "  audio_output_get: " + audio_output_get ());
 
-    if (s2_tx)                                                          // Do nothing if transmit mode...
+    if (com_uti.s2_tx_apk ())                                           // Do nothing if transmit APK...
       return (m_com_api.audio_output = new_audio_output);
 
     boolean lg2_restart = restart_param;                                // If param restart, then LG2 restart...
@@ -1351,8 +1393,10 @@ public class svc_aud implements svc_aap, AudioManager.OnAudioFocusChangeListener
     //if (lg2_restart)                                                  // Without lg2_restart, speaker audio is really messed up   See above at function start; doesn't matter where sleep happens
     //  com_uti.ms_sleep (3000);
 
-    if (restart_enable)
+    if (restart_enable) {
       mode_audio_start ();                                              // Start audio at hardware level based on mode.
+      com_uti.daemon_set ("tuner_mute", "Unmute");                      // !!!! Ensure tuner is unmuted to allow GS2 speaker mode change without needing Pause/Play
+    }
 
     com_uti.output_audio_routing_get ();                                // Log audio routing
 

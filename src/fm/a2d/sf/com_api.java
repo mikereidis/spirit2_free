@@ -1,5 +1,6 @@
 
     // Radio Service API:
+
 package fm.a2d.sf;
 
 import android.app.PendingIntent;
@@ -63,7 +64,7 @@ public class com_api {
   public  String tuner_api_mode     = "UART";                           // Default "" or "UART" or "SHIM"
   public  String tuner_api_state    = "Stop";
 
-  public  String tuner_band         = "";                               // RW CFG set Values:   US, EU, JAPAN, CHINA, EU_50K_OFFSET     (Set before Tuner Start)
+  public  String tuner_band         = "";                               // RW CFG set Values:   US, EU, UU
   public  String tuner_freq         = "";                               // RW CFG api Values:   String  form: 50.000 - 499.999  (76-108 MHz)
   public int     tuner_freq_int     = 0;                                // ""                 Integer form in kilohertz
 
@@ -118,21 +119,21 @@ public class com_api {
     PendingIntent pi = PendingIntent.getService (context, request_code, intent, PendingIntent.FLAG_UPDATE_CURRENT);
     return (pi);
   }
-
+///*
   public void key_set (String key, String val, String key2, String val2) {  // Presets currently require simultaneous preset frequency and name
     num_key_set ++;
     com_uti.logd ("key: " + key + "  val: " + val + "  key2: " + key2 + "  val2: " + val2);
     Intent intent = new Intent (com_uti.api_action_id);
-    /*if (intent == null) {
-      com_uti.loge ("intent == null");
-      return;
-    }*/
+    //if (intent == null) {
+    //  com_uti.loge ("intent == null");
+    //  return;
+    //}
     intent.setClass (m_context, svc_svc.class);
     intent.putExtra (key, val);
     intent.putExtra (key2, val2);
     m_context.startService (intent);
   }
-
+//*/
   public void key_set (String key, String val) {
     num_key_set ++;
     try {
@@ -144,9 +145,7 @@ public class com_api {
       }*/
 
       //intent.setClass (m_context, svc_svc.class);
-      intent.setComponent (new android.content.ComponentName ("fm.a2d.sf",
-            "fm.a2d.sf.svc_svc"));  // Seperate lines for single pass sed
-
+      intent.setComponent (new android.content.ComponentName ("fm.a2d.sf", "fm.a2d.sf.svc_svc"));
       intent.putExtra (key, val);
       if (m_context != null)
         m_context.startService (intent);
@@ -186,7 +185,7 @@ public class com_api {
 
   public void api_service_update (Intent intent) {
     num_api_service_update ++;
-    com_uti.logw ("num_api_service_update: " + num_api_service_update + "  intent: " + intent);
+    com_uti.logv ("num_api_service_update: " + num_api_service_update + "  intent: " + intent);
 
     Bundle extras = intent.getExtras ();
 

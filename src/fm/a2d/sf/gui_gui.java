@@ -96,8 +96,9 @@ public class gui_gui implements gui_gap {//, gui_dlg.gui_dlg_lstnr {
 
     // Radio Group/Buttons:
   private RadioGroup    m_rg_band   = null;;
-  private RadioButton   rb_band_us  = null;
   private RadioButton   rb_band_eu  = null;
+  private RadioButton   rb_band_us  = null;
+  private RadioButton   rb_band_uu  = null;
 
     // Checkboxes:
   private CheckBox      cb_speaker  = null;
@@ -332,14 +333,17 @@ public class gui_gui implements gui_gap {//, gui_dlg.gui_dlg_lstnr {
 
     m_iv_record = (ImageView) m_gui_act.findViewById (R.id.iv_record);
     m_iv_record.setOnClickListener (short_click_lstnr);
+    //m_iv_record.setOnLongClickListener (long_click_lstnr);
     m_iv_record.setId (R.id.iv_record);
 
     m_iv_menu = (ImageView) m_gui_act.findViewById (R.id.iv_menu);
     m_iv_menu.setOnClickListener (short_click_lstnr);
+    m_iv_menu.setOnLongClickListener (long_click_lstnr);
     m_iv_menu.setId (R.id.iv_menu);
 
-    rb_band_us = (RadioButton) m_gui_act.findViewById (R.id.rb_band_us);
     rb_band_eu = (RadioButton) m_gui_act.findViewById (R.id.rb_band_eu);
+    rb_band_us = (RadioButton) m_gui_act.findViewById (R.id.rb_band_us);
+    rb_band_uu = (RadioButton) m_gui_act.findViewById (R.id.rb_band_uu);
 
     cb_speaker = (CheckBox) m_gui_act.findViewById (R.id.cb_speaker);
 
@@ -413,7 +417,10 @@ public class gui_gui implements gui_gap {//, gui_dlg.gui_dlg_lstnr {
 
         // !! tuner_band_set() is now the first thing that starts svc_svc, if not already started
 
-    if (gui_start_count <= 1) {                                         // If first 1 runs...
+    m_com_api.chass_plug_aud = com_uti.chass_plug_aud_get (m_context);  // Setup Audio Plugin
+    m_com_api.chass_plug_tnr = com_uti.chass_plug_tnr_get (m_context);  // Setup Tuner Plugin
+
+    if (gui_start_count <= 1) {// If known device and first 1 runs...
       String cc = com_uti.country_get (m_context).toUpperCase ();
       if (cc.equals ("US") || cc.equals ("CA") || cc.equals ("MX")) {   // If USA, Canada or Mexico
         com_uti.logd ("Setting band US");
@@ -425,19 +432,31 @@ public class gui_gui implements gui_gap {//, gui_dlg.gui_dlg_lstnr {
       }
     }
 
-    if (! com_uti.quiet_file_get ("/dev/s2d_running"))                // If daemon not running
-      m_gui_act.showDialog (DAEMON_START_DIALOG);                     // Show the Start dialog
+    if (! com_uti.file_get ("/dev/s2d_running"))                        // If daemon not running
+      m_gui_act.showDialog (DAEMON_START_DIALOG);                       // Show the Start dialog
 
     String band = com_uti.prefs_get (m_context, "tuner_band", "EU");
-    tuner_band_set (band);
-    if (m_com_api.tuner_band.equals ("US")) {
+    //if (! m_com_api.chass_plug_aud.equals ("UNK"))
+      tuner_band_set (band);
+    if (m_com_api.tuner_band.equals ("EU")) {
+      rb_band_eu.setChecked (true);
+      rb_band_us.setChecked (false);
+      rb_band_uu.setChecked (false);
+    }
+    else if (m_com_api.tuner_band.equals ("US")) {
       rb_band_eu.setChecked (false);
       rb_band_us.setChecked (true);
+      rb_band_uu.setChecked (false);
+    }
+    else if (m_com_api.tuner_band.equals ("UU")) {
+      rb_band_eu.setChecked (false);
+      rb_band_us.setChecked (false);
+      rb_band_uu.setChecked (true);
     }
 
     load_prefs ();
 
-    if (! m_com_api.tuner_state.equals ("Start"))             // If tuner not started...
+    if (! m_com_api.chass_plug_aud.equals ("UNK") && ! m_com_api.tuner_state.equals ("Start"))             // If known device and tuner not started...
       m_com_api.key_set ("audio_state", "Start");                       // Start audio service (which starts tuner (and daemon) first, if not already started)
 
     gui_init = true;
@@ -500,7 +519,7 @@ public class gui_gui implements gui_gap {//, gui_dlg.gui_dlg_lstnr {
           com_uti.logd ("via gui_dia abort tuner_state: " + m_com_api.tuner_state);
           return (false);                                               // Not Consumed
         }
-        if (last_dial_freq < 87500 || last_dial_freq > 108000)
+        if (last_dial_freq < com_uti.band_freq_lo || last_dial_freq > com_uti.band_freq_hi)
           return (false);                                               // Not Consumed
         m_com_api.key_set ("tuner_freq", "" + last_dial_freq);
         return (true);                                                  // Consumed
@@ -517,7 +536,7 @@ public class gui_gui implements gui_gap {//, gui_dlg.gui_dlg_lstnr {
         freq += 25;
         freq /= 50;
         freq *= 50;
-        if (freq < 87500 || freq > 108000)
+        if (freq < com_uti.band_freq_lo || freq > com_uti.band_freq_hi)
           return (false);                                               // Not Consumed
         freq = com_uti.tnru_freq_enforce (freq);
         com_uti.logd ("via gui_dia freq: " + freq + "  curr_time: " + curr_time + "  last_rotate_time: " + last_rotate_time);
@@ -744,8 +763,70 @@ public class gui_gui implements gui_gap {//, gui_dlg.gui_dlg_lstnr {
 
   private Dialog gui_debug_dialog_create (final int id) {
     com_uti.logd ("id: " + id);
+
     AlertDialog.Builder dlg_bldr = new AlertDialog.Builder (m_context);
+    dlg_bldr.setTitle ("Debug");
+    ArrayList <String> array_list = new ArrayList <String> ();
+    array_list.add ("SHIM");
+    array_list.add ("ACDB");
+    array_list.add ("Log");
+    array_list.add ("Digital");
+    array_list.add ("Analog");
+    //array_list.add ("SELinux On");
+    //array_list.add ("SELinux Off");
+
+    dlg_bldr.setOnCancelListener (new DialogInterface.OnCancelListener () {
+      public void onCancel (DialogInterface dialog) {
+      }
+    });
+
+    String [] items = new String [array_list.size ()];
+    array_list.toArray (items);
+
+    dlg_bldr.setItems (items, new DialogInterface.OnClickListener () {
+      public void onClick (DialogInterface dialog, int item) {
+        com_uti.logd ("item: " + item);
+        gui_debug_menu_select (item);
+      }
+
+    });
+
     return (dlg_bldr.create ());
+  }
+  public boolean gui_debug_menu_select (int itemid) {
+    int ret = 0;
+    com_uti.logd ("itemid: " + itemid);                                 // When "Settings" is selected, after pressing Menu key
+    switch (itemid) {
+      case 0:
+        m_gui_act.showDialog (GUI_SHIM_DIALOG);
+        return (true);
+      case 1:
+        m_gui_act.showDialog (GUI_ACDB_DIALOG);
+        return (true);
+      case 2:
+        logs_email ();
+        return (true);
+      case 3:
+        m_com_api.key_set ("audio_mode", "Digital");
+        Toast.makeText (m_context, "audio_mode = Digital", Toast.LENGTH_LONG).show ();
+        return (true);
+      case 4:
+        m_com_api.key_set ("audio_mode", "Analog");
+        Toast.makeText (m_context, "audio_mode = Analog", Toast.LENGTH_LONG).show ();
+        return (true);
+/*
+      case 5:
+        ret = com_uti.sys_run ("setenforce 1", true);
+        Toast.makeText (m_context, "setenforce 1 ret: " + ret, Toast.LENGTH_LONG).show ();
+        return (true);
+      case 6:
+        Toast.makeText (m_context, "DISABLING SELINUX IS BAD FOR SECURITY !!!! ; USE FOR TESTING ONLY !!", Toast.LENGTH_LONG).show ();
+        ret = com_uti.sys_run ("setenforce 0", true);
+        Toast.makeText (m_context, "setenforce 0 ret: " + ret, Toast.LENGTH_LONG).show ();
+        return (true);
+*/
+    }
+    return (false);                                                     // Not consumed ?
   }
 
   private Dialog gui_about_dialog_create (final int id) {
@@ -766,9 +847,15 @@ public class gui_gui implements gui_gap {//, gui_dlg.gui_dlg_lstnr {
       }
     });
 
+    dlg_bldr.setNeutralButton ("Debug", new DialogInterface.OnClickListener () {
+      public void onClick (DialogInterface dialog, int whichButton) {
+        m_gui_act.showDialog (GUI_DEBUG_DIALOG);                        // Show the Debug dialog
+      }
+    });
+
     dlg_bldr.setPositiveButton ("Google Play", new DialogInterface.OnClickListener () {
       public void onClick (DialogInterface dialog, int whichButton) {
-        purchase ("fm.a2d." + "s2");  // Avoid app name change
+        purchase ("fm.a2d." + "s2");                                    // Split string to avoid app name change by scripts
       }
     });
 
@@ -776,13 +863,46 @@ public class gui_gui implements gui_gap {//, gui_dlg.gui_dlg_lstnr {
   }
 
   private Dialog gui_shim_dialog_create (final int id) {
+/*  Code from svc_svc:
+      boolean unfriendly_auto_install_and_reboot = false;
+      if (unfriendly_auto_install_and_reboot) {
+        if (! com_uti.shim_files_operational_get ()) {                    // If shim files not operational...
+          if (com_uti.bt_get ()) {                                        // July 31, 2014: only install shim if BT is on
+            com_uti.bt_set (false, true);                                 // Bluetooth off, and wait for off
+
+            com_uti.rfkill_bt_wait (false);     // Wait for BT off
+            //com_uti.logd ("Start 4 second delay after BT Off");
+            //com_uti.ms_sleep (4000);                                      // Extra 4 second delay to ensure BT is off !!
+            //com_uti.logd ("End 4 second delay after BT Off");
+
+            com_uti.shim_install ();                                      // Install shim
+
+            com_uti.bt_set (true, true);                                  // Bluetooth on, and wait for on  (Need to set BT on so reboot has it on.)
+
+            //Toast.makeText (m_context, "WARM RESTART PENDING FOR SHIM INSTALL !!", Toast.LENGTH_LONG).show ();  java.lang.RuntimeException: Can't create handler inside thread that has not called Looper.prepare()
+            // Don't need a delay before reboot because BT is on enough to stay on after reboot
+            //com_uti.sys_WAS_run ("kill `pidof system_server`", true);
+
+            com_uti.sys_run ("reboot now", true);                         // M7 GPE requires reboot
+
+            fresh_shim_install = true;
+          }
+        }
+      }//if (unfriendly_auto_install_and_reboot) {
+*/
     com_uti.logd ("id: " + id);
 
     AlertDialog.Builder dlg_bldr = new AlertDialog.Builder (m_context);
 
-    dlg_bldr.setTitle ("SpiritF " + com_uti.app_version_get (m_context));
+    dlg_bldr.setTitle ("Bluetooth SHIM");
 
-    String menu_msg = "Select Cancel, Install BT Shim, Remove BT Shim.";
+    String menu_msg = "";
+    menu_msg += "BT SHIM is only needed when BT is on for HTC One M7, LG G2, Xperia Z2/Z3.\n\n";
+
+    menu_msg += "LG G2 can have audio problems unless SpiritF run once with BT off.\n\n";
+
+    menu_msg += "Select: Install BT Shim to install. Reboot after.\n";
+    menu_msg += "Select: Remove BT Shim to remove.";
     dlg_bldr.setMessage (menu_msg);
 
     dlg_bldr.setNegativeButton ("Cancel", new DialogInterface.OnClickListener () {
@@ -790,7 +910,7 @@ public class gui_gui implements gui_gap {//, gui_dlg.gui_dlg_lstnr {
       }
     });
 
-    dlg_bldr.setNeutralButton ("IBTS", new DialogInterface.OnClickListener () {
+    dlg_bldr.setNeutralButton ("Install", new DialogInterface.OnClickListener () {
       public void onClick (DialogInterface dialog, int whichButton) {
         if (com_uti.shim_files_operational_get ()) {
           boolean reinstall_destroys_original = true;
@@ -809,7 +929,7 @@ public class gui_gui implements gui_gap {//, gui_dlg.gui_dlg_lstnr {
       }
     });
 
-    dlg_bldr.setPositiveButton ("RBTS", new DialogInterface.OnClickListener () {
+    dlg_bldr.setPositiveButton ("Remove", new DialogInterface.OnClickListener () {
       public void onClick (DialogInterface dialog, int whichButton) {
         if (com_uti.shim_files_operational_get ()) {
           Toast.makeText (m_context, "Shim file installed. Removing...", Toast.LENGTH_LONG).show ();
@@ -828,9 +948,13 @@ public class gui_gui implements gui_gap {//, gui_dlg.gui_dlg_lstnr {
 
     AlertDialog.Builder dlg_bldr = new AlertDialog.Builder (m_context);
 
-    dlg_bldr.setTitle ("SpiritF " + com_uti.app_version_get (m_context));
+    dlg_bldr.setTitle ("ACDB Fix");
 
-    String menu_msg = "Select Cancel, Install ACDB Fix, Remove ACDB Fix.";
+    String menu_msg = "";
+    menu_msg += "ACDB Fix is only needed when sound is bad on LG G3, Xperia Z1/2/3.\n\n";
+
+    menu_msg += "Select: Install to install. Restart SpiritF after 10 seconds.\n";
+    menu_msg += "Select: Remove to remove.";
     dlg_bldr.setMessage (menu_msg);
 
     dlg_bldr.setNegativeButton ("Cancel", new DialogInterface.OnClickListener () {     //
@@ -838,7 +962,7 @@ public class gui_gui implements gui_gap {//, gui_dlg.gui_dlg_lstnr {
       }
     });
 
-    dlg_bldr.setNeutralButton ("IAF", new DialogInterface.OnClickListener () {
+    dlg_bldr.setNeutralButton ("Install", new DialogInterface.OnClickListener () {
       public void onClick (DialogInterface dialog, int whichButton) {
         /*if (com_uti.acdbfix_files_operational_get ()) {
           boolean reinstall_destroys_original = true;
@@ -854,19 +978,19 @@ public class gui_gui implements gui_gap {//, gui_dlg.gui_dlg_lstnr {
           Toast.makeText (m_context, "ACDB Fix installing...", Toast.LENGTH_LONG).show ();
 
           m_com_api.key_set ("tuner_state", "Stop");
-          com_uti.ms_sleep (2000);
+          com_uti.quiet_ms_sleep (2000);
           com_uti.acdbfix_install (m_context);
         //}
       }
     });
 
-    dlg_bldr.setPositiveButton ("RAF", new DialogInterface.OnClickListener () {
+    dlg_bldr.setPositiveButton ("Remove", new DialogInterface.OnClickListener () {
       public void onClick (DialogInterface dialog, int whichButton) {
         //if (com_uti.acdbfix_files_operational_get ()) {
           Toast.makeText (m_context, "ACDB Fix installed. Removing...", Toast.LENGTH_LONG).show ();
 
           m_com_api.key_set ("tuner_state", "Stop");
-          com_uti.ms_sleep (2000);
+          com_uti.quiet_ms_sleep (2000);
           com_uti.acdbfix_remove (m_context);
         /*}
         else
@@ -883,21 +1007,21 @@ public class gui_gui implements gui_gap {//, gui_dlg.gui_dlg_lstnr {
     com_uti.logd ("id: " + id);
 
     AlertDialog.Builder dlg_bldr = new AlertDialog.Builder (m_context);
-    dlg_bldr.setTitle ("SpiritF Menu");
+    dlg_bldr.setTitle ("SpiritF " + com_uti.app_version_get (m_context));
     ArrayList <String> array_list = new ArrayList <String> ();
     array_list.add ("Set");
     if (free)
       array_list.add ("Go Pro");
     else
       array_list.add ("EQ");
-    array_list.add ("Test");
-    array_list.add ("Debug");
-    array_list.add ("SHIM");
-    array_list.add ("ACDB");
+    //array_list.add ("SHIM");
+    //array_list.add ("ACDB");
     array_list.add ("About");
-    array_list.add ("Digital");
-    array_list.add ("Analog");
+    //array_list.add ("Digital");
+    //array_list.add ("Analog");
     //array_list.add ("Sleep");
+    //array_list.add ("Test");
+    //array_list.add ("Debug");
 
     dlg_bldr.setOnCancelListener (new DialogInterface.OnCancelListener () {
       public void onCancel (DialogInterface dialog) {
@@ -923,14 +1047,14 @@ public class gui_gui implements gui_gap {//, gui_dlg.gui_dlg_lstnr {
 
   private static final int MENU_SET     = 0;
   private static final int MENU_EQ      = 1;
-  private static final int MENU_TEST    = 2;
-  private static final int MENU_DEBUG   = 3;
-  private static final int MENU_SHIM    = 4;
-  private static final int MENU_ACDB    = 5;
-  private static final int MENU_ABOUT   = 6;
-  private static final int MENU_DIG     = 7;
-  private static final int MENU_ANA     = 8;
-  //private static final int MENU_SLEEP   = 9;
+  private static final int MENU_ABOUT   = 2;
+  //private static final int MENU_SHIM    = 2;
+  //private static final int MENU_ACDB    = 3;
+  //private static final int MENU_DIG     = 5;
+  //private static final int MENU_ANA     = 6;
+  //private static final int MENU_SLEEP   = 7;
+  //private static final int MENU_TEST    = 8;
+  //private static final int MENU_DEBUG   = 9;
 
   public boolean gap_menu_create (Menu menu) {
     com_uti.logd ("menu: " + menu);
@@ -940,14 +1064,14 @@ public class gui_gui implements gui_gap {//, gui_dlg.gui_dlg_lstnr {
         menu.add (Menu.NONE, MENU_EQ,   Menu.NONE,       "Go Pro");
       else
         menu.add (Menu.NONE, MENU_EQ,   Menu.NONE,          "EQ");
-      menu.add (Menu.NONE, MENU_TEST,   Menu.NONE,         "Test");//.setIcon (R.drawable.ic_menu_view);
-      menu.add (Menu.NONE, MENU_DEBUG,  Menu.NONE,        "Debug");//.setIcon (R.drawable.ic_menu_help);
-      menu.add (Menu.NONE, MENU_SHIM,   Menu.NONE,         "SHIM");//.setIcon (R.drawable.ic_menu_view);
-      menu.add (Menu.NONE, MENU_ACDB,   Menu.NONE,         "ACDB");//.setIcon (R.drawable.ic_menu_help);
+      //menu.add (Menu.NONE, MENU_SHIM,   Menu.NONE,         "SHIM");//.setIcon (R.drawable.ic_menu_view);
+      //menu.add (Menu.NONE, MENU_ACDB,   Menu.NONE,         "ACDB");//.setIcon (R.drawable.ic_menu_help);
       menu.add (Menu.NONE, MENU_ABOUT,  Menu.NONE,        "About");//.setIcon (R.drawable.ic_menu_info_details);
-      menu.add (Menu.NONE, MENU_DIG,    Menu.NONE,      "Digital");
-      menu.add (Menu.NONE, MENU_ANA,    Menu.NONE,       "Analog");
+      //menu.add (Menu.NONE, MENU_DIG,    Menu.NONE,      "Digital");
+      //menu.add (Menu.NONE, MENU_ANA,    Menu.NONE,       "Analog");
       //menu.add (Menu.NONE, MENU_SLEEP,  Menu.NONE,        "Sleep");//.setIcon (R.drawable.ic_lock_power_off);
+      //menu.add (Menu.NONE, MENU_TEST,   Menu.NONE,         "Test");//.setIcon (R.drawable.ic_menu_view);
+      //menu.add (Menu.NONE, MENU_DEBUG,  Menu.NONE,        "Debug");//.setIcon (R.drawable.ic_menu_help);
     }
     catch (Throwable e) {
       com_uti.loge ("Exception: " + e);
@@ -964,20 +1088,14 @@ public class gui_gui implements gui_gap {//, gui_dlg.gui_dlg_lstnr {
         return (true);
       case MENU_EQ:
         if (free)
-          purchase ("fm.a2d." + "s2");                                  // Avoid app name change
+          purchase ("fm.a2d." + "s2");                                  // Split string to avoid app name change by scripts
         else
           eq_start ();
-        return (true);
-      case MENU_TEST:
-        m_gui_act.showDialog (GUI_TEST_DIALOG);
-        return (true);
-      case MENU_DEBUG:
-        m_gui_act.showDialog (GUI_DEBUG_DIALOG);
         return (true);
       case MENU_ABOUT:
         m_gui_act.showDialog (GUI_ABOUT_DIALOG);
         return (true);
-      case MENU_SHIM:
+      /*case MENU_SHIM:
         m_gui_act.showDialog (GUI_SHIM_DIALOG);
         return (true);
       case MENU_ACDB:
@@ -988,13 +1106,18 @@ public class gui_gui implements gui_gap {//, gui_dlg.gui_dlg_lstnr {
         return (true);
       case MENU_ANA:
         m_com_api.key_set ("audio_mode", "Analog");
-        return (true);
+        return (true);*/
       //case MENU_SLEEP:
       //  return (true);
+      //case MENU_TEST:
+      //  m_gui_act.showDialog (GUI_TEST_DIALOG);
+      //  return (true);
+      /*case MENU_DEBUG:
+        m_gui_act.showDialog (GUI_DEBUG_DIALOG);
+        return (true);*/
     }
     return (false);                                                     // Not consumed ?
   }
-
 
     // Root daemon stuff:
 
@@ -1052,7 +1175,7 @@ public class gui_gui implements gui_gap {//, gui_dlg.gui_dlg_lstnr {
     com_uti.logd ("id: " + id);
     AlertDialog.Builder dlg_bldr = new AlertDialog.Builder (m_context);
     dlg_bldr.setTitle ("SpiritF " + com_uti.app_version_get (m_context));
-    String daemon_msg = "ERROR: Root Daemon did not start after " + (svc_tnr.daemon_start_timout_s) + "  seconds.\n\n" +
+    String daemon_msg = "ERROR: Root Daemon did not start or stop after " + (svc_tnr.service_timeout_daemon_start) + "  seconds.\n\n" +
                         "SpiritF REQUIRES Root and did not get it.\n\n" +
                         "You need to tap System Settings-> About phone-> Build 7 times to enable System Settings-> Developer Options.\n\n" +
                         "Then in Developer Options you need to set Root access to Apps or Apps and ADB.\n\n" +
@@ -1065,7 +1188,7 @@ public class gui_gui implements gui_gap {//, gui_dlg.gui_dlg_lstnr {
     com_uti.logd ("id: " + id);
     AlertDialog.Builder dlg_bldr = new AlertDialog.Builder (m_context);
     dlg_bldr.setTitle ("SpiritF " + com_uti.app_version_get (m_context));
-    String daemon_msg = "ERROR: Tuner API did not start.\n\n" +
+    String daemon_msg = "ERROR: Tuner API did not start or stop.\n\n" +
                         "This device may need a kernel with a working FM driver.\n\n";
     dlg_bldr.setMessage (daemon_msg);
     return (dlg_bldr.create ());
@@ -1075,7 +1198,7 @@ public class gui_gui implements gui_gap {//, gui_dlg.gui_dlg_lstnr {
     com_uti.logd ("id: " + id);
     AlertDialog.Builder dlg_bldr = new AlertDialog.Builder (m_context);
     dlg_bldr.setTitle ("SpiritF " + com_uti.app_version_get (m_context));
-    String daemon_msg = "ERROR: Tuner did not start.\n\n" +
+    String daemon_msg = "ERROR: Tuner did not start or stop.\n\n" +
                         "This device may need a kernel with a working FM driver.\n\n";
     dlg_bldr.setMessage (daemon_msg);
     return (dlg_bldr.create ());
@@ -1109,8 +1232,6 @@ public class gui_gui implements gui_gap {//, gui_dlg.gui_dlg_lstnr {
 
 
     // Regional settings:
-  private static final int        m_freq_lo   = 87500;
-  private static final int        m_freq_hi   = 108000;
 
   private Dialog freq_set_dialog_create (final int id) {                   // Set new frequency
     com_uti.logd ("id: " + id);
@@ -1265,14 +1386,14 @@ int f_freq_hi = 399999;
     }
     else if (freq > 199999 && freq < 400000) {                          // Codes 200.000 - 299.999 / 300.000 - 399.999 = get/set private Broadcom/Qualcomm control
       m_com_api.key_set ("tuner_extension", "" + freq);
-      com_uti.logd ("get/set private Qualcomm/V4L control: " + freq);
+      com_uti.logd ("get/set tuner extension: " + freq);
       return;
     }
     else if (freq <= 40001 && freq >= 39999) {                          // Code 40 = logs_email
       logs_email ();
       return;
     }
-    else if (freq >= m_freq_lo && freq <= m_freq_hi) {
+    else if (freq >= com_uti.band_freq_lo && freq <= com_uti.band_freq_hi) {
       com_uti.logd ("Frequency changing to : " + freq + " KHz");
       m_com_api.key_set ("tuner_freq", "" + freq);
     }
@@ -1298,7 +1419,7 @@ int f_freq_hi = 399999;
     }
 
                                                                         // Power button is always enabled
-    m_iv_record.setEnabled  (pwr);
+    m_iv_record.setEnabled  (true);//pwr);      // Leave record button enabled for debug log
     m_iv_seekup.setEnabled  (pwr);
     m_iv_seekdn.setEnabled  (pwr);
     m_tv_rt.setEnabled      (pwr);
@@ -1376,26 +1497,22 @@ int f_freq_hi = 399999;
       err_str = "ERROR " + err  + " " + svc_phase;
 
     if (err_str.toLowerCase ().contains ("daemon")) {
-    //if (m_com_api.chass_phase.equals ("ERROR Starting Daemon") || m_com_api.chass_phase.equals ("TIMEOUT Starting Daemon")) {
       com_uti.loge ("ERROR Daemon /dev/s2d_running: " + com_uti.quiet_file_get ("/dev/s2d_running"));
       daemon_start_dialog_dismiss ();
       //if (! com_uti.quiet_file_get ("/dev/s2d_running"))
         m_gui_act.showDialog (DAEMON_ERROR_DIALOG);
     }
     else if (err_str.toLowerCase ().contains ("tuner api")) {
-    //else if (m_com_api.chass_phase.equals ("ERROR Starting Tuner API")) {
       com_uti.loge ("ERROR Tuner API /dev/s2d_running: " + com_uti.quiet_file_get ("/dev/s2d_running"));
       daemon_start_dialog_dismiss ();
       m_gui_act.showDialog (TUNER_API_ERROR_DIALOG);
     }
     else if (err_str.toLowerCase ().contains ("tuner")) {
-    //else if (m_com_api.chass_phase.equals ("ERROR Starting Tuner")) {
       com_uti.loge ("ERROR Tuner /dev/s2d_running: " + com_uti.quiet_file_get ("/dev/s2d_running"));
       daemon_start_dialog_dismiss ();
       m_gui_act.showDialog (TUNER_ERROR_DIALOG);
     }
     else if (err_str.toLowerCase ().contains ("bluetooth")) {
-    //else if (m_com_api.chass_phase.equals ("ERROR Broadcom Bluetooth Init")) {
       com_uti.loge ("ERROR Broadcom Bluetooth /dev/s2d_running: " + com_uti.quiet_file_get ("/dev/s2d_running"));
       daemon_start_dialog_dismiss ();
     }
@@ -1609,18 +1726,18 @@ int f_freq_hi = 399999;
     m_preset_ib [idx].setImageResource (R.drawable.transparent);  // R.drawable.btn_preset
   }
 
-  private View.OnClickListener preset_select_lstnr = new                    // Tap: Tune to preset
+  private View.OnClickListener preset_select_lstnr = new                // Tap: Tune to preset
         View.OnClickListener () {
     public void onClick (View v) {
       ani (v);
       com_uti.logd ("view: " + v);
 
-      for (int idx = 0; idx < com_api.chass_preset_max; idx ++) {            // For all presets...
+      for (int idx = 0; idx < com_api.chass_preset_max; idx ++) {       // For all presets...
         if (v == m_preset_ib [idx]) {                                   // If this preset...
           com_uti.logd ("idx: " + idx);
           try {
             if (m_preset_freq [idx].equals (""))                        // If no preset yet...
-              //com_uti.loge ("Must long press to press presets now, to avoid accidental sets");
+              //RE-ENABLED because it's a pain      com_uti.loge ("Must long press to press presets now, to avoid accidental sets");
               preset_set (idx);                                         // Set preset
             else
               freq_set ("" + m_preset_freq [idx]);                      // Else change to preset frequency
@@ -1672,6 +1789,13 @@ int f_freq_hi = 399999;
       ani (v);                                                          // Animate button
       if (v == m_iv_menu) {
         m_gui_act.startActivity (new Intent (m_context, set_act.class));// Start Settings activity
+      }
+      else if (v == m_iv_record) {
+        logs_email ();
+      }
+      else {
+        com_uti.loge ("view: " + v);
+        return (false);                                                 // Don't consume long click
       }
       return (true);                                                    // Consume long click
     }
@@ -1729,14 +1853,14 @@ int f_freq_hi = 399999;
       }
 
       else if (v == m_iv_seekdn) {                                      // Seek down
-        if (com_uti.s2_tx_get ())                                       // Transmit navigates presets instead of seeking
+        if (com_uti.s2_tx_apk ())                                       // Transmit navigates presets instead of seeking
           m_com_api.key_set ("service_seek_state", "Down");
         else
           m_com_api.key_set ("tuner_seek_state", "Down");
       }
 
       else if (v == m_iv_seekup) {                                      // Seek up
-        if (com_uti.s2_tx_get ())                                       // Transmit navigates presets instead of seeking
+        if (com_uti.s2_tx_apk ())                                       // Transmit navigates presets instead of seeking
           m_com_api.key_set ("service_seek_state", "Up");
         else
           m_com_api.key_set ("tuner_seek_state", "Up");
@@ -1788,6 +1912,11 @@ int f_freq_hi = 399999;
 
       case R.id.rb_band_us:
         tuner_band_set ("US");
+        rb_log (view, (RadioButton) view, ((RadioButton) view).isChecked ());
+        break;
+
+      case R.id.rb_band_uu:
+        tuner_band_set ("UU");
         rb_log (view, (RadioButton) view, ((RadioButton) view).isChecked ());
         break;
     }
@@ -1844,7 +1973,9 @@ int f_freq_hi = 399999;
   void tuner_band_set (String band) {
     m_com_api.tuner_band = band;
     com_uti.tnru_band_set (band);                                            // To setup band values; different process than service
-    m_com_api.key_set ("tuner_band", band);
+
+    if (! m_com_api.chass_plug_aud.equals ("UNK"))
+      m_com_api.key_set ("tuner_band", band);
   }
 
   private void cb_tuner_stereo (boolean checked) {
@@ -1913,7 +2044,7 @@ int f_freq_hi = 399999;
 
     cmd += cmd_build ("logcat -d -v time");
 
-    cmd += cmd_build ("ls -lR /data/data/fm.a2d.sf /init* /sbin /firmware /data/anr /data/tombstones /dev /system /sys");
+    cmd += cmd_build ("ls -lR /data/data/fm.a2d.sf/ /data/data/fm.a2d.sf/lib/ /init* /sbin/ /firmware/ /data/anr/ /data/tombstones/ /dev/ /system/ /sys/");
 
     return (cmd);
   }
@@ -1942,9 +2073,9 @@ int f_freq_hi = 399999;
       com_uti.daemon_set ("audio_alsa_log", "1");                       // Log ALSA controls
       cmd = new_logs_cmd_get ();
     }
-    m_com_api.service_update_send (null, "Writing Debug Log", "60");      // Send Phase Update
+    m_com_api.service_update_send (null, "Writing Debug Log", "20");    // Send Phase Update
     int ret = com_uti.sys_run (cmd, true);                              // Run "bugreport" and output to file
-    m_com_api.service_update_send (null, "Sending Debug Log", "20");      // Send Phase Update
+    m_com_api.service_update_send (null, "Sending Debug Log", "20");    // Send Phase Update
 
     String subject = "SpiritF " + com_uti.app_version_get (m_context);
     boolean bret = file_email (subject, logfile);                       // Email debug log file
@@ -1966,6 +2097,7 @@ int f_freq_hi = 399999;
     logs_email_tmr = new Timer ("Logs Email", true);                    // One shot Poll timer for logs email
     if (logs_email_tmr != null) {
       logs_email_tmr.schedule (new logs_email_tmr_hndlr (), 10);        // Once after 0.01 seconds.
+      Toast.makeText (m_context, "Please wait while debug log is collected. Will prompt when done...", Toast.LENGTH_LONG).show ();
     }
     return (ret);
   }

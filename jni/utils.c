@@ -19,7 +19,11 @@
     #define DEF_BUF 512                                                 // Raised from 256 so we can add headers to 255-256 byte buffers
   #endif
 
+  #define MAX_HCI  264   // 8 prepended bytes + 255 max bytes HCI data/parameters + 1 trailing byte to align
+
   #include "man_ver.h"
+
+  char * g2_audio_done_file = "/sdcard/g2_audio_done";  // Does not work: "/data/data/fm.a2d.sf/files/g2_audio_done", "/dev/g2_audio_done";
 
   #include <android/log.h>
   #include <dirent.h>                                                   // For opendir (), readdir (), closedir (), DIR, struct dirent.
@@ -35,32 +39,29 @@
 
   int ena_log_verbo = 0;
   int ena_log_debug = 1;
-  int ena_log_warni = 0;
+  int ena_log_warni = 1;
   int ena_log_error = 1;
 
   int ena_log_verbose_tshoot= 0;
 
   int ena_log_alsa_error    = 1;    // ALSA support Error
-  int ena_log_alsa_verbo    = 0;//1;    // ALSA support Verbose
+  int ena_log_alsa_verbo    = 0;    // ALSA support Verbose
+
   int ena_log_hex_dump      = 0;    // Hex dump for bt-hci and many others
+  int ena_log_ven_extra     = 0;    // Shim
   int ena_log_tnr_extra     = 0;    // Tuner verbose
   int ena_log_tnr_evt       = 0;    // Tuner events
   int ena_log_s2d_cmd       = 0;    // S2d commands
-  int ena_log_ven_extra     = 0;    // Shim
+  int ena_log_chip_access   = 0;    // Monitor chip access
 
+  int ena_log_rds_new       = 1;    // RDS new PI, PT, PS, RT
   int ena_log_af_com_err    = 0;    // AF common errors
-  int ena_log_af_ok         = 0;    // AF OK                !! AF Needs some work !!
-
-  int ena_log_rds_com_err   = 1;    // RDS common errors
+  int ena_log_af_ok         = 0;    // AF OK
+  int ena_log_rds_extra     = 0;    // Time/Date, Traffic, Group info
 
   int ena_log_rds_ok_iris   = 0;    // Qualcomm RDS OK
-
-  int ena_log_rds_rt        = 1;    // New RT
-  int ena_log_rds_pspt      = 1;    // New PS, PT
-  int ena_log_rds_extra     = 0;    // Time/Date, Traffic, Group info
   int ena_log_bch_rds_stats = 0;    // Broadcom RDS stats
   int ena_log_bch_rds_err   = 0;    // Broadcom RDS errors
-
   int ena_log_bch_reg       = 0;    // Broadcom Registers
   int ena_log_bch_hci       = 0;    // Broadcom HCI
 
@@ -105,7 +106,7 @@
   #define PLUG_TNR_BCH 3
 
 
-    // !!!! Eliminate duplicates, such as ms_get, hcd_file_find, ...
+    //
 
   #define MAX_ITOA_SIZE 32      // Int 2^32 need max 10 characters, 2^64 need 21
 
@@ -123,27 +124,31 @@
     //#define IOCTL_METH
     #ifdef  IOCTL_METH
     int nbio = 1;
+    errno = 0;
     int ret = ioctl (fd, FIONBIO, & nbio);
     if (ret == -1)
-      loge ("noblock_set ioctl errno: %d", errno);
+      loge ("noblock_set ioctl errno: %d (%s)", errno, strerror (errno));
     else
       logd ("noblock_set ioctl ret: %d", ret);
     #else
+    errno = 0;
     int flags = fcntl (fd, F_GETFL);
     if (flags == -1) {
-      loge ("noblock_set fcntl get errno: %d", errno);
+      loge ("noblock_set fcntl get errno: %d (%s)", errno, strerror (errno));
       flags = 0;
     }
     else
       logd ("noblock_set fcntl get flags: %d  nonblock flags: %d", flags, flags & O_NONBLOCK);
+    errno = 0;
     int ret = fcntl (fd, F_SETFL, flags | O_NONBLOCK);
     if (ret == -1)
-      loge ("noblock_set fcntl set errno: %d", errno);
+      loge ("noblock_set fcntl set errno: %d (%s)", errno, strerror (errno));
     else
       logd ("noblock_set fcntl set ret: %d", ret);
+    errno = 0;
     flags = fcntl (fd, F_GETFL);
     if (flags == -1)
-      loge ("noblock_set fcntl result get errno: %d", errno);
+      loge ("noblock_set fcntl result get errno: %d (%s)", errno, strerror (errno));
     else
       logd ("noblock_set fcntl result get flags: %d  nonblock flags: %d", flags, flags & O_NONBLOCK);
     #endif
@@ -158,6 +163,7 @@
     delay.tv_sec = us / 1000000;
     delay.tv_nsec = 1000 * 1000 * (us % 1000000);
         // usleep can't be used because it uses SIGALRM
+    errno = 0;
     do {
       err = nanosleep (& delay, & delay);
     } while (err < 0 && errno == EINTR);
@@ -170,7 +176,7 @@
 
   long ms_sleep (long ms) {
     //if (ms > 10 && (ms % 101 != 0) && (ms % 11 != 0))
-      loge ("ms_sleep ms: %d", ms);
+      logw ("ms_sleep ms: %d", ms);
 
     usleep (ms * 1000);
     return (ms);
@@ -198,9 +204,10 @@
     int ret = 0;
     logd ("user_char_dev_get: %s  %d", dir_or_dev, user);
   
+    errno = 0;
     ret = stat (dir_or_dev, & sb);                                        // Get file/dir status.
     if (ret == -1) {
-      loge ("user_char_dev_get: dir_or_dev stat errno: %d", errno);
+      loge ("user_char_dev_get: dir_or_dev stat errno: %d (%s)", errno, strerror (errno));
       return (NULL);
     }
   
@@ -213,8 +220,9 @@
       return (NULL);
     }
   
+    errno = 0;
     if ((dp = opendir (dir_or_dev)) == NULL) {                            // Open the directory. If error...
-      loge ("user_char_dev_get: can't open dir_or_dev: %s  errno: %d", dir_or_dev, errno);
+      loge ("user_char_dev_get: can't open dir_or_dev: %s  errno: %d (%s)", dir_or_dev, errno, strerror (errno));
       return (NULL);                                                      // Done w/ no result
     }
     //logd ("user_char_dev_get opened directory %s", dir_or_dev);
@@ -227,9 +235,10 @@
       strlcat (filename, "/", sizeof (filename));
       strlcat (filename, dirp->d_name, sizeof (filename));                // Set fully qualified filename
   
+      errno = 0;
       ret = stat (filename, & sb);                                        // Get file/dir status.
       if (ret == -1) {
-        loge ("user_char_dev_get: file stat errno: %d", errno);
+        loge ("user_char_dev_get: file stat errno: %d (%s)", errno, strerror (errno));
         continue;                                                         // Ignore/Next if can't get status
       }
   
@@ -266,6 +275,7 @@
   char sys_prop_device          [DEF_BUF] = "";
   char sys_prop_manuf           [DEF_BUF] = "";
   char sys_prop_board           [DEF_BUF] = "";
+  char sys_prop_platform        [DEF_BUF] = "";
   char sys_prop_modversion      [DEF_BUF] = "";
 
   char sys_prop_android_version [DEF_BUF] = "";
@@ -289,6 +299,7 @@
     prop_buf_get ("ro.product.device",          sys_prop_device);
     prop_buf_get ("ro.product.manufacturer",    sys_prop_manuf);
     prop_buf_get ("ro.product.board",           sys_prop_board);
+    prop_buf_get ("ro.board.platform",          sys_prop_platform);
     prop_buf_get ("ro.modversion",              sys_prop_modversion);
 
     prop_buf_get ("ro.build.version.sdk",       sys_prop_android_version);
@@ -297,12 +308,18 @@
     return (0);
   }
 
+  int msm8226_get () {                                                  // MotoG
+    return (! strncmp (sys_prop_platform,"MSM8226", strlen ("MSM8226")));
+  }
+
   int lg_get () {
-    return (! strncmp (sys_prop_manuf,"LG", strlen ("LG")));        // LG or LGE
+    return (! strncmp (sys_prop_manuf,"LG", strlen ("LG")));            // LG or LGE
   }  
+
   int sony_get () {
     return (! strncmp (sys_prop_manuf,"SONY", strlen ("SONY")));
   }  
+
   int htc_get () {
     return (! strncmp (sys_prop_manuf,"HTC", strlen ("HTC")));
   }  
@@ -392,14 +409,14 @@
     struct stat sb;
     int ret = 0;
   
+    errno = 0;
     if ((dp = opendir (dir)) == NULL) {                                 // Open the directory. If error...
-      //#define EACCES      13  /* Permission denied */
-      if (errno == 13)                                                  // Common problem (Even w/ SU)
-        logd ("file_find: can't open directory %s  errno: %d (EACCES Permission denied)", dir, errno);
+      if (errno == EACCES)                                              // EACCESS is a common annoyance, Even w/ SU presumably due to SELinux
+        logd ("file_find: can't open directory %s  errno: %d (%s) (EACCES Permission denied)", dir, errno, strerror (errno));
       else
-        logd ("file_find: can't open directory %s  errno: %d", dir, errno);
+        logd ("file_find: can't open directory %s  errno: %d (%s)", dir, errno, strerror (errno));
       nest --;
-      return (0);//-13);                                                // Done w/ no result & error code -EPERM
+      return (0);                                                       // Done w/ no result for this directory
     }
     //logd ("file_find opened directory %s", dir);
   
@@ -419,9 +436,10 @@
       strlcat (filename, "/", sizeof (filename));
       strlcat (filename, dirp->d_name, sizeof (filename));              // Set fully qualified filename
   
+      errno = 0;
       ret = stat (filename, &sb);                                       // Get file/dir status.
       if (ret == -1) {
-        logd ("file_find: stat errno: %d", errno);
+        logd ("file_find: stat errno: %d (%s)", errno, strerror (errno));
         continue;                                                       // Ignore/Next if can't get status
       }
   
@@ -457,16 +475,55 @@
     nest --;
     return (0);                                                         // Done w/ no result
   }
-  
+
+
+/*
+alls "getprop dev ; find system -iname *hcd"
+gs1
+system/vendor/firmware/bcm4329.hcd
+gs2
+system/bin/bcm4330B1.hcd
+system/bin/bcm4330B1_murata.hcd
+system/bin/bcm4330B1_semcosh.hcd
+no1
+system/bin/bcm4330B1.hcd
+system/bin/bcm4330B1_murata.hcd
+system/bin/bcm4330B1_semcosh.hcd
+gs3
+system/bin/bcm4334.hcd
+system/bin/bcm4334_murata.hcd
+system/bin/bcm4334_semco.hcd
+system/bin/bcm4334_semcosh.hcd
+no2
+system/bin/bcm4334.hcd
+system/bin/bcm4334_murata.hcd
+system/bin/bcm4334_semco.hcd
+system/bin/bcm4334_semcosh.hcd
+oxl
+mog
+xz0
+xz1
+om8
+om7
+system/etc/firmware/BCM4335B0_002.001.006.0296.0297.hcd
+system/vendor/firmware/bcm4335_prepatch.hcd
+xz2
+system/etc/firmware/BCM43xx.hcd
+lg2
+system/vendor/firmware/BCM4335B0_002.001.006.0191.0201_ORC.hcd
+*/
   int hcd_num = 0;
-  
-  int hcd_file_find (char * path_buf, int path_len) {      // Find first file under subdir dir, with pattern pat. Put results in path_buf of size path_len.
-    int ret = file_find ("/system", ".hcd", path_buf, path_len);          // Sometimes under system/vendor/firmware instead of system/etc/firmware
+  int hcd_file_find (char * path_buf, int path_len) {                   // Find HCD file under /system/.        Sometimes under /system/vendor/firmware instead of /system/etc/firmware
+                                                                        // !! NOTE: multi-part HCD files are a problem
+    int ret = file_find ("/system", ".hcd", path_buf, path_len);
     logd ("HCD hcd file_find ret: %d", ret);
-    hcd_num = 0;
+
+    hcd_num = 0;                                                        // Default = file
   
-    if (ret)                  // If we have at least one BC *.hcd or *.HCD firmware file in /system...
+    if (ret)                                                            // If we have at least one BC *.hcd or *.HCD firmware file in /system...
       logd ("hcd_file_find have *.hcd file: %s", path_buf);
+    else
+      loge ("hcd_file_find NO *.hcd file: %s", path_buf);
   
     if (lg_get ()) {
       logd ("hcd_file_find LG G2");
@@ -476,7 +533,7 @@
     else if (sony_get ()) {
       logd ("hcd_file_find Sony Z2+");
       //strlcpy (path_buf, "/data/data/fm.a2d.sf/files/b3.bin", path_len);
-      hcd_num = 0;    // Use actual file
+      hcd_num = 0;                                                      // Use actual BCM4339 specific file for Sony
     }
     else if (htc_get ()) {
       logd ("hcd_file_find HTC One M7");
@@ -484,11 +541,11 @@
       hcd_num = 1;
     }
     else {
-      logd ("hcd_file_find Unknown");
+      loge ("hcd_file_find Unknown");
       hcd_num = 0;    // Use actual file
     }
   
-    if (ret || hcd_num)   // If we have a file or can use internal...
+    if (ret || hcd_num)                                                 // If we have a file or can use internal...
       return (1);
   
     loge ("hcd_file_find no *.hcd file or no permission");
@@ -500,9 +557,10 @@
 
     int ret = 0;                                                        // 0 = File does not exist or is not accessible
     if ( file_get (filename)) {                                         // If file exists...
+      errno = 0;
       int fd = open (filename, flags);
       if (fd < 0)
-        loge ("flags_file_get open fd: %d  errno: %d", fd, errno);
+        loge ("flags_file_get open fd: %d  errno: %d (%s)", fd, errno, strerror (errno));
       else
         logd ("flags_file_get open fd: %d", fd);
       if (fd >= 0) {                                                    // If open success...
@@ -523,22 +581,26 @@
       logd ("file_get ret: %d  filename: %s", ret, filename);
     }
     else {
-      if (errno == 2)
-        logd ("file_get ret: %d  filename: %s  errno 2 = No File/Dir", ret, filename);
+      if (errno == ENOENT)                                              // 2
+        logd ("file_get ret: %d  filename: %s  errno ENOENT = No File/Dir", ret, filename);
       else
-        loge ("file_get ret: %d  filename: %s  errno: %d", ret, filename, errno);
+        loge ("file_get ret: %d  filename: %s  errno: %d (%s)", ret, filename, errno, strerror (errno));
     }
     return (ret);
   }
 
   int file_delete (const char * filename) {
+    errno = 0;
     int ret = unlink (filename);
-    logd ("file_delete ret: %d", ret);
+    if (ret)
+      loge ("file_delete ret: %d  filename: %s  errno: %d (%s)", ret, filename, errno, strerror (errno));
+    else
+      logd ("file_delete ret: %d  filename: %s", ret, filename);
     return (ret);
   }
   int file_create (const char * filename) {
     int ret = flags_file_get (filename, O_CREAT);
-    logd ("file_create ret: %d", ret);
+    logd ("file_create flags_file_get ret: %d  filename: %s");
     return (ret);
   }
 
@@ -591,26 +653,33 @@
   void hex_dump (char * prefix, int width, unsigned char * buf, int len) {
     if (! ena_log_hex_dump)
       return;
-    char tmp  [3 * HD_MW + 8] = "";     // Handle line widths up to HD_MW
+    //loge ("hex_dump prefix: \"%s\"  width: %d   buf: %p  len: %d", prefix, width, buf, len);
+    char tmp  [3 * HD_MW + 8] = "";                                     // Handle line widths up to HD_MW
     char line [3 * HD_MW + 8] = "";
     if (width > HD_MW)
       width = HD_MW;
     int i, n;
     line [0] = 0;
+
     if (prefix)
-      strlcpy (line, prefix, sizeof (line));
-    for (i = 0, n = 1; i < len; i ++, n ++) {
+      //strlcpy (line, prefix, sizeof (line));
+      strlcat (line, prefix, sizeof (line));
+
+    for (i = 0, n = 1; i < len; i ++, n ++) {                           // i keeps incrementing, n gets reset to 0 each line
+
       snprintf (tmp, sizeof (tmp), "%2.2x ", buf [i]);
-      strlcat (line, tmp, sizeof (line));
-      if (n == width) {
-        n = 0;
-        loge (line);
+      strlcat (line, tmp, sizeof (line));                               // Append 2 bytes hex and space to line
+
+      if (n == width) {                                                 // If at specified line width
+        n = 0;                                                          // Reset position in line counter
+        logw (line);                                                    // Log line
         line [0] = 0;
         if (prefix)
-          strlcpy (line, prefix, sizeof (line));
+          //strlcpy (line, prefix, sizeof (line));
+          strlcat (line, prefix, sizeof (line));
       }
-      else if (i == len - 1 && n)
-        loge (line);
+      else if (i == len - 1)                                            // Else if at last byte
+        logw (line);                                                    // Log line
     }
   }
 
@@ -682,7 +751,7 @@
     }
 
     if (* pfd < 0) {
-      loge ("file_write_many open * pfd: %d  flags: %d  errno: %d  len: %d  filename: %s", * pfd, flags, errno, len, filename);
+      loge ("file_write_many open * pfd: %d  flags: %d  errno: %d (%s)  len: %d  filename: %s", * pfd, flags, errno, strerror (errno), len, filename);
       return (0);
     }
 
@@ -692,7 +761,7 @@
     if (len > 0)
       written = write (* pfd, data, len);
     if (written != len)
-      loge ("file_write_many written: %d  flags: %d  errno: %d  len: %d  filename: %s", written, flags, errno, len, filename);
+      loge ("file_write_many written: %d  flags: %d  errno: %d (%s)  len: %d  filename: %s", written, flags, errno, strerror (errno), len, filename);
     else
       logd ("file_write_many written: %d  flags: %d  len: %d  filename: %s", written, flags, len, filename);
     return (written);
@@ -709,7 +778,10 @@
     ret = -1;
     if (fd >= 0)
       ret = close (fd);
-    logd ("file_write close ret: %d", ret);
+    if (ret < 0)
+      loge ("file_write close ret: %d  errno: %d (%s)", ret, errno, strerror (errno));
+    else
+      logd ("file_write close ret: %d", ret);
     return (ret);
   }
 
@@ -778,6 +850,7 @@
     }
 */
 
+    errno = 0;
     ret = init_module (file, size, opts);   // pass it to the kernel
     if (ret != 0) {
       if (errno == EEXIST) { // 17
@@ -785,7 +858,7 @@
         logd ("insmod_internal: init_module '%s' failed EEXIST because already loaded", filename);
       }
       else
-        loge ("insmod_internal: init_module '%s' failed (%s)", filename, strerror (errno));
+        loge ("insmod_internal: init_module '%s' failed errno: %d (%s)", filename, errno, strerror (errno));
     }
 
     free (file);    // free the file buffer
@@ -924,20 +997,46 @@
   #include <netinet/in.h>
   #include <netdb.h> 
 
+//For REUSEADDR only
+//#define SK_NO_REUSE     0
+//#define SK_CAN_REUSE    1
+
+
+  #ifndef SK_FORCE_REUSE
+    #define SK_FORCE_REUSE  2
+  #endif
+
+  #ifndef SO_REUSEPORT
+    #define SO_REUSEPORT 15
+  #endif
+
+    // ?? Blocked in Android ?          sock_tmo_set setsockopt SO_REUSEPORT errno: 92 (Protocol not available)
+
+  int sock_reuse_set (int fd) {
+    errno = 0;
+    int val = SK_FORCE_REUSE;//SK_CAN_REUSE;
+    int ret = setsockopt (fd, SOL_SOCKET, SO_REUSEADDR, & val, sizeof (val));
+    if (ret != 0)
+      loge ("sock_tmo_set setsockopt SO_REUSEADDR errno: %d (%s)", errno, strerror (errno));
+    else
+      logv ("sock_tmo_set setsockopt SO_REUSEADDR Success");
+    return (0);
+  }
+
   int sock_tmo_set (int fd, int tmo) {                                 // tmo = timeout in milliseconds
     struct timeval tv = {0, 0};
     tv.tv_sec = tmo / 1000;                                               // Timeout in seconds
     tv.tv_usec = (tmo % 1000) * 1000;
+    errno = 0;
     int ret = setsockopt (fd, SOL_SOCKET, SO_RCVTIMEO, (struct timeval *) & tv, sizeof (struct timeval));
-    if (ret != 0) {
-      loge ("sock_tmo_set setsockopt SO_RCVTIMEO errno: %d", errno);
-    }
-    else {
-      //logd ("sock_tmo_set setsockopt SO_RCVTIMEO Success");
-    }
+    if (ret != 0)
+      loge ("sock_tmo_set setsockopt SO_RCVTIMEO errno: %d (%s)", errno, strerror (errno));
+    else
+      logv ("sock_tmo_set setsockopt SO_RCVTIMEO Success");
+    //errno = 0;
     //ret = setsockopt (fd, SOL_SOCKET, SO_SNDTIMEO, (struct timeval *) & tv, sizeof (struct timeval));
     //if (ret != 0) {
-    //  loge ("timeout_set setsockopt SO_SNDTIMEO errno: %d", errno);
+    //  loge ("timeout_set setsockopt SO_SNDTIMEO errno: %d (%s)", errno, strerror (errno));
     //}
     return (0);
   }
@@ -952,8 +1051,9 @@
     int ret = 0;
     logd ("pid_get: %s  start_pid: %d", cmd, start_pid);
 
+    errno = 0;
     if ((dp = opendir ("/proc")) == NULL) {                             // Open the /proc directory. If error...
-      loge ("pid_get: opendir errno: %d", errno);
+      loge ("pid_get: opendir errno: %d (%s)", errno, strerror (errno));
       return (0);                                                       // Done w/ no process found
     }
     while ((dirp = readdir (dp)) != NULL) {                             // For all files/dirs in this directory... (Could terminate with errno set !!)
@@ -961,7 +1061,7 @@
       errno = 0;
       pid = atoi (dirp->d_name);                                        // pid = directory name string to integer
       if (pid <= 0) {                                                   // Ignore non-numeric directories
-        //loge ("pid_get: not numeric ret: %d  errno: %d", pid, errno);
+        //loge ("pid_get: not numeric ret: %d  errno: %d (%s)", pid, errno, strerror (errno));
         continue;
       }
       if (pid < start_pid) {                                            // Ignore PIDs we have already checked. Depends on directories in PID order which seems to always be true
@@ -973,22 +1073,25 @@
     
       char fcmdline [DEF_BUF] = "/proc/";
       strlcat (fcmdline, dirp->d_name, sizeof (fcmdline));
+      errno = 0;
       ret = stat (fcmdline, & sb);                                      // Get file/dir status.
       if (ret == -1) {
-        logd ("pid_get: stat errno: %d", errno);                        // Common: pid_get: stat errno: 2
+        logd ("pid_get: stat errno: %d (%s)", errno, strerror (errno)); // Common: pid_get: stat errno: 2 = ENOENT
         continue;
       }
       if (S_ISDIR (sb.st_mode)) {                                       // If this is a directory...
         //logd ("pid_get: dir %d", sb.st_mode);
         char cmdline [DEF_BUF] = {0};
         strlcat (fcmdline, "/cmdline", sizeof (fcmdline));
+        errno = 0;
         if ((fdc = fopen (fcmdline, "r")) == NULL) {                    // Open /proc/???/cmdline file read-only, If error...
-          loge ("pid_get: fopen errno: %d", errno);
+          loge ("pid_get: fopen errno: %d (%s)", errno, strerror (errno));
           continue;
         }
+        errno = 0;
         ret = fread (cmdline, sizeof (char), sizeof (cmdline) - 1, fdc);// Read
         if (ret < 0 || ret > sizeof (cmdline) - 1) {                    // If error...
-          loge ("pid_get fread ret: %d  errno: %d", ret, errno);
+          loge ("pid_get fread ret: %d  errno: %d (%s)", ret, errno, strerror (errno));
           fclose (fdc);
           continue;
         }
@@ -1028,17 +1131,17 @@
         errno = 0;
         ret = kill (pid, sig);
         if (ret) {
-          loge ("pid_kill kill_gentle_first kill() errno: %d", errno);
+          loge ("pid_kill kill_gentle_first kill() errno: %d (%s)", errno, strerror (errno));
         }
         else {
           logd ("pid_kill kill_gentle_first kill() success");
           errno = 0;
           int new_pid_check1 = pid_get (cmd_to_verify, pid);
           if (new_pid_check1 == pid) {
-            loge ("pid_kill kill() success detected but same new_pid_check: %d  errno: %", new_pid_check1, errno);  // Fall through to brutal kill
+            loge ("pid_kill kill() success detected but same new_pid_check: %d  errno: %d (%s)", new_pid_check1, errno, strerror (errno));  // Fall through to brutal kill
           }
           else {
-            logd ("Full Success pid != new_pid_check1: %d  errno: %", new_pid_check1, errno);
+            logd ("Full Success pid != new_pid_check1: %d  errno: %d (%s)", new_pid_check1, errno, strerror (errno));
             return (ret);
           }
         }
@@ -1048,7 +1151,7 @@
     errno = 0;
     ret = kill (pid, sig);
     if (ret) {
-      loge ("pid_kill kill() errno: %d", errno);
+      loge ("pid_kill kill() errno: %d (%s)", errno, strerror (errno));
     }
     else {
       logd ("pid_kill kill() success");
@@ -1057,7 +1160,7 @@
       if (new_pid_check2 == pid)
         loge ("pid_kill kill() success detected but same new_pid_check2: %d", new_pid_check2);
       else
-        logd ("pid != new_pid_check: %d  errno: %", new_pid_check2, errno);
+        logd ("pid != new_pid_check: %d  errno: %d (%s)", new_pid_check2, errno, strerror (errno));
     }
     return (ret);
   }
@@ -1135,43 +1238,45 @@
     // Generic IPC API:
 
   int gen_client_cmd (unsigned char * cmd_buf, int cmd_len, unsigned char * res_buf, int res_max, int net_port, int rx_tmo) {
-//    logd ("net_port: %d  cmd_buf: \"%s\"  cmd_len: %d", net_port, cmd_buf, cmd_len);
+    logv ("net_port: %d  cmd_buf: \"%s\"  cmd_len: %d", net_port, cmd_buf, cmd_len);
     static int sockfd = -1;
-    int res_len, written;
-    static socklen_t srv_len;
+    int res_len = 0, written = 0, ctr = 0;
+    static socklen_t srv_len = 0;
   #ifdef  CS_AF_UNIX
     static struct sockaddr_un  srv_addr;
     #ifdef  CS_DGRAM
     #define   CS_DGRAM_UNIX
-      struct sockaddr_un  cli_addr;                                       // Unix datagram sockets must be bound; no ephemeral sockets.
-      socklen_t cli_len;
+      struct sockaddr_un  cli_addr;                                     // Unix datagram sockets must be bound; no ephemeral sockets.
+      socklen_t cli_len = 0;
     #endif
   #else
     //struct hostent *hp;
     struct sockaddr_in  srv_addr,cli_addr;
-    socklen_t cli_len;
+    socklen_t cli_len = 0;
   #endif
   
     if (sockfd < 0) {
-      if ((sockfd = socket (CS_FAM, CS_SOCK_TYPE, 0)) < 0) {                // Get an ephemeral, unbound socket
-        loge ("gen_client_cmd: socket errno: %d", errno);
-        return (0);//"Error socket");
+      errno = 0;
+      if ((sockfd = socket (CS_FAM, CS_SOCK_TYPE, 0)) < 0) {            // Get an ephemeral, unbound socket
+        loge ("gen_client_cmd: socket errno: %d (%s)", errno, strerror (errno));
+        return (0);
       }
-    #ifdef  CS_DGRAM_UNIX                                                 // Unix datagram sockets must be bound; no ephemeral sockets.
+    #ifdef  CS_DGRAM_UNIX                                               // Unix datagram sockets must be bound; no ephemeral sockets.
       strlcpy (api_clisock, DEF_API_CLISOCK, sizeof (api_clisock));
       char itoa_ret [MAX_ITOA_SIZE] = {0};
       strlcat (api_clisock, itoa (net_port, itoa_ret, 10), sizeof (api_clisock));
-      unlink (api_clisock);                                                // Remove any lingering client socket
+      unlink (api_clisock);                                             // Remove any lingering client socket
       memset ((char *) & cli_addr, sizeof (cli_addr), 0);
       cli_addr.sun_family = AF_UNIX;
       strlcpy (cli_addr.sun_path, api_clisock, sizeof (cli_addr.sun_path));
       cli_len = strlen (cli_addr.sun_path) + sizeof (cli_addr.sun_family);
   
-      if (bind (sockfd, (struct sockaddr *) & cli_addr,cli_len) < 0) {
-        loge ("gen_client_cmd: bind errno: %d", errno);
+      errno = 0;
+      if (bind (sockfd, (struct sockaddr *) & cli_addr, cli_len) < 0) {
+        loge ("gen_client_cmd: bind errno: %d (%s)", errno, strerror (errno));
         close (sockfd);
         sockfd = -1;
-        return (0);//"Error bind");                                        // OK to continue w/ Internet Stream but since this is Unix Datagram and we ran unlink (), let's fail
+        return (0);                                                     // OK to continue w/ Internet Stream but since this is Unix Datagram and we ran unlink (), let's fail
       }
     #endif
     }
@@ -1187,72 +1292,89 @@
     srv_len = strlen (srv_addr.sun_path) + sizeof (srv_addr.sun_family);
   #else
     srv_addr.sin_family = AF_INET;
-    srv_addr.sin_addr.s_addr=htonl (INADDR_LOOPBACK);
+    srv_addr.sin_addr.s_addr = htonl (INADDR_LOOPBACK);
+    //errno = 0;
     //hp = gethostbyname ("localhost");
     //if (hp == 0) {
-    //  loge ("gen_client_cmd: Error gethostbyname  errno: %d", errno);
-    //  return (0);//"Error gethostbyname");
+    //  loge ("gen_client_cmd: Error gethostbyname  errno: %d (%s)", errno, strerror (errno));
+    //  return (0);
     //}
     //bcopy ((char *) hp->h_addr, (char *) & srv_addr.sin_addr, hp->h_length);
     srv_addr.sin_port = htons (net_port);
-    srv_len =sizeof (struct sockaddr_in);
+    srv_len = sizeof (struct sockaddr_in);
   #endif
   
   
   // Send cmd_buf and get res_buf
   #ifdef CS_DGRAM
-    written= sendto (sockfd, cmd_buf, cmd_len, 0,(const struct sockaddr *)&srv_addr,srv_len);
-    if (written != cmd_len) {  // Dgram buffers should not be segmented
-      loge ("gen_client_cmd: sendto errno: %d", errno);
+    errno = 0;
+    written = sendto (sockfd, cmd_buf, cmd_len, 0, (const struct sockaddr *) & srv_addr, srv_len);
+    if (written != cmd_len) {                                           // Dgram buffers should not be segmented
+      loge ("gen_client_cmd: sendto errno: %d (%s)", errno, strerror (errno));
     #ifdef  CS_DGRAM_UNIX
       unlink (api_clisock);
     #endif
       close (sockfd);
       sockfd = -1;
-      return (0);//"Error sendto");
+      return (0);
     }
   
     sock_tmo_set (sockfd, rx_tmo);
-    res_len = recvfrom (sockfd, res_buf, res_max, 0,(struct sockaddr *)&srv_addr, &srv_len);
+
+    res_len = -1;
+    ctr = 0;
+    while (res_len < 0 && ctr < 2) {
+      errno = 0;
+      res_len = recvfrom (sockfd, res_buf, res_max, 0, (struct sockaddr *) & srv_addr, & srv_len);
+      ctr ++;
+      if (res_len < 0 && ctr < 2) {
+        if (errno == EAGAIN)
+          logw ("gen_client_cmd: recvfrom errno: %d (%s)", errno, strerror (errno));           // Occasionally get EAGAIN here
+        else
+          loge ("gen_client_cmd: recvfrom errno: %d (%s)", errno, strerror (errno));
+      }
+    }
     if (res_len <= 0) {
-      loge ("gen_client_cmd: recvfrom errno: %d", errno);               // Occasionally get EAGAIN here
+      loge ("gen_client_cmd: recvfrom errno: %d (%s)", errno, strerror (errno));
     #ifdef  CS_DGRAM_UNIX
       unlink (api_clisock);
     #endif
       close (sockfd);
       sockfd = -1;
-      return (-1);
-  //    return (0);//"Error recvfrom");
+      return (0);
     }
     #ifndef CS_AF_UNIX
   // !!   ?? Don't need this ?? If srv_addr still set from sendto, should restrict recvfrom to localhost anyway ?
-    if ( srv_addr.sin_addr.s_addr != htonl(INADDR_LOOPBACK) ) {
+    if ( srv_addr.sin_addr.s_addr != htonl (INADDR_LOOPBACK) ) {
       loge ("gen_client_cmd: Unexpected suspicious packet from host");// %s", inet_ntop(srv_addr.sin_addr.s_addr)); //inet_ntoa(srv_addr.sin_addr.s_addr));
     }
     #endif
   #else
-    if (connect(sockfd, (struct sockaddr *) &srv_addr, srv_len) < 0) {
-      loge ("gen_client_cmd: connect errno: %d", errno);
+    errno = 0;
+    if (connect (sockfd, (struct sockaddr *) & srv_addr, srv_len) < 0) {
+      loge ("gen_client_cmd: connect errno: %d (%s)", errno, strerror (errno));
       close (sockfd);
       sockfd = -1;
-      return (0);//"Error connect");
+      return (0);
     }
+    errno = 0;
     written = write (sockfd, cmd_buf, cmd_len);                           // Write the command packet
     if (written != cmd_len) {                                             // Small buffers under 256 bytes should not be segmented ?
-      loge ("gen_client_cmd: write errno: %d", errno);
+      loge ("gen_client_cmd: write errno: %d (%s)", errno, strerror (errno));
       close (sockfd);
       sockfd = -1;
-      return (0);//"Error write");
+      return (0);
     }
   
     sock_tmo_set (sockfd, rx_tmo);
   
+    errno = 0;
     res_len = read (sockfd, res_buf, res_max)); // Read response
     if (res_len <= 0) {
-      loge ("gen_client_cmd: read errno: %d", errno);
+      loge ("gen_client_cmd: read errno: %d (%s)", errno, strerror (errno));
       close (sockfd);
       sockfd = -1;
-      return (0);//"Error read");
+      return (0);
     }
   #endif
     //hex_dump ("", 32, res_buf, n);
@@ -1291,13 +1413,16 @@
     strlcat (api_srvsock, itoa (net_port, itoa_ret, 10), sizeof (api_srvsock));
     unlink (api_srvsock);
   #endif
-    if ((sockfd = socket (CS_FAM, CS_SOCK_TYPE, 0)) < 0) {
-      loge ("gen_server_loop socket  errno: %d", errno);
+    errno = 0;
+    if ((sockfd = socket (CS_FAM, CS_SOCK_TYPE, 0)) < 0) {              // Create socket
+      loge ("gen_server_loop socket  errno: %d (%s)", errno, strerror (errno));
       return (-1);
     }
 
+    sock_reuse_set (sockfd);
+
     if (poll_ms != 0)
-      sock_tmo_set (sockfd, poll_ms);                                   // For polling every poll_ms milliseconds
+      sock_tmo_set (sockfd, poll_ms);                                   // If polling mode, set socket timeout for polling every poll_ms milliseconds
 
     memset ((char *) & srv_addr, sizeof (srv_addr), 0);
   #ifdef  CS_AF_UNIX
@@ -1306,10 +1431,12 @@
     srv_len = strlen (srv_addr.sun_path) + sizeof (srv_addr.sun_family);
   #else
     srv_addr.sin_family = AF_INET;
-    srv_addr.sin_addr.s_addr = htonl (INADDR_LOOPBACK); //INADDR_ANY;
+    srv_addr.sin_addr.s_addr = htonl (INADDR_LOOPBACK);                 // Will bind to loopback instead of common INADDR_ANY. Packets should only be received by loopback and never Internet.
+                                                                        // For 2nd line of defence see: loge ("Unexpected suspicious packet from host");
+    //errno = 0;
     //hp = gethostbyname ("localhost");
     //if (hp == 0) {
-    //  loge ("Error gethostbyname  errno: %d", errno);
+    //  loge ("Error gethostbyname  errno: %d (%s)", errno, strerror (errno));
     //  return (-2);
     //}
     //bcopy ((char *) hp->h_addr, (char *) & srv_addr.sin_addr, hp->h_length);
@@ -1322,8 +1449,9 @@
   #else
   logd ("srv_len: %d  fam: %d  addr: 0x%x  port: %d", srv_len, srv_addr.sin_family, ntohl (srv_addr.sin_addr.s_addr), ntohs (srv_addr.sin_port));
   #endif
-    if (bind (sockfd, (struct sockaddr *) & srv_addr, srv_len) < 0) {
-      loge ("Error bind  errno: %d", errno);
+    errno = 0;
+    if (bind (sockfd, (struct sockaddr *) & srv_addr, srv_len) < 0) {   // Bind socket to server address
+      loge ("Error bind  errno: %d (%s)", errno, strerror (errno));
   #ifdef  CS_AF_UNIX
       return (-3);
   #endif
@@ -1333,13 +1461,15 @@
       loge ("Inet stream continuing despite bind error");               // OK to continue w/ Internet Stream
     }
 
-    if (poll_ms != 0)
-      sock_tmo_set (sockfd, poll_ms);                                   // For polling every poll_ms ms
+    // Done after socket() and before bind() so don't repeat it here ?
+    //if (poll_ms != 0)
+    //  sock_tmo_set (sockfd, poll_ms);                                   // If polling mode, set socket timeout for polling every poll_ms milliseconds
 
   // Get command from client
   #ifndef CS_DGRAM
+    errno = 0;
     if (listen (sockfd, 5)) {                                           // Backlog= 5; likely don't need this
-      loge ("Error listen  errno: %d", errno);
+      loge ("Error listen  errno: %d (%s)", errno, strerror (errno));
       return (-4);
     }
   #endif
@@ -1353,6 +1483,7 @@
   
       //logd ("ms_get: %d",ms_get ());
   #ifdef  CS_DGRAM
+      errno = 0;
       cmd_len = recvfrom (sockfd, cmd_buf, sizeof (cmd_buf), 0, (struct sockaddr *) & cli_addr, & cli_len);
       if (cmd_len <= 0) {
         if (errno == EAGAIN) {
@@ -1362,8 +1493,11 @@
             loge ("gen_server_loop EAGAIN !!!");                        // Else EGAIN is an unexpected error for blocking mode
         }
         else {                                                          // Else if some other error, sleep it off for 100 ms
-          loge ("Error recvfrom errno: %d", errno);
-          ms_sleep (101);
+          if (errno == EINTR)
+            logw ("Error recvfrom errno: %d (%s)", errno, strerror (errno));
+          else
+            loge ("Error recvfrom errno: %d (%s)", errno, strerror (errno));
+          quiet_ms_sleep (101);
         }
         continue;
       }
@@ -1375,10 +1509,11 @@
       }
     #endif
   #else
+      errno = 0;
       newsockfd = accept (sockfd, (struct sockaddr *) & cli_addr, & cli_len);
       if (newsockfd < 0) {
-        loge ("Error accept  errno: %d", errno);
-        ms_sleep (101);   // Sleep 0.1 second
+        loge ("Error accept  errno: %d (%s)", errno, strerror (errno));
+        ms_sleep (101);                                                 // Sleep 0.1 second to try to clear errors
         continue;
       }
     #ifndef  CS_AF_UNIX
@@ -1388,12 +1523,13 @@
         loge ("Unexpected suspicious packet from host");// %s", inet_ntoa (cli_addr.sin_addr.s_addr));
       }
     #endif
+      errno = 0;
       cmd_len = read (newsockfd, cmd_buf, sizeof (cmd_buf));
       if (cmd_len <= 0) {
-        loge ("Error read  errno: %d", errno);
-        ms_sleep (101);   // Sleep 0.1 second
+        loge ("Error read  errno: %d (%s)", errno, strerror (errno));
+        ms_sleep (101);                                                 // Sleep 0.1 second to try to clear errors
         close (newsockfd);
-        ms_sleep (101);   // Sleep 0.1 second
+        ms_sleep (101);                                                 // Sleep 0.1 second to try to clear errors
         continue;
       }
   #endif
@@ -1408,31 +1544,34 @@
       unsigned char res_buf [RES_DATA_MAX] = {0};
       int res_len = 0;
 
-      cmd_buf [cmd_len] = 0;    // Null terminate for string usage
-      res_len = gen_server_loop_func ( cmd_buf, cmd_len, res_buf, sizeof (res_buf));    // Do server command function and provide response
+      cmd_buf [cmd_len] = 0;                                            // Null terminate for string usage
+                                                                        // Do server command function and provide response
+      res_len = gen_server_loop_func ( cmd_buf, cmd_len, res_buf, sizeof (res_buf));
 
       if (ena_log_verbose_tshoot)
         logd ("gen_server_loop gen_server_loop_func res_len: %d", res_len);
 
-      if (res_len < 0) {  // If error
+      if (res_len < 0) {                                                // If error
         res_len = 2;
-        res_buf [0] = 0xff;//'?';   ?? 0xff for HCI ?
-        res_buf [1] = 0xff;//'\n';
+        res_buf [0] = 0xff;                                             // '?';   ?? 0xff for HCI ?
+        res_buf [1] = 0xff;                                             // '\n';
         res_buf [2] = 0;
       }
-//      hex_dump ("", 32, res_buf, res_len);
+      //hex_dump ("", 32, res_buf, res_len);
   
   
   // Send response
   #ifdef  CS_DGRAM
+      errno = 0;
       if (sendto (sockfd, res_buf, res_len, 0, (struct sockaddr *) & cli_addr, cli_len) != res_len) {
-        loge ("Error sendto  errno: %d  res_len: %d", errno, res_len);
-        ms_sleep (101);   // Sleep 0.1 second
+        loge ("Error sendto  errno: %d (%s)  res_len: %d", errno, strerror (errno), res_len);
+        ms_sleep (101);                                                 // Sleep 0.1 second to try to clear errors
       }
   #else
-      if (write (newsockfd, res_buf, res_len) != res_len) {
-        loge ("Error write  errno: %d", errno);
-        ms_sleep (101);   // Sleep 0.1 second
+      errno = 0;
+      if (write (newsockfd, res_buf, res_len) != res_len) {             // Write, if can't write full buffer...
+        loge ("Error write  errno: %d (%s)", errno, strerror (errno));
+        ms_sleep (101);                                                 // Sleep 0.1 second to try to clear errors
       }
       close (newsockfd);
   #endif

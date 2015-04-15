@@ -20,9 +20,11 @@ import java.text.SimpleDateFormat;
 import java.util.Calendar;
 import java.util.Locale;
 import java.util.TimeZone;
+import java.io.BufferedReader;
 import java.io.ByteArrayOutputStream;
 import java.io.DataOutputStream;
 import java.io.File;
+import java.io.FileReader;
 import java.io.OutputStream;
 
 import java.io.FileOutputStream;
@@ -57,7 +59,10 @@ public final class com_uti  {
   private static boolean        loop_set            = false;
 
     // Tuner utilities:
-  private static int band_freq_lo = 87500, band_freq_hi = 108000, band_freq_inc = 100, band_freq_odd = 0;
+  public static int band_freq_lo =  87500;
+  public static int band_freq_hi = 108000;
+  public static int band_freq_inc =   100;
+  public static int band_freq_odd =     0;
 
     // Notification ID should be unique on system
   public static final int s2_notif_id = 1963;                           // No relevance except to uniquely identify notification. Spirit1 uses 2112
@@ -93,7 +98,7 @@ public final class com_uti  {
     // Android Logging Levels:
   private static final boolean ena_log_verbo = false;
   private static final boolean ena_log_debug = true;
-  private static final boolean ena_log_warni = false;
+  private static final boolean ena_log_warni = true;
   private static final boolean ena_log_error = true;
 
   private static String tag_prefix = "";
@@ -189,7 +194,7 @@ public final class com_uti  {
   public static boolean main_thread_get (String source) {
     boolean ret = (Looper.myLooper () == Looper.getMainLooper ());
     if (ret)
-      com_uti.loge ("YES MAIN THREAD source: " + source);
+      com_uti.logd ("YES MAIN THREAD source: " + source);
     //else
     //  com_uti.logd ("Not main thread source: " + source);
     return (ret);
@@ -311,7 +316,7 @@ public final class com_uti  {
     main_thread_get ("ms_sleep ms: " + ms);
 
 //    if (ms > 10 && (ms % 101 != 0) && (ms % 11 != 0))
-      com_uti.loge ("ms: " + ms);                                       // Error as a warning
+      com_uti.logw ("ms: " + ms);                                       // Warning
 
     try {
       Thread.sleep (ms);                                                // Wait ms milliseconds
@@ -461,8 +466,8 @@ public final class com_uti  {
     }
   }
 
-  public static String file_create (Context context, int id, String filename, boolean exe) {     // When daemon running !!!! java.io.FileNotFoundException: /data/data/com.WHATEVER.fm/files/sprtd (Text file busy)
-    main_thread_get ("file_create filename: " + filename);
+  public static String res_file_create (Context context, int id, String filename, boolean exe) {     // When daemon running !!!! java.io.FileNotFoundException: /data/data/com.WHATEVER.fm/files/sprtd (Text file busy)
+    main_thread_get ("res_file_create filename: " + filename);
 
     if (context == null)
       return ("");
@@ -622,13 +627,17 @@ public final class com_uti  {
     }
   }
 
+  public static boolean platform_file_entirely_ours () {
+    return (com_uti.file_size_get (com_uti.platform_file) == 187);      // Hard coded !!!!!!!!!!!!!!
+  }
+
   public static void acdbfix_remove (Context context) {
     com_uti.logd ("");
     String cmd = "";
     cmd += ("mount -o remount,rw /system ; ");
     if (! com_uti.file_get (platform_orig)) {
       com_uti.loge ("Original file does not exist platform_orig: " + platform_orig);
-      if (com_uti.file_size_get (platform_file) == 187) {        // !!!!!!!!!!!!!!
+      if (com_uti.platform_file_entirely_ours ()) {
         //boolean bret = com_uti.file_delete (platform_file);
         //com_uti.loge ("!!!!!!!!!! Our file remove bret: : " + bret);
         cmd += ("rm " + platform_file + " ; ");
@@ -651,19 +660,21 @@ public final class com_uti  {
 
   private static String platform_copy = "/data/data/fm.a2d.sf/files/audio_platform_info.xml";
   private static String platform_file = "/system/etc/audio_platform_info.xml";
-  private static String platform_orig = "/system/etc/audio_platform_info.xml.orig";
+  public  static String platform_orig = "/system/etc/audio_platform_info.xml.orig";
   private static java.io.BufferedWriter bw = null;
   public static void acdbfix_install (Context context) {
     com_uti.logd ("");
     String line = null;
     try {
-      //fos = context.openFileOutput ("/data/data/fm.a2d.sf/files/audio_platform_info.xml", Context.MODE_WORLD_WRITEABLE | Context.MODE_WORLD_READABLE);     // NullPointerException here unless permissions 755
+      //fos = context.openFileOutput (platform_copy, Context.MODE_WORLD_WRITEABLE | Context.MODE_WORLD_READABLE);     // NullPointerException here unless permissions 755
                                                                         // Create/open output file for writing & reading
       bw = new java.io.BufferedWriter (new java.io.FileWriter (platform_copy), 8192);//512);  // Should never need more than 512 bytes per line
-      if (! com_uti.file_get (platform_file)) {
-        create_file_fix (context);
-        bw.close ();                                                     // Close output file
-        acdbfix_copy (context);
+
+      if (! com_uti.file_get (platform_file)) {                         // If there is no audio platform info file...
+        create_file_fix (context);                                      // Create it
+        bw.close ();                                                    // Close output file
+        acdbfix_copy (context);                                         // Copy audio platform info and addon.d script to /system
+
         com_uti.logd ("done");
         return;
       }
@@ -673,8 +684,9 @@ public final class com_uti  {
       while (true) {
         line = br.readLine ();
         if (line == null) {
-          bw.close ();                                                     // Close output file
-          acdbfix_copy (context);
+          bw.close ();                                                  // Close output file
+          acdbfix_copy (context);                                       // Copy audio platform info and addon.d script to /system
+
           com_uti.logd ("done");
           return;
         }
@@ -687,9 +699,7 @@ public final class com_uti  {
     catch (Throwable e) {
       com_uti.loge ("exception: " + e);
       e.printStackTrace ();
-      //return;
     }
-    //create_file_fix (context);
   }
 
   private static void acdbfix_copy (Context context) {
@@ -701,6 +711,10 @@ public final class com_uti  {
     }
     cmd += ("cp " + platform_copy + " " + platform_file + " ; ");
     cmd += ("chmod 644 " + platform_file + " ; ");
+
+    cmd += ("cp /data/data/fm.a2d.sf/files/99-spirit.sh /system/addon.d/99-spirit.sh ; ");
+    cmd += ("chmod 755 /system/addon.d/99-spirit.sh ; ");
+
     cmd += ("mount -o remount,ro /system ; ");
     //cmd += ("killall -hup mediaserver ; ");
     cmd += ("killall mediaserver ; ");
@@ -745,9 +759,9 @@ public final class com_uti  {
 
       int exit_val = p.waitFor ();                                      // This could hang forever ?
       if (exit_val != 0)
-        com_uti.loge ("exit_val: " + exit_val);
+        com_uti.logw ("cmds [0]: " + cmds [0] + "  exit_val: " + exit_val);
       else
-        com_uti.logd ("exit_val: " + exit_val);
+        com_uti.logd ("cmds [0]: " + cmds [0] + "  exit_val: " + exit_val);
 
       //os.flush ();
       return (exit_val);
@@ -1045,8 +1059,9 @@ Evo 4G LTE  jewel
     else if (gs3_no2_get ())
       com_uti.chass_plug_aud = "GS3";
 
-    else if (com_uti.sony_get () && file_get ("/system/lib/libbt-fmrds.so"))     // ? Z2/Z3 need to be more specific ?
-      com_uti.chass_plug_aud = "XZ2";
+    //else if (com_uti.sony_get () && file_get ("/system/lib/libbt-fmrds.so"))      // DISABLED: Was causing many QCV Sony's to be mis-identified  // ? Z2/Z3 need to be more specific ?
+    //  com_uti.chass_plug_aud = "XZ2";
+
     else if (sys_prop_device.startsWith ("Z3") || sys_prop_device.startsWith ("SGP5") || sys_prop_device.startsWith ("SOT") || sys_prop_device.startsWith ("SO-05") || sys_prop_device.startsWith ("D65") || sys_prop_device.startsWith ("SO-03") || sys_prop_device.startsWith ("CASTOR") || sys_prop_device.startsWith ("SIRIUS") || 
         sys_prop_device.startsWith ("D66") || sys_prop_device.startsWith ("D58") || sys_prop_device.startsWith ("LEO"))
       com_uti.chass_plug_aud = "XZ2";
@@ -1054,7 +1069,8 @@ Evo 4G LTE  jewel
 //C65, C66, C69
                                 // NECCASIO G'zOne Commando 4G LTE– C811
     else if (sys_prop_device.startsWith ("C811") || sys_prop_device.startsWith ("EVITA") || sys_prop_device.startsWith ("VILLE") || sys_prop_device.startsWith ("JEWEL")//) // || sys_prop_device.startsWith ("SCORPION")) //_MINI_U"))
-          || sys_prop_device.startsWith ("C2") || sys_prop_device.startsWith ("C21") || sys_prop_device.startsWith ("C19") || sys_prop_device.startsWith ("C6") || sys_prop_device.startsWith ("SGP3") || sys_prop_device.startsWith ("LT29") || sys_prop_device.startsWith ("LT30") ||
+          || sys_prop_device.startsWith ("C2") || sys_prop_device.startsWith ("C21") || sys_prop_device.startsWith ("C19") || sys_prop_device.startsWith ("C6") || sys_prop_device.startsWith ("SGP3") || sys_prop_device.startsWith ("LT29")
+          || sys_prop_device.startsWith ("LT30") || sys_prop_device.startsWith ("D55") ||
                 //  || sys_prop_device.startsWith ("C65") || sys_prop_device.startsWith ("C66") || sys_prop_device.startsWith ("C69")    // Japan Xperia Z1  SO-01f & SOL23 (Australia also SOL23)
              sys_prop_device.startsWith ("YUGA") || sys_prop_device.startsWith ("ODIN") || sys_prop_device.startsWith ("TSUBASA") || sys_prop_device.startsWith ("HAYABUSA") || sys_prop_device.startsWith ("MINT") || sys_prop_device.startsWith ("POLLUX") || sys_prop_device.startsWith ("HONAMI") ||
              sys_prop_device.startsWith ("GEE")   )    // LG Optimus G/G Pro
@@ -1103,6 +1119,13 @@ Evo 4G LTE  jewel
       com_uti.loge ("UNK fix -> chass_plug_aud: " + com_uti.chass_plug_aud);
     }
     com_uti.logd ("Auto-Detected chass_plug_aud: " + com_uti.chass_plug_aud);
+    //if (com_uti.chass_plug_aud.equals ("UNK"))    DISABLED: because gui_gui needs to know if device unknown.
+    //  com_uti.chass_plug_aud = "CUS";
+
+    if (s2_tx_apk () && ! com_uti.chass_plug_aud.equals ("QCV")) {
+      com_uti.loge ("Transmit forcing QCV, otherwise chass_plug_aud: " + com_uti.chass_plug_aud);
+      com_uti.chass_plug_aud = "QCV";
+    }
 
     com_uti.chass_plug_aud = com_uti.prefs_get (context, "chass_plug_aud", com_uti.chass_plug_aud);
     com_uti.logd ("Final chass_plug_aud: " + com_uti.chass_plug_aud);
@@ -1137,7 +1160,15 @@ Evo 4G LTE  jewel
       com_uti.chass_plug_tnr = "BCH";
     else
       com_uti.chass_plug_tnr = "UNK";
+
     com_uti.logd ("Auto-Detected chass_plug_tnr: " + com_uti.chass_plug_tnr);
+    //if (com_uti.chass_plug_tnr.equals ("UNK"))
+    //  com_uti.chass_plug_tnr = "CUS";
+
+    if (s2_tx_apk () && ! com_uti.chass_plug_tnr.equals ("QCV")) {
+      com_uti.loge ("Transmit forcing QCV, otherwise chass_plug_tnr: " + com_uti.chass_plug_tnr);
+      com_uti.chass_plug_tnr = "QCV";
+    }
 
     com_uti.chass_plug_tnr = com_uti.prefs_get (context, "chass_plug_tnr", com_uti.chass_plug_tnr);
     com_uti.logd ("Final chass_plug_tnr: " + com_uti.chass_plug_tnr);
@@ -2106,16 +2137,18 @@ b31:    AUDIO_DEVICE_BIT_IN      = 0x80000000,
         com_uti.logd ("Aborting tuner_bulk for do_daemon_cmd_sem: " + do_daemon_cmd_sem + "  res_len: " + res_len + "  rx_tmo: " + rx_tmo + "  cmd: \"" + cmd + "\"  last_cmd: \"" + last_cmd + "\"");
         return (-999);
       }
-      com_uti.loge ("Waiting for do_daemon_cmd_sem: " + do_daemon_cmd_sem + "  res_len: " + res_len + "  rx_tmo: " + rx_tmo + "  cmd: \"" + cmd + "\"  last_cmd: \"" + last_cmd + "\"");
-      com_uti.ms_sleep (101);
+      com_uti.logw ("Waiting for do_daemon_cmd_sem: " + do_daemon_cmd_sem + "  res_len: " + res_len + "  rx_tmo: " + rx_tmo + "  cmd: \"" + cmd + "\"  last_cmd: \"" + last_cmd + "\"");
+      com_uti.quiet_ms_sleep (101);
       do_daemon_cmd_sem ++;
     }
 
     last_cmd = cmd;                                                     // Update last command to our current command, now that semaphore is obtained
 
     long sem_ms = com_uti.tmr_ms_get () - start_sem_ms;                 // Log semaphore wait time
-    if (sem_ms > 20)
+    if (sem_ms > 500)
       com_uti.loge ("Semaphore wait time sem_ms: " + sem_ms);
+    else if (sem_ms > 100)
+      com_uti.logw ("Semaphore wait time sem_ms: " + sem_ms);
     else if (ena_log_daemon_cmd_sem)
       com_uti.logd ("Semaphore wait time sem_ms: " + sem_ms);           // 6-7 ms is common, 11 ms less common
 
@@ -2232,15 +2265,15 @@ b31:    AUDIO_DEVICE_BIT_IN      = 0x80000000,
     int max_timeouts = 3;
     if (rx_tmo > 0)//2000)
       max_timeouts = 1;
-    while (timeouts ++ < max_timeouts) {
+    while (timeouts < max_timeouts) {
       start_ms = com_uti.tmr_ms_get ();                                 // Reset start_ms to current time for first try and after each timeout
       res = string_daemon_cmd (key + " " + val, rx_tmo);                // Send set command to daemon
       cmd_time_ms = com_uti.tmr_ms_get () - start_ms;                   // Calculate time taken for command
 
-      if (cmd_time_ms > (rx_tmo * 15) / 16)
-        com_uti.loge ("timeouts: " + timeouts + "  cmd_time_ms: " + cmd_time_ms);
-      else
+      if (cmd_time_ms <= (rx_tmo * 15) / 16)
         break;
+      timeouts ++;
+      com_uti.loge ("timeouts: " + timeouts + "  cmd_time_ms: " + cmd_time_ms);
     }
 
     com_uti.logd ("after  string_daemon_cmd key: " + key + "  val: " + val + "  res: " + res + "  cmd_time_ms: " + cmd_time_ms + "  timeouts: " + timeouts);
@@ -2249,27 +2282,7 @@ b31:    AUDIO_DEVICE_BIT_IN      = 0x80000000,
   }
 
 
-    // !! Use native_priority_set() instead !!
 /*
-
-  #include <sys/time.h>
-  #include <sys/resource.h>
-
-  jint Java_fm_a2d_s2_svc_1aud_native_1priority_1set (JNIEnv * env, jobject thiz, jint new_priority) {
-    logd ("native_priority_set new_priority: %d", new_priority);
-    int priority = 0;
-    priority = getpriority (PRIO_PROCESS, 0);
-    logd ("native_priority_set priority: %d  errno: %d", priority, errno);
-
-    priority = setpriority (PRIO_PROCESS, 0, new_priority);//-19);
-    logd ("native_priority_set priority: %d  errno: %d", priority, errno);
-
-    priority = getpriority (PRIO_PROCESS, 0);
-    logd ("native_priority_set priority: %d  errno: %d", priority, errno);
-    return (0);
-  }
-
-
   private static void old_thread_priority_set () {
 
     int tid = -5;
@@ -2398,62 +2411,32 @@ http://www.netmite.com/android/mydroid/frameworks/base/include/utils/threads.h
     }
   }
 
-  public static boolean s2_tx_get () {
-    boolean s2_tx = false;
-    if (s2_tx_apk ())
-      s2_tx = ! com_uti.file_get ("/data/data/fm.a2d.sf/files/s2_rx");
-    else
-      s2_tx = com_uti.file_get ("/data/data/fm.a2d.sf/files/s2_tx");
-    com_uti.logd ("s2_tx: " + s2_tx);
-    return (s2_tx);
-  }
-
-  public static boolean s2_tx_set (boolean s2_tx) {
-    if (s2_tx) {
-      if (s2_tx_apk ())
-
-        com_uti.sys_run ("rm /data/data/fm.a2d.sf/files/s2_rx", false);
-      else
-        com_uti.sys_run ("touch /data/data/fm.a2d.sf/files/s2_tx", false);
-    }
-    else {
-      if (s2_tx_apk ())
-        com_uti.sys_run ("touch /data/data/fm.a2d.sf/files/s2_rx", false);
-      else
-        com_uti.sys_run ("rm /data/data/fm.a2d.sf/files/s2_tx", false);
-    }
-    return (s2_tx);
-  }
-
   public static int tnru_band_set (String band) {
     com_uti.logd ("band: " + band);
-    com_uti.band_freq_lo =  87500;                                              // Actually  87900 for US
-    com_uti.band_freq_hi = 108000;                                              // Actually 107900 for US
+    com_uti.band_freq_lo =  87500;                                      // Actually  87900 for US
+    com_uti.band_freq_hi = 108000;                                      // Actually 107900 for US
     com_uti.band_freq_inc = 100;
     com_uti.band_freq_odd = 0;
 
-    if (band.equals ("US")) {
+    if (band.equals ("EU")) {
+    }
+    else if (band.equals ("US")) {
       com_uti.band_freq_inc = 200;
       com_uti.band_freq_odd = 1;
     }
-    else if (band.equals ("EU")) {
-    }
-    else if (band.equals ("JAPAN")) {
-      com_uti.band_freq_lo =  76000;
-      com_uti.band_freq_hi =  90000;
-    }
-    else if (band.equals ("CHINA")) {
-      com_uti.band_freq_lo =  70000;
-      com_uti.band_freq_inc = 50;
-    }
-    else if (band.equals ("EU_50K_OFFSET")) {
-      com_uti.band_freq_inc = 50;
+    else if (band.equals ("UU")) {
+      if (com_uti.chass_plug_tnr.equals ("BCH")) {
+        com_uti.band_freq_lo =  76000;//65000;
+        com_uti.band_freq_hi = 90000;
+      }
+      else {
+        com_uti.band_freq_lo =  76000;
+      }
     }
 
     com_uti.logd ("lo: " + com_uti.band_freq_lo + "  hi: " + com_uti.band_freq_hi + "  inc: " + com_uti.band_freq_inc + "  odd: " + band_freq_odd);
     return (0);
   }
-
 
   private static int band_freq_updn_get (int tuner_freq_int, boolean up) {
     int new_freq;
@@ -2464,10 +2447,11 @@ http://www.netmite.com/android/mydroid/frameworks/base/include/utils/threads.h
     return (new_freq);
   }
 
+  private static int mhz_get_freq_inc = 50; //5;
   public static String tnru_mhz_get (int freq) {
-    freq += 25;                                                         // Round up...
-    freq = freq / 50;                                                   // Nearest 50 KHz
-    freq *= 50;                                                         // Back to KHz scale
+    freq += mhz_get_freq_inc / 2;                                       // Round up...
+    freq = freq / mhz_get_freq_inc;                                     // Nearest 50 KHz or mhz_freq_inc
+    freq *= mhz_get_freq_inc;                                           // Back to KHz scale
     double dfreq = (double) freq;
     dfreq = java.lang.Math.rint (dfreq);
     dfreq /= 1000;
@@ -2498,7 +2482,12 @@ http://www.netmite.com/android/mydroid/frameworks/base/include/utils/threads.h
     return (ifreq);
   }
 
+
   public static int tnru_freq_fix (int freq) {
+    return (tnru_freq_fix_inc (freq, com_uti.band_freq_inc));           // mhz_get_freq_inc
+  }
+
+  public static int tnru_freq_fix_inc (int freq, int inc) {
 
     // w/ Odd:  107900-108099 -> 107900     = Add 100, Divide by 200, then multiply by 200, then subtract 100
     // w/ Even: 108000-108199 -> 108000     = Divide by 200, then multiply by 200  (freq_inc)
@@ -2508,19 +2497,20 @@ http://www.netmite.com/android/mydroid/frameworks/base/include/utils/threads.h
     //com_uti.logd ("lo: " + com_uti.band_freq_lo + "  hi: " + com_uti.band_freq_hi + "  inc: " + com_uti.band_freq_inc + "  odd: " + com_uti.band_freq_odd);
 
     if (com_uti.band_freq_odd != 0) {
-      freq += com_uti.band_freq_inc / 2;    // 87700
-      freq /= com_uti.band_freq_inc;
-      freq *= com_uti.band_freq_inc;        // 87600
-      freq -= com_uti.band_freq_inc / 2;    // 87500
+      freq += inc / 2;    // 87700
+      freq /= inc;
+      freq *= inc;        // 87600
+      freq -= inc / 2;    // 87500
       //com_uti.logd ("US ODD freq: "  + freq);
     }
     else {
-      freq /= com_uti.band_freq_inc;
-      freq *= com_uti.band_freq_inc;
+      freq /= inc;
+      freq *= inc;
       //com_uti.logd ("EU ALL freq: "  + freq);
     }
     return (freq);
   }
+
   public static int tnru_freq_enforce (int freq) {
     if (freq < com_uti.band_freq_lo)
       freq = com_uti.band_freq_hi;
@@ -2946,12 +2936,14 @@ It should be noted that operation in this region is the same as it is for all RD
       return (true);
     return (false);
   }
+
 /* OLD: 4 states:
     BT Off                                                            Use UART  (or BT on and install/use shim if possible)
     BT On & (Shim Not Installed or Shim Old)    Install Shim, BT Off, Use UART      First run before reboot or first boot after ROM update with no addon.d fix
     BT On &  Shim     Installed & NOT Active                  BT Off, Use UART      Need reboot & BT to be active
     BT On &  Shim     Installed &     Active                          Use SHIM  */
-  public static int shim_install () {
+
+  public static int shim_install () {                                   // XZ2:    Can't remount /system as ro
     main_thread_get ("shim_install");
     int ret = 0;
     boolean restart_bt = false;
@@ -2993,17 +2985,13 @@ com_uti.sys_run ("killall com.android.bluetooth", true);
     //com_uti.sys_run (cmd, true);
     //com_uti.ms_sleep (1000);                                              // Extra 1 second delay to ensure
 
-  private static void shim_remove_log (String log) {
-    //Toast.makeText (context, log, Toast.LENGTH_LONG).show ();
-    loge (log);
-  }
 
   public static int shim_remove () {
     main_thread_get ("shim_remove");
     int ret = 0;
 
     if (! shim_files_operational_get ()) {
-      shim_remove_log ("Shim file not installed !!");
+      com_uti.loge ("Shim file not installed !!");
 //      return (-1);
     }
 
@@ -3012,13 +3000,17 @@ com_uti.sys_run ("killall com.android.bluetooth", true);
 
     if (com_uti.file_get ("/system/lib/libbt-hcio.so"))  //shim_files_operational_get ())
       cmd += ("mv /system/lib/libbt-hcio.so  /system/lib/libbt-hci.so ; ");
+    else if (! com_uti.file_get ("/system/lib/libbt-hci.so"))
+      com_uti.logd ("No /system/lib/libbt-hci.so installed");
     else
-      shim_remove_log ("No original hci shim file installed !!");
+      com_uti.loge ("No original hci shim file installed !!");
 
     if (com_uti.file_get ("/system/vendor/lib/libbt-vendoro.so"))  //shim_files_operational_get ())
       cmd += ("mv /system/vendor/lib/libbt-vendoro.so  /system/vendor/lib/libbt-vendor.so ; ");
+    else if (! com_uti.file_get ("/system/vendor/lib/libbt-vendor.so"))
+      com_uti.logd ("No /system/vendor/lib/libbt-vendor.so installed");
     else
-      shim_remove_log ("No original vendor shim file installed !!");
+      com_uti.loge ("No original vendor shim file installed !!");
 
     if (com_uti.file_get ("/system/addon.d/99-spirit.sh"))
       cmd += ("rm /system/addon.d/99-spirit.sh ; ");
@@ -3028,18 +3020,16 @@ com_uti.sys_run ("killall com.android.bluetooth", true);
 
     if (! shim_files_operational_get ()) {
       com_uti.logd ("Removed SHIM OK");
-      shim_remove_log ("Removed SHIM OK");
     }
     else {
       com_uti.loge ("Remove SHIM ERROR");
-      shim_remove_log ("Remove SHIM ERROR");
       ret = -1;
     }
 
 //com_uti.sys_run ("killall com.android.bluetooth", true);
 
 /*
-    //shim_remove_log ("WARM RESTART !!");
+    //com_uti.loge ("WARM RESTART !!");
     com_uti.sys_run ("kill `pidof system_server`", true);
 */
     return (ret);
@@ -3071,7 +3061,7 @@ private final int getAndIncrement(int modulo) {
     boolean ret = false;                                                //      BUT: if isEnabled () doesn't work, m_bt_adapter.enable () and m_bt_adapter.disable () may not work either.
     if (m_bt_adapter == null)
       if (! bta_get ())
-        return (false);
+        return (ret);
     ret = m_bt_adapter.isEnabled ();
     com_uti.logd ("bt_get isEnabled (): " + ret);
     return (ret);
@@ -3088,20 +3078,20 @@ private final int getAndIncrement(int modulo) {
       if (! bta_get ())
         return (-1);
 
-    boolean bt = bt_get ();
-    if (bt_pwr && bt) {
+    boolean bt = bt_get ();                                             // bt = current BT state
+    if (bt_pwr && bt) {                                                 // If want BT and have BT...
       com_uti.logd ("bt_set BT already on");
       return (0);
     }
-    if (! bt_pwr && ! bt) {
+    if (! bt_pwr && ! bt) {                                             // If not want BT and not have BT...
       com_uti.logd ("bt_set BT already off");
       return (0);
     }
-    if (bt_pwr) {                                                       // If request for BT on
+    if (bt_pwr) {                                                       // If actionable request for BT on
       com_uti.logd ("bt_set BT turning on");
 
       try {
-        m_bt_adapter.enable ();                                       // Start enable BT
+        m_bt_adapter.enable ();                                         // Start enable BT
       }
       catch (Throwable e) {
         com_uti.loge ("bt_set m_bt_adapter.disable () Exception");
@@ -3110,7 +3100,7 @@ private final int getAndIncrement(int modulo) {
       if (! wait)                                                       // If no wait
         return (0);                                                     // Done w/ no error
 
-      bt_wait (true);                                                   // Wait until BT is on or times out
+      bt_wait (true);                                                   // Else wait until BT is on or times out
       bt = bt_get ();
       if (bt) {
         com_uti.logd ("bt_set BT on success");
@@ -3119,7 +3109,7 @@ private final int getAndIncrement(int modulo) {
       com_uti.loge ("bt_set BT on error");
       return (-1);
     }
-    else {
+    else {                                                              // Else if actionable request for BT off
       com_uti.logd ("bt_set BT turning off");
       try {
         m_bt_adapter.disable ();                                        // Start disable BT
@@ -3143,18 +3133,82 @@ private final int getAndIncrement(int modulo) {
   }
 
   private static void bt_wait (boolean wait_on) {
+    com_uti.logd ("Start wait_on: " + wait_on);
     int ctr = 0;
     boolean done = false;
 
     while (! done && ctr ++ < 100 ) {                                   // While not done and 10 seconds has not elapsed...
-      com_uti.ms_sleep (100);                                           // Wait 0.1 second
       if (wait_on)                                                      // If waiting for BT on...
         done = bt_get ();                                               // Done if BT on
       else                                                              // Else if waiting for BT off...
         done = ! bt_get ();                                             // Done if BT off
+      if (! done)
+        com_uti.quiet_ms_sleep (100);                                   // Wait 0.1 second
     }
+    com_uti.logd ("wait_on: " + wait_on + "  done: " + done);
     return;
   }
+
+  public static void rfkill_bt_wait (boolean wait_on) {
+    com_uti.logd ("Start wait_on: " + wait_on);
+    int ctr = 0;
+    boolean done = false;
+
+    while (! done && ctr ++ < 100 ) {                                   // While not done and 10 seconds has not elapsed...
+      if (wait_on)                                                      // If waiting for BT on...
+        done = bt_get ();                                               // Done if BT on
+      else                                                              // Else if waiting for BT off...
+        done = ! bt_get ();                                             // Done if BT off
+      if (! done)
+        com_uti.quiet_ms_sleep (100);                                   // Wait 0.1 second
+    }
+    com_uti.logd ("wait_on: " + wait_on + "  done: " + done);
+    return;
+  }
+
+
+  private static boolean rfkill_bt_get () {
+    String state = rfkill_state_get ();
+    if (state.equals ("1"))
+      return (true);
+    else
+      return (false);
+  }
+
+  private static String rfkill_state_get () {
+    String state = "0";
+    try {
+      state = (new BufferedReader (new FileReader ("/sys/class/rfkill/rfkill0/state"))).readLine ();
+      com_uti.logd ("Read rfkill0/state: " + state);
+    }
+    catch (Throwable e) {
+      e.printStackTrace ();
+      com_uti.loge ("Read rfkill0/state Exception");
+    }
+    return (state);
+  }
+/*
+  private int rfkill_state_set (int state) {
+    com_uti.logd ("state: " + state);
+    if (state != 0) {                                                   // If turning on...
+      //rfkill_state_set_on = true;
+    }
+    else {                                                              // Else if turning off...
+      if (! rfkill_state_set_on)                                        // If was not previously off...
+        return (0);                                                     // Done
+    }
+    rfkill_state_get ();                                                // Display rfkill state
+    String [] cmds = {("")};
+    cmds [0] = ("echo " + state + " > /sys/class/rfkill/rfkill0/state");
+    com_uti.sys_WAS_run (cmds, true);                                         // Set rfkill state WITH SU/Root
+    rfkill_state_get ();                                                // Display rfkill state
+    if (state != 0)                                                     // If turning on...
+      rfkill_state_set_on = true;
+    else
+      rfkill_state_set_on = false;
+    return (0);
+  }
+*/
 
     // Install app:
 /*private void app_install (String filename) {

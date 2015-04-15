@@ -70,6 +70,18 @@ dialogTitle not needed if same as title
    </PreferenceCategory>
    <PreferenceCategory
    android:title="QCom">
+    <ListPreference
+    android:key="tuner_antenna"
+    android:title="QCom Antenna"
+    android:entries="@array/tuner_antenna"
+    android:entryValues="@array/tuner_antenna"
+    />
+    <ListPreference
+    android:key="tuner_mode"
+    android:title="Mode"
+    android:entries="@array/tuner_mode"
+    android:entryValues="@array/tuner_mode"
+    />
     <EditTextPreference
     android:key="tuner_rds_pi"
     android:title="Transmit RDS PI"
@@ -85,18 +97,6 @@ dialogTitle not needed if same as title
     <EditTextPreference
     android:key="tuner_rds_rt"
     android:title="Transmit RDS RT"
-    />
-    <ListPreference
-    android:key="tuner_antenna"
-    android:title="QCom Antenna"
-    android:entries="@array/tuner_antenna"
-    android:entryValues="@array/tuner_antenna"
-    />
-    <ListPreference
-    android:key="tuner_mode"
-    android:title="Mode"
-    android:entries="@array/tuner_mode"
-    android:entryValues="@array/tuner_mode"
     />
 -->
    </PreferenceCategory>
@@ -126,6 +126,27 @@ dialogTitle not needed if same as title
     />
    </PreferenceCategory>
    <PreferenceCategory
+   android:title="Debug">
+    <ListPreference
+    android:key="audio_pseudo_source"
+    android:title="Pseudo Source"
+    android:entries="@array/audio_pseudo_source"
+    android:entryValues="@array/audio_pseudo_source"
+    />
+    <EditTextPreference
+    android:key="audio_digital_amp"
+    android:title="Digital Amp"
+    />
+    <EditTextPreference
+    android:key="audio_samplerate"
+    android:title="Sample Rate"
+    />
+    <EditTextPreference
+    android:key="audio_buffersize"
+    android:title="Buffer Size"
+    />
+   </PreferenceCategory>
+   <PreferenceCategory
    android:title="Record">
     <EditTextPreference
     android:key="audio_record_directory"
@@ -142,27 +163,6 @@ dialogTitle not needed if same as title
     />
 -->
    </PreferenceCategory>
-   <PreferenceCategory
-   android:title="Debug">
-    <EditTextPreference
-    android:key="audio_digital_amp"
-    android:title="Digital Amp"
-    />
-    <EditTextPreference
-    android:key="audio_samplerate"
-    android:title="Sample Rate"
-    />
-    <EditTextPreference
-    android:key="audio_buffersize"
-    android:title="Buffer Size"
-    />
-    <ListPreference
-    android:key="audio_pseudo_source"
-    android:title="Pseudo Source"
-    android:entries="@array/audio_pseudo_source"
-    android:entryValues="@array/audio_pseudo_source"
-    />
-   </PreferenceCategory>
   </PreferenceScreen>
 
   <PreferenceScreen   android:title="GUI">
@@ -171,6 +171,7 @@ dialogTitle not needed if same as title
     android:title="Visual State"
     android:entries="@array/state_2"
     android:entryValues="@array/state_2"/>
+<!--
     <ListPreference
     android:key="gui_display_name"
     android:title="Display Name"
@@ -183,6 +184,7 @@ dialogTitle not needed if same as title
     android:entries="@array/dynamic_metadata"
     android:entryValues="@array/dynamic_metadata"
     />
+-->
   </PreferenceScreen>
 <!--
 -->
@@ -207,6 +209,7 @@ dialogTitle not needed if same as title
     />
    </PreferenceCategory>
 -->
+<!--
    <PreferenceCategory
    android:title="Media Button Actions">
     <ListPreference
@@ -228,6 +231,7 @@ dialogTitle not needed if same as title
     android:entryValues="@array/chass_action"
     />
    </PreferenceCategory>
+-->
    <PreferenceCategory
    android:title="Updates">
     <ListPreference
@@ -235,6 +239,17 @@ dialogTitle not needed if same as title
     android:title="Update Notification"
     android:entries="@array/enable_disable"
     android:entryValues="@array/enable_disable"/>
+    <ListPreference
+    android:key="chass_update_gui"
+    android:title="Update GUI Intents"
+    android:entries="@array/enable_disable"
+    android:entryValues="@array/enable_disable"/>
+    <ListPreference
+    android:key="chass_update_remote"
+    android:title="Update Remote RCC:AVRCP/4.4Lockscr"
+    android:entries="@array/enable_disable"
+    android:entryValues="@array/enable_disable"/>
+<!--
     <ListPreference
     android:key="chass_notifremote_title"
     android:title="Notif/Remote Title"
@@ -247,16 +262,7 @@ dialogTitle not needed if same as title
     android:entries="@array/dynamic_metadata"
     android:entryValues="@array/dynamic_metadata"
     />
-    <ListPreference
-    android:key="chass_update_gui"
-    android:title="Update GUI Intents"
-    android:entries="@array/enable_disable"
-    android:entryValues="@array/enable_disable"/>
-    <ListPreference
-    android:key="chass_update_remote"
-    android:title="Update Remote RCC:AVRCP/4.4Lockscr"
-    android:entries="@array/enable_disable"
-    android:entryValues="@array/enable_disable"/>
+-->
    </PreferenceCategory>
    <PreferenceCategory
    android:title="Debug">
@@ -277,6 +283,7 @@ dialogTitle not needed if same as title
 
 <!--
 -->
+<!--
   <PreferenceScreen   android:title="Debug">
    <PreferenceCategory
    android:title="General">
@@ -288,6 +295,7 @@ dialogTitle not needed if same as title
     />
    </PreferenceCategory>
   </PreferenceScreen>
+-->
 
 
 </PreferenceScreen>

@@ -68,7 +68,6 @@ public class svc_svc extends Service implements svc_tcb, svc_acb {  // Service c
 
   private AudioManager          m_AM = null;
 
-  private boolean s2_tx             = false;
   private boolean remote_rcc_enable = false;
   private boolean service_update_gui = true;
   private boolean service_update_notification = true;
@@ -100,12 +99,8 @@ public class svc_svc extends Service implements svc_tcb, svc_acb {  // Service c
 
       m_AM = (AudioManager) m_context.getSystemService (Context.AUDIO_SERVICE);
 
-      s2_tx = com_uti.s2_tx_get ();
-      if (s2_tx)
-        com_uti.logd ("s2_tx");
-
-      if (s2_tx) {                                                      // If Transmit mode
-        remote_rcc_enable = false;                                      // Not needed; need for receive only
+      if (com_uti.s2_tx_apk ()) {                                       // If Transmit APK
+        remote_rcc_enable = false;                                      // Remote/RCC not needed, for receive only
       }
                                                                         // Else if receive mode and Kitkat or earlier
       else if (com_uti.android_version <  VERSION_CODES.LOLLIPOP) {
@@ -238,6 +233,7 @@ public class svc_svc extends Service implements svc_tcb, svc_acb {  // Service c
     String val = "";                                                    // Value used for many
 
 
+
 // audio_android_smo    // ?? setMode == setPhoneState ???
     if (! (val = extras.getString ("audio_android_smo", "")).equals ("")) {
       m_AM.setMode (com_uti.int_get (val));
@@ -338,6 +334,8 @@ public class svc_svc extends Service implements svc_tcb, svc_acb {  // Service c
       m_svc_tap.tuner_set ("tuner_seek_state", val);
     }
 
+    //val = extras.getString ("service_preset_go", "");
+
 // service_seek_state : preset or seek
     val = extras.getString ("service_seek_state", "");
     //com_uti.loge ("preset or seek extras.getString (\"service_seek_state\", \"\") val: " + val);
@@ -401,15 +399,17 @@ public class svc_svc extends Service implements svc_tcb, svc_acb {  // Service c
 
 
 // These are just passed directly to the daemon:
-    com_uti.extras_daemon_set ("tuner_vol",   extras);
-    com_uti.extras_daemon_set ("tuner_acdb",   extras);
-    com_uti.extras_daemon_set ("tuner_softmute", extras);
+    com_uti.extras_daemon_set ("tuner_vol",     extras);
+    com_uti.extras_daemon_set ("tuner_mute",    extras);
+    com_uti.extras_daemon_set ("tuner_acdb",    extras);
+    com_uti.extras_daemon_set ("tuner_softmute",extras);
+    com_uti.extras_daemon_set ("tuner_thresh",  extras);
     com_uti.extras_daemon_set ("tuner_antenna", extras);
 
-    com_uti.extras_daemon_set ("tuner_rds_pi", extras);
-    com_uti.extras_daemon_set ("tuner_rds_pt", extras);
-    com_uti.extras_daemon_set ("tuner_rds_ps", extras);
-    com_uti.extras_daemon_set ("tuner_rds_rt", extras);
+    com_uti.extras_daemon_set ("tuner_rds_pi",  extras);
+    com_uti.extras_daemon_set ("tuner_rds_pt",  extras);
+    com_uti.extras_daemon_set ("tuner_rds_ps",  extras);
+    com_uti.extras_daemon_set ("tuner_rds_rt",  extras);
 
     //Disable Plugin changing to ensure problems don't happen while FM running
 //    com_uti.extras_daemon_set ("chass_plug_aud", extras);
@@ -491,7 +491,7 @@ public class svc_svc extends Service implements svc_tcb, svc_acb {  // Service c
     if (! screen_on)
       return;
 
-    com_uti.logw ("caller: " + caller);
+    com_uti.logv ("caller: " + caller);
 
     if (screen_on && service_update_gui) {
       Intent service_update_intent = service_update_send ();            // Send Intent to send and Update widgets, GUI(s), other components and 
@@ -591,7 +591,7 @@ public class svc_svc extends Service implements svc_tcb, svc_acb {  // Service c
 
 
 
-  private int preset_curr_set (String freq) {                           // Set preset_curr to a valid preset index for passed frequency
+  private int preset_curr_set (String freq) {                           // Set preset_curr to a valid preset index for passed frequency by searching preset list
     com_uti.logd ("freq: " + freq);
     if (preset_num > 0) {                                               // If we have any presets...
       if (freq.equals (plst_freq [preset_curr])) {                      // If current preset and passed frequency matches...
@@ -624,23 +624,32 @@ public class svc_svc extends Service implements svc_tcb, svc_acb {  // Service c
     return (preset_curr);
   }
 
-  private void preset_next (boolean up) {                               // Tune to next preset, up (true) or down
+  private void preset_go (int idx) {                                    // Tune to specified preset
     com_uti.logd ("start preset_curr: " + preset_curr + "  preset_num: " + preset_num);
     if (preset_num <= 0)                                                // If no presets, done
       return;
-    preset_curr_fix ();                                                 // First fix any problems
-    preset_curr_set (m_com_api.tuner_freq);
-    if (up)
-      preset_curr ++;
-    else
-      preset_curr --;
+
+    preset_curr = idx;
     preset_curr_fix ();                                                 // Fix any problems
     String freq = plst_freq [preset_curr];
     double freq_dou = com_uti.double_get (freq);
     int freq_int = (int) (freq_dou * 1000);
     com_uti.logd ("freq: " + freq + "  freq_int: " + freq_int + "  freq_dou: " + freq_dou + "  preset_curr: " + preset_curr + "  preset_num: " + preset_num);
-    if (! freq.equals (""))// && freq_int >= 50000 && freq_int <= 108000)
+    if (! freq.equals (""))// && freq_int >= com_uti.band_freq_lo && freq_int <= com_uti.band_freq_hi)
       tuner_freq_set (freq);
+  }
+
+  private void preset_next (boolean up) {                               // Tune to next preset, up (true) or down
+    com_uti.logd ("start preset_curr: " + preset_curr + "  preset_num: " + preset_num);
+    if (preset_num <= 0)                                                // If no presets, done
+      return;
+    preset_curr_fix ();                                                 // First fix any problems
+    preset_curr_set (m_com_api.tuner_freq);                             // Set preset_curr to a valid preset index for passed frequency by searching preset list
+    if (up)
+      preset_curr ++;
+    else
+      preset_curr --;
+    preset_go (preset_curr);
   }
 
 
@@ -697,16 +706,19 @@ public class svc_svc extends Service implements svc_tcb, svc_acb {  // Service c
   public void cb_audio_state (String new_audio_state) {                 // Audio state changed callback from svc_aud
     com_uti.logd ("new_audio_state: " + new_audio_state);
 
-    if (new_audio_state.equals ("Start")) {                   // If new audio state = Start...
-//      service_update_send ();                                           // Update GUI/Widget/Remote/Notification with latest data
+    if (new_audio_state.equals ("Start")) {                             // If new audio state = Start...
+      //service_update_send ();                                         // Update GUI/Widget/Remote/Notification with latest data
+
+      if (m_com_api.chass_plug_aud.equals ("QCV")) // && com_uti.om8_get ())    // !!!!!! remove om8_get for similar devices (LG G3 ?)
+        com_uti.ms_sleep (200);                                         // Otherwise M8 gets pop at start; 100 ms not enough
 
       com_uti.daemon_set ("tuner_mute", "Unmute");                      // Finally unmute tuner audio now that audio start has completed (!! ensure digital output does not require unmute earlier !)
     }
-    else if (new_audio_state.equals ("Stop")) {               // Else if new audio state = Stop...
-//      service_update_send ();                                           // Update GUI/Widget/Remote/Notification with latest data
+    else if (new_audio_state.equals ("Stop")) {                         // Else if new audio state = Stop...
+      //service_update_send ();                                         // Update GUI/Widget/Remote/Notification with latest data
     }
-    else if (new_audio_state.equals ("Pause")) {              // Else if new audio state = Pause...
-//      service_update_send ();                                           // Update GUI/Widget/Remote/Notification with latest data
+    else if (new_audio_state.equals ("Pause")) {                        // Else if new audio state = Pause...
+      //service_update_send ();                                         // Update GUI/Widget/Remote/Notification with latest data
       // Remote State = Still Playing
     }
     else {
@@ -749,7 +761,14 @@ public class svc_svc extends Service implements svc_tcb, svc_acb {  // Service c
   }
 
 
+  private boolean disable_wifi_hack = false;//true;
   private void wifi_hack () {
+
+    if (disable_wifi_hack)
+      return;
+
+    if (com_uti.bt_get ())
+      return;
 
     if (com_uti.android_version <  VERSION_CODES.LOLLIPOP)
       return;
@@ -778,7 +797,7 @@ public class svc_svc extends Service implements svc_tcb, svc_acb {  // Service c
 
   private void cb_tuner_state (String new_tuner_state) {
     com_uti.logd ("new_tuner_state: " + new_tuner_state);
-    if (new_tuner_state.equals ("Start")) {                   // If tuner state is Start...
+    if (new_tuner_state.equals ("Start")) {                             // If new tuner state is Start...
       service_update_send ();                                           // Update GUI/Widget/Remote/Notification with latest data
       foreground_start ();
       tuner_prefs_init ();                                              // Load tuner prefs
@@ -786,12 +805,12 @@ public class svc_svc extends Service implements svc_tcb, svc_acb {  // Service c
         need_audio_start_after_tuner_start = false;
         m_svc_aap.audio_state_set ("Start");                            // Set Audio State synchronously
       }
-wifi_hack ();
+      wifi_hack ();                                                     // For LG G2 CM12 BT/WiFi problem
       return;
     }
-    else if (new_tuner_state.equals ("Stop")) {               // Else if tuner state is Stop...
+    else if (new_tuner_state.equals ("Stop")) {                         // Else if new tuner state is Stop...
       service_update_send ();                                           // Update GUI/Widget/Remote/Notification with latest data
-      foreground_stop ();                                                 // !! match startForeground()
+      foreground_stop ();                                               // !! match startForeground()
 
         // Optional, but helps clear out old data/problems:
       com_uti.logd ("Before stopSelf()");
@@ -804,7 +823,7 @@ wifi_hack ();
       return;
     }
 
-//    displays_update ("cb_tuner_state");                                 // Update all displays/data sinks
+    //displays_update ("cb_tuner_state");                                 // Update all displays/data sinks
   }
 
   private class tuner_state_start_tmr_hndlr extends TimerTask {
@@ -868,9 +887,10 @@ wifi_hack ();
   }
 
 
-  private void tuner_freq_set (String freq) {//int freq) {                              // To fix float problems w/ 106.1 becoming 106099
+  private void tuner_freq_set (String freq) {
     com_uti.logd ("freq: " + freq);
-    int ifreq = com_uti.tnru_band_new_freq_get (freq, m_com_api.tuner_freq_int); // Deal with up, down, etc.
+                                                                        // Deal with up, down, etc.
+    int ifreq = com_uti.tnru_band_new_freq_get (freq, m_com_api.tuner_freq_int);
 
     //int ifreq = com_uti.tnru_khz_get (freq);
 
@@ -894,6 +914,8 @@ wifi_hack ();
 
     if (key == null)
       com_uti.loge ("key: " + key);
+    else if (key.equals ("tuner_bulk"))
+      cb_tuner_bulk (val);
     else if (key.equals ("tuner_state"))
       cb_tuner_state (val);
     else if (key.equals ("tuner_freq"))
@@ -943,7 +965,10 @@ wifi_hack ();
     m_com_api.tuner_rds_ta       = "";//";                               // ro ... ... Values:   0 - 65535   TA Traffic Announcement code
     m_com_api.tuner_rds_taf      = "";//";                               // ro ... ... Values:   0 - 2^32-1  TAF TA Frequency
 
-    int new_freq = com_uti.tnru_freq_fix (25 + com_uti.tnru_khz_get (freq));
+    int new_freq = 0;
+    new_freq = com_uti.tnru_freq_fix (25 + com_uti.tnru_khz_get (freq));
+    //!!!! CHANGE TO NEWER BETTER METHOD AFTER NEW RELEASE MARCH 17, 2015:  new_freq = com_uti.tnru_freq_fix_inc (25 + com_uti.tnru_khz_get (freq), 5);  // Otherwise setting 108.0 in US band sets to 107.9
+
     m_com_api.tuner_freq = com_uti.tnru_mhz_get (new_freq);
     m_com_api.tuner_freq_int = new_freq;
 
@@ -951,6 +976,12 @@ wifi_hack ();
 
     com_uti.prefs_set (m_context, "tuner_freq", new_freq);
   }
+
+  private void cb_tuner_bulk (String bulk) {
+    displays_update ("cb_tuner_bulk");
+  }
+
+
 // RSSI:
   private void cb_tuner_rssi (String rssi) {
     //com_uti.loge ("rssi: " + rssi);
@@ -986,11 +1017,11 @@ wifi_hack ();
   private int files_init () {
     com_uti.logd ("starting...");
 
-    //String wav_full_filename = com_uti.file_create (m_context, R.raw.s_wav,    "s.wav",         false);             // Not executable
-    //String bb1_full_filename = com_uti.file_create (m_context, R.raw.b1_bin,     "b1.bin",        false);             // Not executable
-    //String bb2_full_filename = com_uti.file_create (m_context, R.raw.b2_bin,     "b2.bin",        false);             // Not executable
+    //String wav_full_filename = com_uti.res_file_create (m_context, R.raw.s_wav,    "s.wav",         false);             // Not executable
+    //String bb1_full_filename = com_uti.res_file_create (m_context, R.raw.b1_bin,     "b1.bin",        false);             // Not executable
+    //String bb2_full_filename = com_uti.res_file_create (m_context, R.raw.b2_bin,     "b2.bin",        false);             // Not executable
 
-    String add_full_filename = com_uti.file_create (m_context, R.raw.spirit_sh,  "99-spirit.sh",  true);
+    String add_full_filename = com_uti.res_file_create (m_context, R.raw.spirit_sh,  "99-spirit.sh",  true);
         // Check:
     int ret = 0;
 
@@ -998,6 +1029,40 @@ wifi_hack ();
         com_uti.loge ("error unexecutable addon.d script 99-spirit.sh");
         ret ++;
       }
+// !!!!!! OM7 GPE does not have addon.d so shim is not updated
+      if (ret == 0 && com_uti.file_get ("/system/addon.d/99-spirit.sh") && com_uti.file_size_get ("/system/addon.d/99-spirit.sh") != com_uti.file_size_get ("/data/data/fm.a2d.sf/files/99-spirit.sh")) {
+
+        com_uti.logw ("Installing new shim files: Turn BT off");
+
+        com_uti.bt_set (false, true);                                   // Bluetooth off, and wait for off
+        com_uti.rfkill_bt_wait (false);                                 // Wait for BT off
+
+        String cmd = "";
+        cmd += ("mount -o remount,rw /system ; ");
+        cmd += ("cp /data/data/fm.a2d.sf/files/99-spirit.sh /system/addon.d/99-spirit.sh ; ");
+        cmd += ("chmod 755 /system/addon.d/99-spirit.sh ; ");
+        if (com_uti.file_get ("/system/lib/libbt-hci.so") && com_uti.file_get ("/system/lib/libbt-hcio.so")) {                // Favor old style
+          cmd += ("cp /data/data/fm.a2d.sf/lib/libbt-hci.so /system/lib/libbt-hci.so ; ");
+          cmd += ("chmod 644 /system/lib/libbt-hci.so ; ");
+        }
+        else if (com_uti.file_get ("/system/vendor/lib/libbt-vendor.so") && com_uti.file_get ("/system/vendor/lib/libbt-vendoro.so")) {
+          cmd += ("cp /data/data/fm.a2d.sf/lib/libbt-vendor.so /system/vendor/lib/libbt-vendor.so ; ");
+          cmd += ("chmod 644 /system/vendor/lib/libbt-vendor.so ; ");
+        }
+        cmd += ("mount -o remount,ro /system ; ");
+        com_uti.sys_run (cmd, true);
+        com_uti.logd ("Done Installing new shim files");
+      }
+      else if (ret == 0 && (com_uti.file_get (com_uti.platform_orig) || com_uti.platform_file_entirely_ours ())) { // Use platform_file_entirely_ours () in case ROM adds later
+        String cmd = "";
+        cmd += ("mount -o remount,rw /system ; ");
+        cmd += ("cp /data/data/fm.a2d.sf/files/99-spirit.sh /system/addon.d/99-spirit.sh ; ");
+        cmd += ("chmod 755 /system/addon.d/99-spirit.sh ; ");
+        cmd += ("mount -o remount,ro /system ; ");
+        com_uti.sys_run (cmd, true);
+        com_uti.logd ("Done Installing addon.d script for /system/etc/audio_platform_info.xml");
+      }
+
 /*
       if (! com_uti.access_get (bb1_full_filename, true, false, false)) { // Rwx
         com_uti.loge ("error inaccessible bb1 file");
@@ -1012,73 +1077,48 @@ wifi_hack ();
     return (ret);
   }
 
-  private int bcom_bluetooth_init () {    // Install shim if needed (May change BT state & warm restart). Determine UART or SHIM Mode & create/delete "use_shim" flag file for s2d. Turn BT off if needed.
+
+    // BT is? KitKat:   service call bluetooth_manager 4                                                TRANSACTION_isEnabled
+    // BT On  KitKat:   service call bluetooth_manager 6        Older:  service call bluetooth 3
+    // BT On- KitKat:   service call bluetooth_manager 7                                                TRANSACTION_enableNoAutoConnect
+    // BT Off KitKat:   service call bluetooth_manager 8        Older:  service call bluetooth 4
+
+    // BT is? Lolpop:   service call bluetooth_manager 7
+    // BT On  Lolpop:   service call bluetooth_manager 8
+    // BT On- Lolpop:   service call bluetooth_manager 9        // n.o. .p.e.r.m.i.s.s.i.o.n. .t.o. .e.n.a.b.l.e. .B.l.u.e.t.o.o.t.h. .q.u.i.e.t.l.y.
+    // BT Off Lolpop:   service call bluetooth_manager 10
+
+    // grep TRANSACTION_ /home/m/android/system/out/target/common/obj/JAVA_LIBRARIES/framework_intermediates/src/core/java/android/bluetooth/IBluetoothManager.java
+    // static final int TRANSACTION_registerAdapter = (android.os.IBinder.FIRST_CALL_TRANSACTION + 0);
+    // static final int TRANSACTION_registerQAdapter = (android.os.IBinder.FIRST_CALL_TRANSACTION + 1);
+    // static final int TRANSACTION_unregisterAdapter = (android.os.IBinder.FIRST_CALL_TRANSACTION + 2);
+    // static final int TRANSACTION_unregisterQAdapter = (android.os.IBinder.FIRST_CALL_TRANSACTION + 3);
+    // static final int TRANSACTION_registerStateChangeCallback = (android.os.IBinder.FIRST_CALL_TRANSACTION + 4);
+    // static final int TRANSACTION_unregisterStateChangeCallback = (android.os.IBinder.FIRST_CALL_TRANSACTION + 5);
+
+    //  7 static final int TRANSACTION_isEnabled = (android.os.IBinder.FIRST_CALL_TRANSACTION + 6);
+    //  8 static final int TRANSACTION_enable = (android.os.IBinder.FIRST_CALL_TRANSACTION + 7);
+    //  9 static final int TRANSACTION_enableNoAutoConnect = (android.os.IBinder.FIRST_CALL_TRANSACTION + 8);
+    // 10 static final int TRANSACTION_disable = (android.os.IBinder.FIRST_CALL_TRANSACTION + 9);               // n.o. .p.e.r.m.i.s.s.i.o.n. .t.o. .e.n.a.b.l.e. .B.l.u.e.t.o.o.t.h. .q.u.i.e.t.l.y.
+
+    // static final int TRANSACTION_getBluetoothGatt = (android.os.IBinder.FIRST_CALL_TRANSACTION + 10);
+    // static final int TRANSACTION_getQBluetooth = (android.os.IBinder.FIRST_CALL_TRANSACTION + 11);
+    // static final int TRANSACTION_getAddress = (android.os.IBinder.FIRST_CALL_TRANSACTION + 12);
+    // static final int TRANSACTION_getName = (android.os.IBinder.FIRST_CALL_TRANSACTION + 13);
+
+    // !!!! Need code to update shim when it changes !!!!   (Stable Jan 1, 2014 -> July 31/Nov 30, 2014)
+    // Should test new SpiritF shims with Spirit1
+
+  private int bcom_bluetooth_init () {                                  // Determine UART or SHIM Mode & Turn BT off if no shim installed
     com_uti.logd ("Start");
 
-    m_com_api.tuner_api_mode = "UART";                                           // Default = UART MODE
-/*
-    String short_filename = "use_shim";
-    String full_filename = m_context.getFilesDir () + "/" + short_filename;
-
-    if (com_uti.file_get (full_filename)) {                             // If use_shim flag is set...
-      com_uti.logd ("Removing file: " + full_filename);
-      //File.delete (full_filename); //com_uti.sys_WAS_run ("rm " + full_filename, true);                    // Remove file/flag
-
-      File dir = m_context.getFilesDir ();
-      File file = new File (dir, short_filename);
-      boolean deleted = file.delete ();
-      if (deleted)
-        com_uti.logd ("deleted: " + deleted);
-      else
-        com_uti.loge ("deleted: " + deleted);
-    }
-*/
+    m_com_api.tuner_api_mode = "UART";                                  // Default = UART MODE
     if (com_uti.shim_files_possible_get ()) {                           // If Bluedroid...
       com_uti.logd ("Bluedroid support");
 
-      boolean fresh_shim_install = false;                               // !!!! Need code to update shim when it changes !!!!   (Stable Jan 1, 2014 -> July 31/Nov 30, 2014)
-
-      boolean unfriendly_auto_install_and_reboot = false;
-      if (unfriendly_auto_install_and_reboot) {
-      if (! com_uti.shim_files_operational_get ()) {                    // If shim files not operational...
-        if (com_uti.bt_get ()) {                                        // July 31, 2014: only install shim if BT is on
-          com_uti.bt_set (false, true);                                 // Bluetooth off, and wait for off
-          com_uti.logd ("Start 4 second delay after BT Off");
-          com_uti.ms_sleep (4000);                                      // Extra 4 second delay to ensure BT is off !!
-          com_uti.logd ("End 4 second delay after BT Off");
-
-          com_uti.shim_install ();                                      // Install shim
-
-          com_uti.bt_set (true, true);                                  // Bluetooth on, and wait for on  (Need to set BT on so reboot has it on.)
-
-            //Toast.makeText (m_context, "WARM RESTART PENDING FOR SHIM INSTALL !!", Toast.LENGTH_LONG).show ();  java.lang.RuntimeException: Can't create handler inside thread that has not called Looper.prepare()
-        /* Don't need a delay before reboot because BT is on enough to stay on after reboot ?? (And we waited for On to be detected anyway)
-            com_uti.logd ("Start 4 second delay after BT On");
-            com_uti.ms_sleep (4000);                                    // Extra 4 second delay to ensure BT is on
-            com_uti.logd ("End 4 second delay after BT On"); */
-            //Toast.makeText (m_context, "WARM RESTART !!", Toast.LENGTH_LONG).show ();
-            //com_uti.sys_WAS_run ("kill `pidof system_server`", true);
-
-          com_uti.sys_run ("reboot now", true);                         // M7 GPE requires reboot
-
-          fresh_shim_install = true;
-        }
-      }
-      }//if (unfriendly_auto_install_and_reboot) {
-
-      if (! fresh_shim_install && com_uti.shim_files_operational_get () && com_uti.bt_get ()) {     // If not fresh shim install, and shim files operational, and BT is on...
+      if (com_uti.shim_files_operational_get () && com_uti.bt_get ()) { // If shim files operational, and BT is on...
         com_uti.logd ("Bluedroid shim installed & BT on");
-        try {
-          /*FileOutputStream fos = m_context.openFileOutput (short_filename, Context.MODE_PRIVATE);   // | MODE_WORLD_WRITEABLE      // Somebody got a NullPointerException here
-          if (fos != null) {
-            fos.close ();*/                                               // Create "use_shim" flag file for lower level
-            m_com_api.tuner_api_mode = "SHIM";                                          // SHIM MODE if success
-          //}
-        }
-        catch (Throwable e) {
-          com_uti.loge ("Exception, try UART mode");
-          e.printStackTrace ();
-        }
+        m_com_api.tuner_api_mode = "SHIM";                              // SHIM MODE
       }
     }
 
@@ -1086,60 +1126,16 @@ wifi_hack ();
       if (com_uti.bt_get ()) {
         com_uti.logd ("UART mode needed but BT is on; turn BT Off");
         com_uti.bt_set (false, true);                                   // Bluetooth off, and wait for off
-        com_uti.logd ("Start 4 second delay after BT Off");
-        com_uti.ms_sleep (4000);                                        // Extra 4 second delay to ensure BT is off !!
-        com_uti.logd ("End 4 second delay after BT Off");
+        com_uti.rfkill_bt_wait (false);                                 // Wait for BT off
+        //com_uti.logd ("Start 4 second delay after BT Off");
+        //com_uti.ms_sleep (4000);                                      // Extra 4 second delay to ensure BT is off !!
+        //com_uti.logd ("End 4 second delay after BT Off");
       }
-/* Back in acc_hci
-      rfkill_state_set (1);                                             // BT UART Power = ON
-      rfkill_state_set (1);                                             // Original code did twice
-*/
     }
-// BT is? KitKat:   service call bluetooth_manager 4                                                TRANSACTION_isEnabled
-// BT On  KitKat:   service call bluetooth_manager 6        Older:  service call bluetooth 3
-// BT On- KitKat:   service call bluetooth_manager 7                                                TRANSACTION_enableNoAutoConnect
-// BT Off KitKat:   service call bluetooth_manager 8        Older:  service call bluetooth 4
-
 
     com_uti.logd ("done m_com_api.tuner_api_mode: " + m_com_api.tuner_api_mode);
     return (0);
   }
-
-/*
-  private String rfkill_state_get () {
-    String state = "0";
-    try {
-      state = (new BufferedReader (new FileReader ("/sys/class/rfkill/rfkill0/state"))).readLine ();
-      com_uti.logd ("Read rfkill0/state: " + state);
-    }
-    catch (Throwable e) {
-      e.printStackTrace ();
-      com_uti.loge ("Read rfkill0/state Exception");
-    }
-    return (state);
-  }
-
-  private int rfkill_state_set (int state) {
-    com_uti.logd ("state: " + state);
-    if (state != 0) {                                                   // If turning on...
-      //rfkill_state_set_on = true;
-    }
-    else {                                                              // Else if turning off...
-      if (! rfkill_state_set_on)                                        // If was not previously off...
-        return (0);                                                     // Done
-    }
-    rfkill_state_get ();                                                // Display rfkill state
-    String [] cmds = {("")};
-    cmds [0] = ("echo " + state + " > /sys/class/rfkill/rfkill0/state");
-    com_uti.sys_WAS_run (cmds, true);                                         // Set rfkill state WITH SU/Root
-    rfkill_state_get ();                                                // Display rfkill state
-    if (state != 0)                                                     // If turning on...
-      rfkill_state_set_on = true;
-    else
-      rfkill_state_set_on = false;
-    return (0);
-  }
-*/
 
 }
 

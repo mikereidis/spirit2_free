@@ -33,9 +33,9 @@
   #include <termios.h>
 
   // 100 / 50 / 100 was OK, but @ 4 MBits/second on the M7 the 50 for normal_uart_recv resulted in a patchram error
-  int patchram_uart_recv_tmo_ms = 501;//201;//100;//500;//1000;         // Initial patchram command only
-  int normal_uart_recv_tmo_ms   = 502;//202;// 50;//200;//400;
-  int normal_uart_send_tmo_ms   = 203;//100;//400;    //800);//1000);      // Write HCI command, waiting up to 0.8 (1) second to complete
+  int patchram_uart_recv_tmo_ms = 201;//501;//201;//100;//500;//1000;         // Initial patchram command only
+  int normal_uart_recv_tmo_ms   = 202;//502;//202;// 50;//200;//400;
+  int normal_uart_send_tmo_ms   = 104;//203;//100;//400;    //800);//1000);      // Write HCI command, waiting up to 0.8 (1) second to complete
 
   int gen_server_loop_func (unsigned char * cmd_buf, int cmd_len, unsigned char * res_buf, int res_max );
 
@@ -47,14 +47,35 @@
   unsigned char hci_recv_buf [1024] = {0};             // Should only need 259 bytes ?
 
     // Sending order
-  unsigned char hci_cmd_full_reset     [] = { 0, 0, 0, 0, 0x01, 0x03, 0x0c, 0x00 };                                     // OGF:    3    OCF:    3   (Host Controller & Baseband Commands, Reset)
-  unsigned char hci_cmd_baudrate_reset [] = { 0, 0, 0, 0, 0x01, 0x18, 0xfc, 0x06, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 }; // OGF: 0x3f    OCF: 0x18   Parameter Total Length:  6
-  unsigned char hci_cmd_patchram_start [] = { 0, 0, 0, 0, 0x01, 0x2e, 0xfc, 0x00 };                                     // OGF: 0x3f    OCF: 0x2e
+                                                                        // OGF: 0x03    OCF: 0x03   Param: none         OGF: Host Ctrlr & BB    OCF: Reset
+  unsigned char hci_cmd_full_reset     [] = { 0, 0, 0, 0, 0x01, 0x03, 0x0c, 0x00 };
+
+                                                                        // OGF: 0x3f    OCF: 0x18   Param: six 0's      OGF: Vendor             OCF: Baudrate reset
+  unsigned char hci_cmd_baudrate_reset [] = { 0, 0, 0, 0, 0x01, 0x18, 0xfc, 0x06, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 };
+
+                                                                        // OGF: 0x3f    OCF: 0x2e   Param: none         OGF: Vendor             OCF: Patchram start
+  unsigned char hci_cmd_patchram_start [] = { 0, 0, 0, 0, 0x01, 0x2e, 0xfc, 0x00 };
 
 
-    // Each command is assigned a 2 byte Opcode used to uniquely identify different types of commands.
-    // The Opcode parameter is divided into two fields, called the OpCode Group Field (OGF) and OpCode Command Field (OCF).
-    // The OGF occupies the upper 6 bits of the Opcode, while the OCF occupies the remaining 10 bits. The OGF of 0x3F is reserved for vendor-specific debug commands. 
+/*
+    HCI command/packet handling:
+
+    2 byte Opcode uniquely identifies different types of commands:
+        OGF OpCode   Group Field:   Upper  6 bits of Opcode         0x3F reserved for vendor-specific commands
+        OCF OpCode Command Field:   Other 10 bits
+
+    int uart_hci_xact (unsigned char * cmd, int cmd_len)                 // Do UART mode command & get response in global hci_recv_buf
+        Internal to tnr_bch.c & called w/ & by:
+            hci_cmd_baudrate_reset              baudrate_reset()
+            hci_cmd_full_reset                  reset_start()
+            hci_cmd_patchram_start              patchram_set()
+            hci_cmd_patchram_send_buf           ""
+            cmd_buf                             hci_cmd
+
+        len is always 8+0 to 8+255  (8 - 263)
+
+
+*/
 
   struct termios termios = {0};
   typedef struct {
@@ -252,57 +273,97 @@
   }
 
 
-  char * hcd_ptr = NULL;
-  int hcd_bytes_left = 0;
+  char * hcd_internal_ptr = NULL;
+  int hcd_internal_bytes_left = 0;
 
   #include "hcd/hcd_bch.c"                                              // Patchram data
 
-  int hcd_open (char * hcd) {                                           // Open patchram file (if used) or setup hcd_ptr and hcd_bytes_left (for ram method)
+  int hcd_read_ctr = 0;
+
+  int hcd_open (char * hcd) {                                           // Open patchram file (if used) or setup hcd_internal_ptr and hcd_internal_bytes_left (for ram method)
     int ret = 0;
+    hcd_read_ctr = 0;
     if (hcd_num == 0) {
+      errno = 0;
       ret = open (hcd, O_RDONLY);
+      if (ret < 0)
+        loge ("hcd_open from file ret: %d  hcd: \"%s\"  errno: %d (%s) fd: %d  buf: %p  count: %d", ret, hcd, errno, strerror (errno));
+      else
+        logd ("hcd_open from file ret: %d  hcd: \"%s\"", ret, hcd);
       return (ret);
     }
     else if (hcd_num == 1) {
-      hcd_ptr = b1_bin;
-      hcd_bytes_left = sizeof (b1_bin);
+      hcd_internal_ptr = b1_bin;
+      hcd_internal_bytes_left = sizeof (b1_bin);
+      logd ("hcd_open from internal hcd_num = 1");
       return (hcd_num);
     }
     else if (hcd_num == 2) {
-      hcd_ptr = b2_bin;
-      hcd_bytes_left = sizeof (b2_bin);
+      hcd_internal_ptr = b2_bin;
+      hcd_internal_bytes_left = sizeof (b2_bin);
+      logd ("hcd_open from internal hcd_num = 2");
       return (hcd_num);
     }
+    loge ("hcd_open ERROR");
     return (-1);
   }
 
   int hcd_close (int fd) {                                              // Close patchram file if used
     int ret = 0;
+    logd ("hcd_close fd: %d  hcd_num: %d", fd, hcd_num);
     if (hcd_num == 0) {
+      errno = 0;
       ret = close (fd);
+      if (ret < 0)
+        loge ("hcd_close from file ret: %d  fd: %d  errno: %d (%s)", ret, fd, errno, strerror (errno));
+      else
+        logd ("hcd_close from file ret: %d  fd: %d", ret, fd);
       return (ret);
     }
-    return (-1);
+    return (0);
   }
 
-  ssize_t hcd_read (int fd, void * buf, size_t count) {                 // Read patchram file (if used) or read data from ram
-    if (count < 0 || buf == NULL)
+  /*ssize_t*/ int hcd_read (int fd, void * buf, /*size_t*/int count) {                 // Read patchram file (if used) or read data from RAM
+
+    hcd_read_ctr ++;
+
+    if (count < 0 || buf == NULL) {
+      loge ("hcd_read bad count or buf fd: %d  buf: %p  count: %d  hcd_num: %d  hcd_internal_bytes_left: %d", fd, buf, count, hcd_num, hcd_internal_bytes_left);
       return (-1);
-    ssize_t ret = 0;
-    if (hcd_num == 0) {
+    }
+
+    /*ssize_t*/ int ret = 0;
+    if (hcd_num == 0) {                                                 // If via file
+      errno = 0;
       ret = read (fd, buf, count);
+      if (ret != count) {                                               // hcd_read count != ret: 0  errno: 0 (Success) fd: 11  buf: 0xbec3bcf9  count: 3
+        if (count == 3 && ret == 0)
+          logd ("hcd_read finished ret: %d  errno: %d (%s) fd: %d  buf: %p  count: %d", ret, errno, strerror (errno), fd, buf, count);
+        else
+          loge ("hcd_read count != ret: %d  errno: %d (%s) fd: %d  buf: %p  count: %d", ret, errno, strerror (errno), fd, buf, count);
+      }
       return (ret);
     }
-    else if (hcd_num == 1 || hcd_num == 2) {
-      if (hcd_bytes_left <= 0)
+    else if (hcd_num == 1 || hcd_num == 2) {                            // If internal read from RAM
+      if (hcd_internal_bytes_left <= 0) {                               // Done if no bytes left
+        if (count == 3 && hcd_internal_bytes_left == 0)
+          logd ("hcd_read   expected no bytes left fd: %d  buf: %p  count: %d  hcd_num: %d  hcd_internal_bytes_left: %d", fd, buf, count, hcd_num, hcd_internal_bytes_left);
+        else
+          loge ("hcd_read unexpected no bytes left fd: %d  buf: %p  count: %d  hcd_num: %d  hcd_internal_bytes_left: %d", fd, buf, count, hcd_num, hcd_internal_bytes_left);
         return (0);
-      if (count > hcd_bytes_left)
-        count = hcd_bytes_left;
-      memcpy (buf, hcd_ptr, count);
-      hcd_ptr += count;
-      hcd_bytes_left -= count;
-      return (count);
+      }
+      if (count > hcd_internal_bytes_left) {                            // If more bytes requested than available (shouldn't happen unless image is corrupt)
+        loge ("hcd_read too many bytes requested fd: %d  buf: %p  count: %d  hcd_num: %d  hcd_internal_bytes_left: %d", fd, buf, count, hcd_num, hcd_internal_bytes_left);
+        count = hcd_internal_bytes_left;
+      }
+      memcpy (buf, hcd_internal_ptr, count);
+      hcd_internal_ptr += count;
+      hcd_internal_bytes_left -= count;
+      if (count == 1)
+        loge ("hcd_read count == 1 fd: %d  buf: %p  count: %d  hcd_num: %d  hcd_internal_bytes_left: %d", fd, buf, count, hcd_num, hcd_internal_bytes_left);
+      return (count);                                                   // ? Why did this return 1 instead of count of bytes ???? ssize_t ??
     }
+    loge ("hcd_read bad hcd_num fd: %d  buf: %p  count: %d  hcd_num: %d  hcd_internal_bytes_left: %d", fd, buf, count, hcd_num, hcd_internal_bytes_left);
     return (-1);
   }
 
@@ -315,45 +376,52 @@
     if (! hcd)
       return (-1);
 
-    if ((hcdfile_fd = hcd_open (hcd)) < 0) {                            // Open hcd file
-      loge ("patchram_set open errno: %d", errno);
-      return (-5);
-    }
-    logd ("patchram_set fd: %d", hcdfile_fd);
                                                                         // Start patchram
     ret = uart_hci_xact (hci_cmd_patchram_start, sizeof (hci_cmd_patchram_start));
     if (ret < 0) {
-      loge ("patchram_set uart_hci_xact 1 error: %d", ret);
+      loge ("patchram_set uart_hci_xact hci_cmd_patchram_start error: %d", ret);
       return (-1);
     }
+
+    errno = 0;
+    if ((hcdfile_fd = hcd_open (hcd)) < 0) {                            // Open hcd file (returns fd or 1 or 2 for internal)
+      loge ("patchram_set open errno: %d", errno, strerror (errno));
+      return (-5);
+    }
+    logd ("patchram_set fd: %d", hcdfile_fd);
+
                                                                         // Always times out now ?
     ret = tmo_read (uart_fd, & hci_cmd_patchram_send_buf [4], 2, patchram_uart_recv_tmo_ms, 0);   // W/ timeout, Read 2 bytes from UART (uses neither byte), doing multiple reads if needed
-    logd ("patchram_set read 1 ret: %d", ret);
+    logd ("patchram_set tmo_read uart ret: %d", ret);
 
+    baudrate_reset (high_baudrate);                                     // Reset baudrate high      // patchram takes 5 seconds regardless of baudrate !
 
-// !! patchram takes 5 seconds regardless !!
-    baudrate_reset (high_baudrate);                                     // Reset baudrate high
+    quiet_ms_sleep (55);                                                // !! ?? Need ??
 
-    quiet_ms_sleep (55);                                            // !! ?? Need ??
-
-    while (ret = hcd_read (hcdfile_fd, & hci_cmd_patchram_send_buf [5], 3) > 0) { // Read 3 bytes from hcdfile until returns 0   (!! could mess up!!)
-      if (ret < 0) {                                                    // If error...
-        loge ("patchram_set read 2 ret: %d  errno: %d", ret, errno);
+    errno = 0;                                                          // While hcd data remains, read first 3 bytes (2 bytes opcode & 1 byte len) from hcdfile to [5]...
+    while (ret = hcd_read (hcdfile_fd, & hci_cmd_patchram_send_buf [5], 3) > 0) {
+      if (ret < 0) {    // || ret != 3) {                                        // If error... !!!! Why does this return 1 for first internal ????
+        loge ("patchram_set hcd_read ret: %d  errno: %d", ret, errno, strerror (errno));
+        hcd_close (hcdfile_fd);
+        hcdfile_fd = -1;
         return (-1);                                                    // Done w/ error
       }
-      if (ret != 1)
-        logd ("patchram_set read 2 ret: %d", ret);                      // Always shows 1 ??
-      hci_cmd_patchram_send_buf [4] = 0x01;
-      len = hci_cmd_patchram_send_buf [7];
-      ret = hcd_read (hcdfile_fd, & hci_cmd_patchram_send_buf [8], len);// Read specified length of file
-      if (ret < 0) {
-        loge ("patchram_set read 3 ret: %d  len: %d  errno: %d", ret, len, errno);
+      hci_cmd_patchram_send_buf [4] = 0x01;                             // [4] = 1
+      len = hci_cmd_patchram_send_buf [7];                              // remaining len = [7]
+      errno = 0;
+      ret = hcd_read (hcdfile_fd, & hci_cmd_patchram_send_buf [8], len);// Read remaining len to [8]
+      if (ret < 0 || ret != len) {
+        loge ("patchram_set hcd_read 2 ret: %d  len: %d  errno: %d", ret, len, errno, strerror (errno));
+        hcd_close (hcdfile_fd);
+        hcdfile_fd = -1;
         return (-1);
       }
-      logd ("patchram_set read 3 ret: %d  len: %d", ret, len);
+      logd ("patchram_set hcd_read 2 ret: %d  len: %d", ret, len);
 
       if (uart_hci_xact (hci_cmd_patchram_send_buf, len + 8) < 0) {     // Send to UART
-        loge ("patchram_set uart_hci_xact 2 error: %d", ret);
+        loge ("patchram_set uart_hci_xact hci_cmd_patchram_send_buf error: %d", ret);
+        hcd_close (hcdfile_fd);
+        hcdfile_fd = -1;
         return (-1);
       }
     }
@@ -383,14 +451,16 @@
     for (id = 0; id < MAX_RFKILL; id ++) {                                // For all possible values of id that have a type file...
       snprintf (type_path, sizeof (type_path), "/sys/class/rfkill/rfkill%d/type", id);
 
+      errno = 0;
       fd = open (type_path, O_RDONLY);                                  // Open type file
       if (fd < 0) {
-        loge ("rfkill_state_file_get open %s errno: %s (%d)", type_path, strerror (errno), errno);
+        loge ("rfkill_state_file_get open %s errno: %d (%s)", type_path, errno, strerror (errno));
         return;
       }
+      errno = 0;
       type_len = read (fd, & type_buf, sizeof (type_buf));              // Get contents of type file
       if (type_len <= 0) {
-        loge ("rfkill_state_file_get read %s errno: %s (%d)", type_path, strerror (errno), errno);
+        loge ("rfkill_state_file_get read %s errno: %d (%s)", type_path, errno, strerror (errno));
         close (fd);
         return;
       }
@@ -422,14 +492,16 @@
     if (rfkill_state_file [0] == 0)                                       // If no state file of type desired found...
       return (-1);
 
+    errno = 0;
     fd = open (rfkill_state_file, O_RDONLY);                              // Open state file
     if (fd < 0) {
-      loge ("rfkill_state_get open \"%s\" errno: %s (%d)", rfkill_state_file, strerror (errno), errno);
+      loge ("rfkill_state_get open \"%s\" fd: %d  errno: %d (%s)", rfkill_state_file, fd, errno, strerror (errno));
       return (-2);
     }
+    errno = 0;
     ret = read (fd, & rbuf, 1);                                           // Read 1 byte
     if (ret < 1) {                                                        // If don't have at least 1 byte...
-      loge ("rfkill_state_get read \"%s\" ret: %d  errno: %s (%d)", rfkill_state_file, ret, strerror (errno), errno);
+      loge ("rfkill_state_get read \"%s\" ret: %d  errno: %d (%s)", rfkill_state_file, ret, errno, strerror (errno));
       close (fd);
       return (-3);
     }
@@ -468,20 +540,21 @@
         loge ("tmo_write timeout reached of %d milliseconds", tmo_ms);
         return (buf_sent);
       }
+      errno = 0;
       int wret = write (fd, & buf [buf_sent], buf_left);
       if (wret < 0) {
         if (errno == EAGAIN || errno == EWOULDBLOCK) {
-          loge ("tmo_write waiting errno: %s (%d)", strerror (errno), errno);
+          loge ("tmo_write waiting errno: %d (%s)", errno, strerror (errno));
           ms_sleep (22);                                                  // Wait a bit: 20 ms better than 10 ms on battery with Broadcom RDS ?
           continue;
         }
-        loge ("tmo_write write errno: %s (%d)", strerror (errno), errno);
+        loge ("tmo_write write errno: %d (%s)", errno, strerror (errno));
         return (buf_sent);
       }
       buf_left -= wret;
       buf_sent += wret;
       if (wret == 0) {                                                  // If wrote 0 bytes (but no error)
-        loge ("tmo_write wrote 0 errno: %s (%d)", strerror (errno), errno);
+        loge ("tmo_write wrote 0 errno: %d (%s)", errno, strerror (errno));
         return (buf_sent);                                              // Just return now
       }
       else if (buf_left > 0) {
@@ -492,7 +565,7 @@
     return (buf_sent);
   }
 
-
+  int tmo_read_errors = 0;
   int tmo_read (int fd, unsigned char * buf, int buf_len, int tmo_ms, int single_read) {
     //logd ("tmo_read buf_len: %d  tmo_ms: %d", buf_len, tmo_ms);
     int partial = 0, rret = 0;
@@ -503,27 +576,29 @@
 
     while (buf_left > 0) {                                              // While we still have bytes to read
       if (ms_get () >= tmo_time) {
-        if (tmo_ms != 1) {                                              // Suppress for UART flush
-          loge ("tmo_read timeout reached of %d milliseconds", tmo_ms);
-        }
+        if (curr_api_mode || tmo_read_errors > 2)
+          loge ("tmo_read timeout tmo_read_errors: %d  tmo_ms: %d", tmo_read_errors, tmo_ms);
+        else
+          logw ("tmo_read timeout tmo_read_errors: %d  tmo_ms: %d", tmo_read_errors, tmo_ms);
+        tmo_read_errors ++;
         return (buf_recv);                                              // If timeout,... return number bytes read so far
       }
       errno = 0;
       rret = read (fd, & buf [buf_recv], buf_left);                     // Try to read up to number of bytes left to read
       if (rret < 0) {                                                   // If error
         if (errno == EAGAIN || errno == EWOULDBLOCK) {                  // If would block
-          //logd ("tmo_read waiting errno: %s (%d)", strerror (errno), errno);
+          //logd ("tmo_read waiting errno: %d (%s)", errno, strerror (errno));
           //ms_sleep (1);
           quiet_ms_sleep (10);  // !! Will this improve battery on Broadcom w/ RDS ???? !!!!
           continue;                                                     // Sleep a bit and continue loop
         }
-        loge ("tmo_read read errno: %s (%d)", strerror (errno), errno); // If other error...
+        loge ("tmo_read read errno: %d (%s)", errno, strerror (errno)); // If other error...
         return (buf_recv);                                              // Return number bytes read so far
       }
       buf_left -= rret;                                                 // If bytes were read,... left reduced by number read this loop
       buf_recv += rret;                                                 // Received increased by number read this loop
-      if (single_read)
-            //!!!! For BT just return; if buf was big enough we have all we nead; a 2nd read never returns more data
+
+      if (single_read)                                                  // If single_read (note used) just return; if buf was big enough we have all we nead; a 2nd read never returns more data
         return (buf_recv);                                              // Return number bytes read (should be all of them)
 
       if (buf_left > 0) {                                               // If still bytes to get,... display debug message
@@ -534,7 +609,7 @@
     if (partial && buf_len == 3 && buf_recv == 3) {                     // To attempt to fix extra byte response to reset_start ()...
       if (buf [0] != 4 && buf [1] == 4 && buf [2] == 0x0e) {
         loge ("tmo_read removing bogus byte: 0x%x", buf [0]);
-        ms_sleep (1);                                                   // Sleep a bit to ensure next byte
+        quiet_ms_sleep (1);                                             // Sleep a bit to ensure next byte
         buf [0] = 4;
         buf [1] = 0x0e;
         //buf [2] =4;
@@ -555,7 +630,7 @@
                                                                         // First do a non-blocking read to remove any previous stuff
     int rret = read (uart_fd, hci_recv_buf, sizeof (hci_recv_buf));
     if (rret > 0) {
-      loge ("uart_send rret: %d", rret);
+      logw ("uart_send rret: %d", rret);
       hex_dump ("", 32, hci_recv_buf, rret);
     }
     //logd ("uart_send bytes: %d", len);
@@ -570,26 +645,23 @@
   }
 
 
-  int uart_recv (int fd, unsigned char * buf, int flush) {
-    //flush = 0;  // !!!! Get this followed by problems: "uart_recv flushed bytes: 11"
-
+  int uart_recv (int fd, unsigned char * buf) {                         // Get HCI response from UART       Called only by uart_hci_xact()
+    int g2_audio = 0;
     int rret = 0;
-    if (flush)
-      rret = tmo_read (fd, & buf [1], 3,   1, 0);                         // W/ timeout 1 ms, Read first 3 bytes, doing multiple reads if needed
-    else
-      rret = tmo_read (fd, & buf [1], 3, normal_uart_recv_tmo_ms, 0);     // W/ timeout 400 ms, Read first 3 bytes, doing multiple reads if needed
-    if (rret != 3) {                                                      // If a read error or 3 bytes not read
-      //if (! flush) loge ("uart_recv error 1 rret: %d  flush: %d", rret, flush);   // tmo_read already logged an error message
+    rret = tmo_read (fd, & buf [1], 3, normal_uart_recv_tmo_ms, 0);     // W/ timeout, Read first 3 bytes to [1], doing multiple reads if needed
+    if (rret != 3) {                                                    // If read error or 3 bytes not read for some other reason...
       return (-1);
     }
 
-    if (buf [2] == 0x0f) {
-      loge ("!!!!!!!!!    LG G2 BC detected, return success buf [0] buf [7]"); // ????
-      buf [0] = 0;
-      buf [7] = 0;
+
+                                                                        // 0xf3, 0x88, 0x01, 0x02, 0x05};      // hcitool cmd 3f 00 f3 88 01 02 05
+    if (buf [2] == 0x0f) {                                              // If Event Code: 0x0F == HCI_EV_CMD_STATUS (and not the usual 0x0E = HCI_EV_CMD_COMPLETE)
+      g2_audio = 1;
+      logw ("LG G2 HCI_EV_CMD_STATUS buf [1]: %d  buf [3]: %d", buf [1], buf [3]);       // !!!!
+//      buf [0] = 0;                  // LG G2 HCI_EV_CMD_STATUS      buf [1]: 4 (Event packet)        buf [3]: 4 (4 bytes remain)
+//      buf [7] = 0;                  // -- 04 0f 04 00 01 00 fc          ocf = 1     ogf = 0     HCI error code: fc
     }
-        // ff 04 0f 04 00 01 00 fc
-        // 00  
+
         // Else 3 bytes read OK...
     // buf [1]        = 1 for HCI Command packet, 4 for HCI Event packet, ff for HCI Vendor packet
     // buf [2]        = Event Code: 0x0e = Command Complete HCI_EV_CMD_COMPLETE, 0x0f = HCI_EV_CMD_STATUS 
@@ -601,29 +673,52 @@
     // buf [7]        = HCI Error code (or length on Tx)
     // buf [8]...     = Return_Parameter(s) (Optional)
       
-    rret = tmo_read (fd, & buf [4], read_remain, normal_uart_recv_tmo_ms, 0); // W/ timeout 400 ms, Read remaining bytes, doing multiple reads if needed
-    if (rret != read_remain) {                                            // If read error or partial read...
-      loge ("uart_recv error 2 rret %d  read_remain %d  flush: %d", rret, read_remain, flush);
+                                                                        // W/ timeout, Read remaining bytes to [4], doing multiple reads if needed
+    rret = tmo_read (fd, & buf [4], read_remain, normal_uart_recv_tmo_ms, 0);
+    if (rret != read_remain) {                                          // If read error or partial read...
+      loge ("uart_recv error 2 rret %d  read_remain %d", rret, read_remain);
       return (-1);
     }
-    if (flush) {
-      logd ("uart_recv flushed bytes: %d", rret + 3);
-      //if (rret < 128)                                                   // Only dump smaller packets
-      hex_dump ("", 32, & buf [0],rret + 4);
+
+    if (g2_audio) {                                                     // If special G2 audio enable command...
+      if (rret != 4)
+        loge ("uart_recv rret: %d", rret);
+      hex_dump ("G2A ", 32, & buf [0], 8);
+
+        // Instant; all at 03-12 02:56:21.275
+        // G2A ff 04 0f 04 00 01 00 fc
+        // G2B ff 04 ff 04 f3 00 88 00 
+
+      logw ("LG G2 start 2nd read");
+
+                                                                        // W/ timeout, Read 7 bytes to [1], doing multiple reads if needed
+      rret = tmo_read (fd, & buf [1], 7, normal_uart_recv_tmo_ms, 0);
+      if (rret != 7) {                                                  // If read error or partial read...
+        loge ("LG G2 uart_recv error 2 rret %d  read_remain %d", rret, read_remain);
+        return (-1);
+      }
+      hex_dump ("G2B ", 32, & buf [0], 8);
+      logw ("LG G2 done 2nd read");
+      return (8);
     }
-    return (rret + 4);                                                    // Return positive total length of normalized standard HCI response packet
+
+
+    //if (rret < 128)                                                   // Only dump smaller packets
+    //hex_dump ("", 32, & buf [0], rret + 4);
+    return (rret + 4);                                                  // Return positive total length of normalized standard HCI response packet
   }
 
 
-  int uart_hci_xact (unsigned char * cmd, int cmd_len) {                  // Do UART mode command
+  int uart_hci_xact (unsigned char * cmd, int cmd_len) {                // Do UART mode command & get response in global hci_recv_buf
+
     int ctr = 0;
     int fret = 0;
-    int wret = uart_send (cmd, cmd_len);                                  // Send command via UART
+    int wret = uart_send (cmd, cmd_len);                                // Send command via UART
     if (wret) {
       loge ("uart_hci_xact uart_send error wret: %d", wret);
       return (-1);
     }
-    int rret = uart_recv (uart_fd, hci_recv_buf, 0);                      // Receive response event via UART, no flush
+    int rret = uart_recv (uart_fd, hci_recv_buf);                       // Receive response event via UART
     return (rret);
   }
 
@@ -776,8 +871,9 @@
 
     //logd ("uart_hci_start rfkill_state_get: %d", rfkill_state_get (bt_rfkill_state_file, sizeof (bt_rfkill_state_file), "bluetooth"));
 
+    errno = 0;
     if ( (uart_fd = open (uart, O_RDWR | O_NOCTTY | O_NONBLOCK)) == -1) // Open UART
-      loge ("uart_hci_start open uart: %s  errno: %d", uart, errno);
+      loge ("uart_hci_start open uart: %s  errno: %s (%d)", uart, errno, strerror (errno));
     else
       logd ("uart_hci_start open uart: %s", uart);
 
@@ -796,6 +892,8 @@
     //{"BCM43341", 100},
     //{(const char *) NULL, 100} // Giving the generic fw settlement delay setting.
     //};
+
+    tmo_read_errors = 0;
 
     if (reset_start ()) {                                               // If reset start error...  !!!! Doesn't work; error comes in patchram_set () !!!!
       loge ("uart_hci_start reset_start error @ 115200");
@@ -841,7 +939,7 @@
 
     // HCI Layer:
 
-  #define MAX_HCI  264   // 8 prepended bytes + 255 max bytes HCI data/parameters + 1 trailing byte to align
+//  #define MAX_HCI  264   // 8 prepended bytes + 255 max bytes HCI data/parameters + 1 trailing byte to align
 
     /*
     adb shell hcitool cmd 4 1
@@ -850,17 +948,17 @@
     01 01 10 00 04 00 00 04 1D 00 C7 0D
     */
 
-    /* Our/Serial HCI response: (Ours prepends 1 byte for internal use)
-    04 0e 05 01 0a fc 00 3f
-    0   -       Status / error ?
-    1   0       4 always    4 for response
-    2   1    0x0e always 0x0e Event Code: Should be 0x0e (Command Complete)
-    3   2       5 remaining length after this byte (So response data max size is actually 255-4 or 251 bytes !)
-    4   3       1 always 1
-    5   4    0x0a OCF lower 8 bits 
-    6   5    0xfc OGF<<2 + top 2 bits OCF
-    7   6       0 HCI error code
-    8   7    0x3f Response data...
+    /* Our HCI response: (Ours prepends 1 byte for internal use)
+    -- 04 0e 05 01 0a fc 00 3f
+    0     -- Our Status / error, followed by UART response:
+    1    4  Always 4 for response
+    2   0E  Always 0x0E (Command Complete) for 3F 15 for FM, except for 3F 00 for LG G2 audio
+    3    5  00 - FF = Remaining length after this byte
+    4    1  Always 1
+    5   0A  OCF lower 8 bits 
+    6   FC  OGF<<2 + top 2 bits OCF
+    7    0  HCI error code
+    8   3F  Response data if any...
 
 
   res_buf [0] = 0;
@@ -868,116 +966,121 @@
   res_buf [2] = 0x0e;
   res_buf [3] = hci_req.rlen + 3;
   res_buf [4] = 1;
-  res_buf [5] = ocf&0x00ff;
-  res_buf [6] = ((ocf&0x0300)>>8) | ((ogf&0x3f)<<2);
+  res_buf [5] = ocf & 0x00ff;
+  res_buf [6] = ((ocf & 0x0300) >> 8) | ((ogf & 0x3f) << 2);
   res_buf [7] = hci error
   res_buf [8] = data
 
-  request packets will be aligned to match w/ OCF / OGF
-    Response HCI error maps to
-    Command  Length of following HCI data bytes
+  Request packets aligned to match [5/6] OCF / OGF
+    [7] Response:   HCI error:      maps to...
+    [7] Command:    Length of following HCI data bytes
 
     prepend 4 bytes to:
     unsigned char hci_fm_on[] = { 0x01, 0x15, 0xfc, 0x03, 0x00, 0x00, 0x01 };   // power reg 0 = 1
 */
 
+    // hci_cmd: Send HCI command to UART or SHIM and get or formulate response:
+                // Called only by tnr_bch:   bc_bulk_get() / bc_reg_get() / bc_reg_set() / enable_g2_audio()      (Also used to be called by bc_ar_set())
+
+    // Return: size = 0 for errors, size = 8 for success with no data, size = 9 to 263 (HCI_MAX - 1) for 1 - 255 bytes of returned HCI data
+
   int hci_cmd (uint8_t ogf, uint16_t ocf, unsigned char * cmd_buf, int cmd_len, unsigned char * res_buf, int res_max, int rx_tmo) {
-    int hci_cmd_start_time = 0;
-    //if (cmd_len > 8)
-    //hex_dump ("", 32, cmd_buf + 8, cmd_len - 8);
+
     if (ena_log_bch_hci) {
-      hci_cmd_start_time = ms_get ();
-      logd ("hci_cmd ogf: 0x%x  ocf: 0x%x  cmd_len: %d  res_max: %d", ogf, ocf, cmd_len, res_max);
+      logd ("hci_cmd ogf: 0x%x  ocf: 0x%x  reg: 0x%x cmd_len: %d  res_max: %d", ogf, ocf, cmd_buf [8], cmd_len, res_max);
       hex_dump ("", 32, cmd_buf, cmd_len);
     }
-    int res_len = 0;
-    if (res_max > 252)
-      res_max = 252;
-    //if (cmd_len > 255 || cmd_len < 8) {
-    if (cmd_len > 263 || cmd_len < 8) {                                 // !! For ti_bulk_hci_write
+    else if (ena_log_chip_access) {
+      if (ogf == 0x3f && ocf == 0x15) {
+        int reg = cmd_buf [8];
+        if (reg == 0x0a)//BC_REG_FREQ0)
+          logd ("hci_cmd fm reg: BC_REG_FREQ0");
+        else if (reg == 0x0f)//BC_REG_RSSI)
+          logd ("hci_cmd fm reg: BC_REG_RSSI");
+        else
+          logd ("hci_cmd fm reg: 0x%x", reg);
+      }
+      else
+        logd ("hci_cmd ogf: 0x%x  ocf: 0x%x  reg: 0x%x cmd_len: %d  res_max: %d", ogf, ocf, cmd_buf [8], cmd_len, res_max);
+    }
+
+    if (cmd_len >= MAX_HCI || cmd_len < 8) {
       loge ("hci_cmd error cmd_len: %d", cmd_len);
       return (0);
     }
 
-    res_buf [7] = 0xfe;                                                 // Put something in HCI error field in case no response
-    cmd_buf [4] = 1;
-    cmd_buf [5] = ocf & 0x00ff;
-    cmd_buf [6] = ((ocf & 0x0300) >> 8) | ((ogf & 0x3f) << 2);
-    cmd_buf [7] = cmd_len - 8;
-    if (curr_api_mode)                                                  // If hci command to Shim...
+    if (res_max > 252)
+      res_max = 252;
+
+    res_buf [7] = 0xfe;                                                 // Default error FE for [7] HCI error field in case of no response
+
+    // First 4 bytes don't matter
+    cmd_buf [4] = 1;                                                    // [4] = 1
+    cmd_buf [5] = ocf & 0x00ff;                                         //
+    cmd_buf [6] = ((ocf & 0x0300) >> 8) | ((ogf & 0x3f) << 2);          // [5/6] = OCF / OGF
+    cmd_buf [7] = cmd_len - 8;                                          // [7] = HCI len
+
+    int res_len = 0;
+
+    int hci_cmd_start_time = 0;
+    if (ena_log_bch_hci)
+      hci_cmd_start_time = ms_get ();
+
+    if (curr_api_mode)                                                  // If SHIM, send HCI command to SHIM and get response...
       res_len = gen_client_cmd (cmd_buf, cmd_len, res_buf, res_max, NET_PORT_HCI, rx_tmo);
-    else {                                                              // Else direct...
-      hci_recv_buf [0] = 0xff;                                          // Default = error
+
+    else {                                                              // Else if UART, send HCI command to UART and get response...
       res_len = uart_hci_xact (cmd_buf, cmd_len);                       // Do UART mode transaction
-      if (res_len < 8 || res_len > 270) {
-        hci_recv_buf [0] = 0xff; // Error
-        res_len = 8;
-      }
-      hci_recv_buf [0] = 0;
-      memcpy (res_buf, hci_recv_buf, res_len);
+      if (res_len >= 8 && res_len < MAX_HCI)                            // If valid response length...
+        memcpy (res_buf, hci_recv_buf, res_len);                        // Copy response
     }
 
-    //int size_evt = res_buf [3] - 3;
+    if (ena_log_bch_hci)
+      logd ("hci_cmd took %d ms", ms_get () - hci_cmd_start_time);      // UART: 1-2 ms     Daemon HCI: 3/5-10/18 ms w/ open/bind/close every time, else 3-11 ms
+
     int hci_err = res_buf [7];
 
+    if (res_len < 8 || res_len >= MAX_HCI) {                            // If invalid response length...
+      loge ("hci_cmd hci_err: %d %s  res_len: %d", hci_err, hci_err_get (hci_err), res_len);
+      res_len = 0;                                                      // Error
+    }
+    else if (hci_err) {
+      loge ("hci_cmd hci_err: %d %s  res_len: %d", hci_err, hci_err_get (hci_err), res_len);
+      res_len = 0;                                                      // Error
+    }
+    else if (ena_log_bch_hci) {
+      logd ("hci_cmd hci_err: %d %s  res_len: %d", hci_err, hci_err_get (hci_err), res_len);
+    }
+
     if (ena_log_bch_hci) {
-      if (res_len > 1 + 8)
-        logd ("hci_cmd hci_err: %d %s   res_len: %d  first data byte: 0x%x  last data byte: 0x%x", hci_err, hci_err_get (hci_err), res_len, res_buf [8], res_buf [res_len-1]);
-      else if (res_len > 8)
-        logd ("hci_cmd hci_err: %d %s   res_len: %d  one data byte: 0x%x", hci_err, hci_err_get (hci_err), res_len, res_buf [8]);
-      else
-        logd ("hci_cmd hci_err: %d %s  res_len: %d", hci_err, hci_err_get (hci_err), res_len);
-      //if (res_len > 0 && res_len < 1024)
-      //  hex_dump ("", 32, res_buf, res_len);
-    }
-    else if (hci_err || res_len < 8 || res_len >= 270) {
-      loge ("hci_cmd error res_len: %d  hci_err: %d %s", res_len, hci_err, hci_err_get (hci_err));     // Display the error
       int fix_res_len = res_len;
-      if (fix_res_len < 8 || fix_res_len >= 270)
+      if (fix_res_len < 8 || fix_res_len >= MAX_HCI)
         fix_res_len = 16;
-      //hex_dump ("", 32, res_buf, fix_res_len);
-      logd ("hci_cmd failed command ogf: 0x%x  ocf: 0x%x  cmd_len: %d  res_max: %d",ogf,ocf, cmd_len, res_max);
-      //hex_dump ("", 32, cmd_buf, cmd_len);
+      hex_dump ("", 32, res_buf, fix_res_len);
     }
-    if (ena_log_bch_hci)
-      logd ("hci_cmd took %d milliseconds", ms_get () - hci_cmd_start_time);
-          // 20 - 40/50 ms for hcitool popen2, same except spikes to 60-100+ for hcitool>file, 1-2 ms for UART
-          // Daemon HCI = 3/5-10/18 ms w/ open/bind/close every time, else 3-11 ms
-    if (hci_err)
-      res_len = 0;
+
     return (res_len);
   }
 
 
-  int shim_client_cmd (unsigned char cmd, int rx_tmo, int tmo) {        // Only used for startup test by shim_hci_start()
-    if (tmo < 100)
-      tmo = 100;
-    int shim_ok_tmo = ms_get () + tmo;                                    // Wait up to tmo milliseconds, resending every rx_tmo milliseconds
-    while (ms_get () < shim_ok_tmo) {
+  int shim_hci_start () {
+    logd ("shim_hci_start");
+    unsigned char cmd = 0x73;
+    int shim_ok_tmo = ms_get () + 1200;
+    while (ms_get () < shim_ok_tmo) {                                   // Timeout at total time of 1.2 seconds, resending every 1 second (Up to 2 tries; 1st times out after 1s, 2nd after 0.2s)
       unsigned char res_buf [DEF_BUF] = {0};
-      int res_len = gen_client_cmd (& cmd, 1, res_buf, sizeof (res_buf), NET_PORT_HCI, rx_tmo);    // 1 Byte: cmd
-      if (res_len == 1 && res_buf [0] == cmd)
-        return (0);                                                       // Daemon is ready
+      int res_len = gen_client_cmd (& cmd, 1, res_buf, sizeof (res_buf), NET_PORT_HCI, 1000);
+      if (res_len == 1 && res_buf [0] == cmd) {                         // If success...
+      logd ("shim_hci_start ok");
+        return (0);                                                     // Daemon is ready
+      }
     }
-    loge ("shim_client_cmd timeout error");
+    loge ("shim_hci_start error");
     return (-1);
   }
 
-  int shim_hci_start () {
-    logd ("shim_hci_start");
-    if (shim_client_cmd (0x73, 1000, 1200)) {                             // Inquiry / ping every 1 second for up to 1.2 seconds
-      loge ("shim_hci_start error");
-      return (-1);
-    }
-    logd ("shim_hci_start ok");
-    return (0);
-  }
-  int shim_hci_stop () {
-    logd ("shim_hci_stop");
-    /*if (shim_client_cmd (0x7f, 1000, 1200)) {                             // Terminate  every 1 second for up to 1.2 seconds        !!!! Leave running or problems !!!
-      loge ("shim_hci_stop error");
-      return (-1);
-    }*/
+  int shim_hci_stop () {                                                // Leave shim running
+    //logd ("shim_hci_stop");
     logd ("shim_hci_stop ok");
     return (0);
   }
@@ -1040,54 +1143,54 @@
   
   Writes:
   
-      reg_set (reg  |       0,  val );                                    // Read 1 byte
-      reg_set (reg  | 0x10000,  val );                                    // Read 2 bytes
-      reg_set (reg  | 0x20000,  val );                                    // Read 4 bytes
+      bc_reg_set (reg, 1,  val);                                        // Read 1 byte
+      bc_reg_set (reg, 2,  val);                                        // Read 2 bytes
+      bc_reg_set (reg, 4,  val);                                        // Read 4 bytes
   
    0, 03
    2, 02
   fb, 00000000
    1, 02
-              reg_get (0x4d           = 0x44
+              bc_reg_get (0x4d, 1        = 0x44
    5, 005c
   fd, 0064
   14, 40
-              bulk_get (0x80, 0xf0)
-              reg_get (0x12+10000     = 0x0008
+              bc_bulk_get (0x80, 0xf0)
+              bc_reg_get (0x12, 2        = 0x0008
   10, 0200
    a, 5fb4
    9, 01
    
 
-    reg_set (0x00 |       0,  0x03);                                    // FM + RDS = On        00 00 03 
-    reg_set (0x02 |       0,  0x02);                                    //  RDS + Flush         02 00 02 
-    reg_set (0xfb | 0x20000,  0x00000000);                              // Audio PCM ????       fb 00 00 00 00 00 
-    reg_set (0x01 |       0,  0x02);                                    // NotJap + Stro Blnd   01 00 02 
-    reg_set (0x05 | 0x10000,  0x005c);                                  // 75 DAC No Mute       05 00 5c 00 
-    reg_set (0x05 | 0x10000,  0x006c);                                  // 75 I2S No Mute       05 00 6c 00 
-    reg_set (0x0a | 0x10000,  0x5fb4);                                  // Freq 88.5            0a 00 b4 5f 
+    bc_reg_set (0x00, 1,  0x03);                                    // FM + RDS = On        00 00 03 
+    bc_reg_set (0x02, 1,  0x02);                                    //  RDS + Flush         02 00 02 
+    bc_reg_set (0xfb, 4,  0x00000000);                              // Audio PCM ????       fb 00 00 00 00 00 
+    bc_reg_set (0x01, 1,  0x02);                                    // NotJap + Stro Blnd   01 00 02 
+    bc_reg_set (0x05, 2,  0x005c);                                  // 75 DAC No Mute       05 00 5c 00 
+    bc_reg_set (0x05, 2,  0x006c);                                  // 75 I2S No Mute       05 00 6c 00 
+    bc_reg_set (0x0a, 2,  0x5fb4);                                  // Freq 88.5            0a 00 b4 5f 
 
-    reg_set (0x10 | 0x10000,  0x0003);                                  // IRQ MASKS            10 00 03 00 
-    reg_set (0x09 |       0,  0x01);                                    // SrchTune Mode Prst   09 00 01 
-    reg_set (0xf8 | 0x10000,  0x00ff);                                  // Vol Max              f8 00 ff 00 
-    reg_set (0x14 |       0,  0x40);                                    // RDS WLINE 64         14 00 40 
-    reg_set (0x10 | 0x10000,  0x0200);                                  // IRQ MASKS            10 00 00 02 
-    reg_set (0x02 |       0,  0x03);                                    // RBDS + Flush         02 00 03 
-    reg_set (0x0a | 0x10000,  0x5fb4);                                  // Freq 88.5            0a 00 b4 5f 
+    bc_reg_set (0x10, 2,  0x0003);                                  // IRQ MASKS            10 00 03 00 
+    bc_reg_set (0x09, 1,  0x01);                                    // SrchTune Mode Prst   09 00 01 
+    bc_reg_set (0xf8, 2,  0x00ff);                                  // Vol Max              f8 00 ff 00 
+    bc_reg_set (0x14, 1,  0x40);                                    // RDS WLINE 64         14 00 40 
+    bc_reg_set (0x10, 2,  0x0200);                                  // IRQ MASKS            10 00 00 02 
+    bc_reg_set (0x02, 1,  0x03);                                    // RBDS + Flush         02 00 03 
+    bc_reg_set (0x0a, 2,  0x5fb4);                                  // Freq 88.5            0a 00 b4 5f 
 
-    reg_set (0x10 | 0x10000,  0x0003);                                  // IRQ MASKS            10 00 03 00 
-    reg_set (0x09 |       0,  0x01);                                    // SrchTune Mode Prst   09 00 01 
-    reg_set (0x10 | 0x10000,  0x0200);                                  // IRQ MASKS            10 00 00 02 
-    reg_set (0x10 | 0x10000,  0x0200);                                  // IRQ MASKS            10 00 00 02 
-    reg_set (0x10 | 0x10000,  0x0200);                                  // IRQ MASKS            10 00 00 02 
+    bc_reg_set (0x10, 2,  0x0003);                                  // IRQ MASKS            10 00 03 00 
+    bc_reg_set (0x09, 1,  0x01);                                    // SrchTune Mode Prst   09 00 01 
+    bc_reg_set (0x10, 2,  0x0200);                                  // IRQ MASKS            10 00 00 02 
+    bc_reg_set (0x10, 2,  0x0200);                                  // IRQ MASKS            10 00 00 02 
+    bc_reg_set (0x10, 2,  0x0200);                                  // IRQ MASKS            10 00 00 02 
     */
 
-  // reg_set (0x00, BC_REG_SYS bits:
+  // bc_reg_set (0x00, BC_REG_SYS bits:
   #define BC_VAL_SYS_OFF                      0x00
   #define BC_VAL_SYS_FM                       0x01
   #define BC_VAL_SYS_RDS                      0x02
   
-  // reg_set (0x01, BC_REG_CTL bits:
+  // bc_reg_set (0x01, BC_REG_CTL bits:
   #define BC_VAL_CTL_BND_EUROPE_US            0x00
   #define BC_VAL_CTL_BND_JAPAN                0x01    // BCM2048_BAND_SELECT
   
@@ -1112,7 +1215,7 @@
   
   
   
-  // reg_set (0x05, BC_REG_AUD_CTL0 bits:
+  // bc_reg_set (0x05, BC_REG_AUD_CTL0 bits:
   #define BC_VAL_AUD_CTL0_RF_MUTE_DISABLE     0x00
   #define BC_VAL_AUD_CTL0_RF_MUTE_ENABLE      0x01
   
@@ -1137,7 +1240,7 @@
   #define BCM2048_AUDIO_BANDWIDTH_SELECT	0x80
   
   
-  // reg_set (0x07, BC_REG_SRCH_CTL0 bits:
+  // bc_reg_set (0x07, BC_REG_SRCH_CTL0 bits:
   #define BC_VAL_SRCH_CTL0_DOWN               0x00
   #define BC_VAL_SRCH_CTL0_UP                 0x80
   #define BC_VAL_SRCH_CTL0_RSSI_60DB          0x5e        //94
@@ -1148,13 +1251,13 @@
   #define BCM2048_SEARCH_DIRECTION	0x80
   
   
-  // reg_set (0x09, BC_REG_SRCH_TUNE_MODE:
+  // bc_reg_set (0x09, BC_REG_SRCH_TUNE_MODE:
   #define BC_REG_SRCH_TUNE_MODE_TERMINATE     0x00
   #define BC_VAL_SRCH_TUNE_MODE_PRESET        0x01
   #define BC_REG_SRCH_TUNE_MODE_AUTO          0x02
   #define BC_REG_SRCH_TUNE_MODE_AF_JUMP       0x03        // BCM2048_FM_AUTO_SEARCH
   
-  // reg_set (0x12, BC_REG_FLG0 / BC_REG_MSK0 bits:
+  // bc_reg_set (0x12, BC_REG_FLG0 / BC_REG_MSK0 bits:
   #define BC_VAL_FLG0_SRCH_TUNE_FINISHED      0x01
   #define BC_VAL_FLG0_SRCH_TUNE_FAIL          0x02
   #define BC_VAL_FLG0_RSSI_LOW                0x04
@@ -1163,13 +1266,13 @@
   #define BC_VAL_FLG0_STEREO_DETECTION        0x20
   #define BC_VAL_FLG0_STEREO_ACTIVE           0x40
   
-  // reg_set (0x13, BC_REG_FLG1 / BC_REG_MSK1 bits:
+  // bc_reg_set (0x13, BC_REG_FLG1 / BC_REG_MSK1 bits:
   #define BC_VAL_FLG1_RDS_FIFO_WLINE          0x02
   #define BC_VAL_FLG1_RDS_B_BLOCK_MATCH       0x08
   #define BC_VAL_FLG1_RDS_SYNC_LOST           0x10
   #define BC_VAL_FLG1_RDS_PI_MATCH            0x20
   
-  // reg_set (0xfc, BC_REG_SRCH_METH:
+  // bc_reg_set (0xfc, BC_REG_SRCH_METH:
   #define BC_VAL_SRCH_METH_NORMAL             0x00
   #define BC_VAL_SRCH_METH_PRESET             0x01
   #define BC_VAL_SRCH_METH_RSSI               0x02
@@ -1196,160 +1299,129 @@
 
     // Chip code:
 
-  int bulk_get (int reg, int size, unsigned char * res_buf, int res_max) {  // For RDS or otherwise reading multiple registers at once; use reg_get() for 1-4 byte/register reads
+  int bc_bulk_get (int reg, int size, unsigned char * res_buf, int res_max) {  // For RDS or otherwise reading multiple registers at once; use bc_reg_get() for 1-4 byte/register reads
     int res_len = -1;
-    if (size > 252 || size < 0) {
-      loge ("bulk_get error size: %d", size);
+    if (size > 252 || size <= 0) {
+      loge ("bc_bulk_get error size: %d", size);
       return (0);
     }
-    unsigned char cmd_buf [MAX_HCI] = {0};//3 + 8] = {0};
-    int  cmd_buf_size = 3 + 8;                                          // ! 11 works for both TI and BCM !           sizeof (cmd_buf);
+    unsigned char cmd_buf [MAX_HCI] = {0};
+    int  cmd_buf_size = 3 + 8;
     if (ena_log_bch_reg)
-      logd ("bulk_get reg: %x  size: %d", reg, size);
+      logd ("bc_bulk_get reg: %x  size: %d", reg, size);
 
     cmd_buf [8] = reg;
     cmd_buf [9] = 1;                                                    // a hcitool cmd 3f 15 reg 1(read) size
     cmd_buf [10] = 0xff & size;
     res_len = hci_cmd (0x3f, 0x15, cmd_buf, cmd_buf_size, res_buf, res_max, hci_cmd_tmo);
-    if (res_len >= 3 + 8 && ! res_buf [7]) {                            // !! ?? Actual value ??
-      memcpy (&res_buf [8],&res_buf [10], res_len-8-2);                 // Copy data down 2 bytes to match TI response w/ bulk data starting at res_buf [8]
-                                                                        // !!! Assume data is copied from bottom up since we are copying in place
-      res_len -= 2;
+
+    if (res_len != 2 + 8 + size)
+      loge ("!!!! res_len: %d  reg: %x  size: %d", res_len, reg, size);
+
+    if (res_len >= 2 + 8 + size) {
+      return (res_len);                                                 // If success, return size
     }
 
-    if (res_len <= 0)                                                   // If error...
-      return (0);
-
-    if (res_buf [7]) {                                                  // If HCI error...
-      loge ("bulk_get hci error: %d %s  reg: 0x%x  size: %d", res_buf [7], hci_err_get (res_buf [7]), reg, size);     // Display the error
-      return (0);
-    }
-
-    return (res_len);                                                   // If success, return size
+    return (0);                                                         // Else if error return size = 0 = no data...
   }
 
 
-  int reg_get (int reg) {                                               // If error, return 0 instead of error code. This helps protect against strange values for frequency etc.
-    unsigned char res_buf [MAX_HCI];
-    int val = 0;
+  int bc_reg_get (int reg, int size) {                                  // If error, return 0 instead of error code. This helps protect against strange values for frequency etc.
+    unsigned char res_buf [MAX_HCI] = {0};
     int res_len = -1;
     unsigned char cmd_buf [MAX_HCI] = {0};                              // 3+8] = {};; //= {0xff, 0x01, 0x01};    // TI: {0xff, 0x02, 0x00};
 
-    if (ena_log_bch_reg)
-      logd ("reg_get reg: 0x%x", reg);
-
-    int size = 1;                                                       // Hack to allow different register sizes w/ all bytes read simultaneously encoded in register number as higher order bits
-    if (reg & 0x00010000)
-      size = 2;
-    else if (reg & 0x00020000)
-      size = 4;
-    reg &= 0x0000ffff;
-
-    cmd_buf [8] = reg;
-    cmd_buf [9] = 1;        // a hcitool cmd 3f 15 reg 1(read) 1(size)
-    cmd_buf [10] = size;//1;
-    res_len = hci_cmd (0x3f, 0x15, cmd_buf, 3 + 8, res_buf, sizeof (res_buf), hci_cmd_tmo);          // BC HCI: 0x15
-    //if (res_len >= 3+8 && ! res_buf [7])
-    if (size == 2)
-      val = 256 * res_buf [11] + res_buf [10];
-    else if (size == 4)
-      //val = 16777216 * res_buf [13] + 65536 * res_buf [12] + 256 * res_buf [11] + res_buf [10];
-      val = res_buf [13] << 24 + res_buf [12] << 16 + res_buf [11] << 8 + res_buf [10] << 0;
-    else
-      val = res_buf [10];
-    if (res_len < 8) {
-      //if (ena_log_bch_reg)
-        loge ("reg_get hci_cmd error: %d hci error: %d %s  reg: 0x%x  val: 0x%x", res_len, res_buf [7], hci_err_get (res_buf [7]), reg, val);    // Display the error
+    if (size < 1 || size > 4) {
+      loge ("bc_reg_get reg: 0x%x  size: %d", reg, size);
       return (0);
     }
-    else if (ena_log_bch_reg)
-      logd ("reg_get res_len: %d", res_len);
-    if (! res_buf [7]) {
-      if (ena_log_bch_reg)
-        logd ("reg_get reg: 0x%x  val: 0x%x (%d)", reg, val, val);
+    if (ena_log_bch_reg)
+      logd ("bc_reg_get reg: 0x%x  size: %d", reg, size);
+
+
+    cmd_buf [8] = reg;                                                  // a hcitool cmd 3f 15 reg 1(read) 1(size)
+    cmd_buf [9] = 1;
+    cmd_buf [10] = size;
+                                                                        // Send HCI command and get response
+    res_len = hci_cmd (0x3f, 0x15, cmd_buf, 3 + 8, res_buf, sizeof (res_buf), hci_cmd_tmo);
+
+    int val = 0;
+    if (res_len < 11) {
+      loge ("bc_reg_get hci_cmd res_len: %d  reg: 0x%x  size: %d  val: 0x%x (%d)", res_len, reg, size, val, val);
       return (val);
     }
-    //if (ena_log_bch_reg)
-      loge ("reg_get hci error: %d %s  reg: 0x%x  val: 0x%x", res_buf [7], hci_err_get (res_buf [7]), reg, val);     // Display the error
-    return (0);
+
+    if (res_len != 10 + size)
+      loge ("!!!! res_len: %d  != 10 + size: %d", res_len, size);
+
+    if (size >= 1 && res_len >= 10 + size)
+      val += res_buf [10] << 0;
+    if (size >= 2 && res_len >= 10 + size)
+      val += res_buf [11] << 8;
+    if (size >= 3 && res_len >= 10 + size)
+      val += res_buf [12] << 16;
+    if (size >= 4 && res_len >= 10 + size)
+      val += res_buf [13] << 24;
+
+    if (ena_log_bch_reg)
+        logd ("bc_reg_get hci_cmd res_len: %d  reg: 0x%x  size: %d  val: 0x%x (%d)", res_len, reg, size, val, val);
+
+    return (val);
   }
 
-  int reg_set (int reg, int val) {
-    unsigned char res_buf [MAX_HCI];
+  int bc_reg_set (int reg, int size, int val) {
+    unsigned char cmd_buf [MAX_HCI] = {0};
+    unsigned char res_buf [MAX_HCI] = {0};
     int res_len = -1;
-    unsigned char cmd_buf [MAX_HCI] = {0};//5+8] = {0};   // !! Only supports up to 3 bytes on BC !!!!!!!!!!!!!!!!!!!!!!!!
   
-    if (ena_log_bch_reg)
-      logd ("reg_set reg: %x  val: 0x%x (%d)", reg, val, val);
-
-    int size = 1;
-    if (reg >= 65536) {
-      if (reg >= 131072) {
-        size = 4;
-        reg -= 131072;
-      }
-      else {
-        size = 2;
-        reg -= 65536;
-      }
-    }
-    cmd_buf [8] = reg;
-    cmd_buf [9] = 0;        // a hcitool cmd 3f 15 reg 0(write) val
-    if (size == 2) {
-      cmd_buf [11] = val / 256;
-      cmd_buf [10] = val % 256;
-    }
-    else if (size == 4) {
-      cmd_buf [13] = (0xff) & (val >> 24);      // (val / 16777216);
-      cmd_buf [12] = (0xff) & (val >> 16);      // (val /    65536);
-      cmd_buf [11] = (0xff) & (val >>  8);      // (val /      256);
-      cmd_buf [10] = (0xff) & (val >>  0);      // (val %      256);
-    }
-    else {
-      cmd_buf [10] = val;
-    }
-    res_len = hci_cmd (0x3f, 0x15, cmd_buf, size + 2 + 8, res_buf, sizeof (res_buf), hci_cmd_tmo);            // BC HCI: 0x15
-    if (res_len < 8) {
-      loge ("reg_set hci_cmd error res_len: %d hci error: %d %s  reg: 0x%x  val: 0x%x", res_len, res_buf [7], hci_err_get (res_buf [7]), reg, val);
-      return (-1);//return (0);
-    }
-    else if (ena_log_bch_reg)
-      logd ("reg_set res_len: %d", res_len);
-    if (! res_buf [7]) {
-      if (reg_verify) {
-        int read = 0;
-        if (size == 2)                                                    // If 2 bytes...
-          read = reg_get (reg | 0x10000);                                 // Read 2 bytes
-        else if (size == 4)                                               // If 4 bytes...
-          read = reg_get (reg | 0x20000);                                 // Read 4 bytes
-        else
-          read = reg_get (reg);
-        if (read != val) {                                                // If read value different than write value...
-          if (reg == 0x01 && (val & ~0x20) == read)
-            return (0);
-
-          loge ("reg_set verify error reg: 0x%x  write val: 0x%x  read val: 0x%x", reg, val, read);
-          return (-1);
-        }
-      }
+    if (size < 1 || size > 4) {
+      loge ("bc_reg_set reg: 0x%x  size: %d  val: 0x%x (%d)", reg, size, val, val);
       return (0);
     }
-    loge ("reg_set hci error: %d %s  reg: 0x%x  val: 0x%x", res_buf [7], hci_err_get (res_buf [7]), reg, val);
-    return (res_buf [7]);
+
+    if (ena_log_bch_reg)
+      logd ("bc_reg_set reg: 0x%x  size: %d  val: 0x%x (%d)", reg, size, val, val);
+
+    cmd_buf [8] = reg;
+    cmd_buf [9] = 0;        // a hcitool cmd 3f 15 reg 0(write) val
+
+    if (size >= 1)
+      cmd_buf [10] = (0xff) & (val >>  0);
+    if (size >= 2)
+      cmd_buf [11] = (0xff) & (val >>  8);
+    if (size >= 3)
+      cmd_buf [12] = (0xff) & (val >> 16);
+    if (size >= 4)
+      cmd_buf [13] = (0xff) & (val >> 24);
+
+    res_len = hci_cmd (0x3f, 0x15, cmd_buf, size + 2 + 8, res_buf, sizeof (res_buf), hci_cmd_tmo);            // BC HCI: 0x15
+    if (res_len < 8) {
+      loge ("bc_reg_set hci_cmd error res_len: %d  reg: 0x%x  size: %d  val: 0x%x (%d)", res_len, reg, size, val, val);
+      return (-1);
+    }
+
+    if (ena_log_bch_reg)
+      logd ("bc_reg_set res_len: %d  reg: 0x%x  size: %d  val: 0x%x (%d)", res_len, reg, size, val, val);
+
+    if (reg_verify) {
+      int read_val = bc_reg_get (reg, size);
+      if (read_val != val) {                                            // If read_val different than val passed...
+        if (reg == 0x01 && (val & ~0x20) == read_val)                   // If special case with bit 5 of register 1...
+          return (0);                                                   // Done OK
+        loge ("bc_reg_set verify error res_len: %d  reg: 0x%x  size: %d  val: 0x%x (%d)  read_val: 0x%x (%d)", res_len, reg, size, val, val, read_val, read_val);
+        return (-1);                                                    // Else error
+      }
+    }
+    return (0);                                                         // Done OK
   }
 
 
 /*
-void bc_reg_dump (int lo, int hi, int bytes) {
+void bc_reg_dump (int lo, int hi, int size) {
   ms_sleep (20);
   int reg = 0, val = 0;
-  for (reg = lo; reg <= hi; reg += bytes) {
-    if (bytes == 1)
-      val = reg_get (reg);
-    else if (bytes == 2)
-      val = reg_get (reg | 0x10000);
-    else
-      val = reg_get (reg | 0x20000);
+  for (reg = lo; reg <= hi; reg += size) {
+    val = bc_reg_get (reg, size);
 
     logd ("bc_reg_dump 0x%x: 0x%x (%d)", reg, val, val);
     ms_sleep (20);
@@ -1358,14 +1430,14 @@ void bc_reg_dump (int lo, int hi, int bytes) {
 */
 
   int vol_get () {
-    int vol = 257 * reg_get (0xf8 | 0x00010000);
+    int vol = 257 * bc_reg_get (0xf8, 2);
     logd ("chip_imp_vol_get: %d", vol);
     return (vol);
   }
 
   int freq_get () {
     //logd ("freq_get");
-    int ret = reg_get (0x0a | 0x10000);
+    int ret = bc_reg_get (0x0a, 2);
     int freq = bc_freq_lo + ret;
     curr_freq_int = freq;
     if (ena_log_tnr_extra)
@@ -1381,11 +1453,11 @@ void bc_reg_dump (int lo, int hi, int bytes) {
     // !! Shouldn't need two mutes here !!
     // This was disabled, re-enable...
     bc_reg_aud_ctl0 = 0x02;//0x03;                                      // DACs and I2S off, mute audio + rf mute, resets band but power off so OK
-    if (reg_set (0x05 | 0x10000, bc_reg_aud_ctl0) < 0) {                //
+    if (bc_reg_set (0x05, 2, bc_reg_aud_ctl0) < 0) {                    //
       loge ("pwr_off error writing 0x05");
     }
 
-    if (reg_set (0x00, 0) < 0) {                                          // Set: SYS: OFF turn off FM
+    if (bc_reg_set (0x00, 1, 0) < 0) {                                  // Set: SYS: OFF turn off FM
       loge ("pwr_off error writing 0x00");
     }
 
@@ -1393,7 +1465,8 @@ void bc_reg_dump (int lo, int hi, int bytes) {
     return (curr_state);
   }
 
-/*
+/*  No longer needed for Spirit2 supported devices:
+
   int bc_ar_set () {                                                      // Broadcom Audio route set (probably does something else?)
     unsigned char res_buf [MAX_HCI];
     int res_len;
@@ -1407,12 +1480,10 @@ void bc_reg_dump (int lo, int hi, int bytes) {
     //  char bc_ar_1_buf [] = {0, 0, 0, 0, 0, 0, 0, 0, 5, 0xc0, 0x41, 0x0f, 0, 0x20, 0, 0, 0};  // Add 3 trailing 0's
 
     res_len = hci_cmd (0x3f, 0x0a, bc_ar_1_buf, sizeof (bc_ar_1_buf), res_buf, sizeof (res_buf), hci_cmd_tmo);
-    if (res_buf [7]) {
-      loge ("bc_ar_set 1 hci error: %d %s", res_buf [7], hci_err_get (res_buf [7]));
-      return (res_buf [7]);
-    }
-    if (res_len < 1 + 8)
+    if (res_len < 1 + 8) {
       loge ("bc_ar_set 1 hci_cmd error res_len: %d", res_len);
+      return (-1);
+    }
 
     logd ("bc_ar_set 2");
 
@@ -1422,12 +1493,10 @@ void bc_reg_dump (int lo, int hi, int bytes) {
     unsigned char bc_ar_2_buf [] = {0, 0, 0, 0, 0, 0, 0, 0, 5, 0xe4, 0x41, 0x0f, 0, 0};      // Don't need the 3 trailing 0's
     //  char bc_ar_2_buf [] = {0, 0, 0, 0, 0, 0, 0, 0, 5, 0xe4, 0x41, 0x0f, 0,    0, 0, 0, 0};  // Add 3 trailing 0's
     res_len = hci_cmd (0x3f, 0x0a, bc_ar_2_buf, sizeof (bc_ar_2_buf), res_buf, sizeof (res_buf), hci_cmd_tmo);
-    if (res_buf [7]) {
-      loge ("bc_ar_set 2 hci error: %d %s", res_buf [7], hci_err_get (res_buf [7]));
-      return (res_buf [7]);
-    }
-    if (res_len < 1 + 8)
+    if (res_len < 1 + 8) {
       loge ("bc_ar_set 2 hci_cmd error res_len: %d", res_len);
+      return (-1);
+    }
 
     return (0);
   }
@@ -1436,12 +1505,6 @@ void bc_reg_dump (int lo, int hi, int bytes) {
 
   // Event flags requiring callback:
 //  extern int need_freq_chngd;//     = 0;
-
-  int reg_set_slow (int reg, int val) {
-    int ret = reg_set (reg, val);
-//    ms_sleep (20);
-    return (ret);
-  }
 
 
   int bc_seek_handle (int flags, int seek_state) {
@@ -1460,13 +1523,13 @@ void bc_reg_dump (int lo, int hi, int bytes) {
         logd ("bc_seek_handle restart seek down    flags: 0x%x    curr_freq_int: %d", flags, curr_freq_int);
         //chip_imp_seek_state_sg (seek_state);                          // Restart seek in original direction (down)
         chip_imp_freq_sg (curr_freq_hi);
-        reg_set_slow (0x09, 2);                                         // Set SRCH_TUNE_MODE: TUNE_MODE_AUTO
+        bc_reg_set (0x09, 1, 2);                                        // Set SRCH_TUNE_MODE: TUNE_MODE_AUTO
       }
       else if (curr_freq_int >= curr_freq_hi) {                         // If upper limit (must have been seek up)
         logd ("bc_seek_handle restart seek up    flags: 0x%x    curr_freq_int: %d", flags, curr_freq_int);
         //chip_imp_seek_state_sg (seek_state);                          // Restart seek in original direction (up)
         chip_imp_freq_sg (curr_freq_lo);
-        reg_set_slow (0x09, 2);                                         // Set SRCH_TUNE_MODE: TUNE_MODE_AUTO
+        bc_reg_set (0x09, 1, 2);                                        // Set SRCH_TUNE_MODE: TUNE_MODE_AUTO
       }
       else {                                                            // If not at a limit. MIGHT be hung here
         logd ("bc_seek_handle unknown seek error    flags: 0x%x    curr_freq_int: %d", flags, curr_freq_int);     // 0x27, 0x2b bc_reg
@@ -1478,7 +1541,6 @@ void bc_reg_dump (int lo, int hi, int bytes) {
     return (0);                                                         // Seek not finished
   }
 
-  int freq_inc_set (int inc);
   int bc_ctl_rssi_base = 0x60;
     //0x20          // Finds 0
     //0x40          // Finds 14  Set: SRCH_CTL0: CTL0_UP + CTL0_RSSI_MID                            // Now 2, min=48
@@ -1491,48 +1553,59 @@ void bc_reg_dump (int lo, int hi, int bytes) {
 
   int seek_stop () {
     logd ("seek_stop");
-    reg_set (0x09, 0);                                                    // Set SRCH_TUNE_MODE: TUNE_MODE_TERMINATE to stop searching.
+    bc_reg_set (0x09, 1, 0);                                            // Set SRCH_TUNE_MODE: TUNE_MODE_TERMINATE to stop searching.
 
     curr_seek_state = 0;
     return (curr_seek_state);
   }
 
 
-  int band_set (int low , int high, int band) {                 // ? Do we need to stop/restart RDS power in reg 0x00 ? Or rbds_set to flush ?
+  int band_set (int low , int high, int band) {                         // ? Do we need to stop/restart RDS power in reg 0x00 ? Or rbds_set to flush ?
     logd ("band_set low: %d  high: %d  band: %d", low, high, band);
-    bc_reg_ctl &= ~0x01;                                                  // bit0  = 0 (BND_EUROPE_US)
-    if (low < 87500)
-      bc_reg_ctl |= 0x01;                                                 // Set CTL: + BND_JAPAN Japan
-    if (reg_set (0x01, bc_reg_ctl) < 0) {                                 //
+    bc_reg_ctl &= ~0x01;                                                // bit0  = 0 (BND_EUROPE_US)
+    if (low < 87500 || band == 2)
+      bc_reg_ctl |= 0x01;                                               // Set CTL: + BND_JAPAN Japan
+    if (bc_reg_set (0x01, 1, bc_reg_ctl) < 0) {                         //
       loge ("bc_band_set error writing 0x01");
+      return (-1);
     }
-    return (0);
+    logd ("rbds_set success writing 0x01");
+    return (band);
   }
 
   int freq_inc_set (int inc) {
-    logd ("freq_inc_set: %d", inc);
-    //reg_set (0xfd | 0x10000, inc);                                      // Set: BC_REG_SRCH_STEPS  Reg 0xfd write/read bad on BCM4325 !!, perhaps because last byte RDS data, sets 256 KHz jumps
+    logd ("freq_inc_set inc: %d", inc);
+    //bc_reg_set (0xfd, 2, inc);                                        // Set: BC_REG_SRCH_STEPS  Reg 0xfd write/read bad on BCM4325 !!, perhaps because last byte RDS data, sets 256 KHz jumps
     //ms_sleep (1);//20000);
-    return (0);
+    return (inc);
   }
-  int emph75_set (int emph75) {
-    logd ("emph75_set: %d", emph75);
-    bc_reg_aud_ctl0 &= ~0x40;                                             // bit6  = 0
-    if (emph75)
-      bc_reg_aud_ctl0 |= 0x40;                                            // Set: AUD_CTL0: + DEMPH_75US for North America (and a few other countries).
-    if (reg_set (0x05 | 0x10000, bc_reg_aud_ctl0) < 0) {                  //
+
+  int emph75_set (int band) {
+    logd ("emph75_set band: %d", band);
+    bc_reg_aud_ctl0 &= ~0x40;                                           // bit6  = 0
+    if (band == 1)
+      bc_reg_aud_ctl0 |= 0x40;                                          // Set: AUD_CTL0: + DEMPH_75US for North America (and a few other countries).
+    if (bc_reg_set (0x05, 2, bc_reg_aud_ctl0) < 0) {                    //
       loge ("emph75_set error writing 0x05");
-      //return (-1);
+      return (-1);
     }
-    return (0);
+    logd ("rbds_set success writing 0x05");
+    return (band);
   }
-  int rbds_set (int rbds) {
-    logd ("rbds_set: %d",rbds);
-    if (rbds)
-      reg_set (0x02, 0x03); //  ?? correct ? + flush
+
+  int rbds_set (int band) {
+    logd ("rbds_set band: %d", band);
+    int ret = 0;
+    if (band == 1)
+      ret = bc_reg_set (0x02, 1, 0x03);                                 // ?? correct ? + flush
     else
-      reg_set (0x02, 0x02); //  ?? correct ? + flush
-    return (rbds);
+      ret = bc_reg_set (0x02, 1, 0x02);                                 // ?? correct ? + flush
+    if (ret < 0) {
+      loge ("rbds_set error writing 0x02");
+      return (-1);
+    }
+    logd ("rbds_set success writing 0x02");
+    return (band);
   }
 
 
@@ -1595,6 +1668,65 @@ void bc_reg_dump (int lo, int hi, int bytes) {
     return (curr_mode);
   }
 
+  int enable_g2_audio_done = 0;
+
+  int shim_mode_bypass = 0;
+
+
+  int g2_audio_done_enable = 0;
+
+  int enable_g2_audio () {
+
+    if (! lg_get ())                                                    // Done if not LG
+      return (0);
+
+    if (curr_api_mode && shim_mode_bypass) {     // If SHIM mode...
+      logw ("!!!! Bypassing enable_g2_audio for shim mode !!!!");
+      return (0);
+    }
+
+//    if (enable_g2_audio_done)                                           // Done if already done
+//      return (0);
+
+    if (curr_api_mode) {     // If SHIM mode...
+    #ifdef  SUPPORT_RDS
+      g2_disable_rds = 1;
+      g2_disable_rds = 0;
+    #endif
+      g2_audio_done_enable = 1;
+      //g2_audio_done_enable = 0;
+    }
+    else {
+    #ifdef  SUPPORT_RDS
+      g2_disable_rds = 0;
+    #endif
+      g2_audio_done_enable = 0;                                     // ?? UART mode must always re-send ; presumably UART power cycling resets ?
+    }
+
+    if (g2_audio_done_enable && file_get (g2_audio_done_file))
+      return (0);
+
+    enable_g2_audio_done = 1;
+    if (g2_audio_done_enable)
+      file_write (g2_audio_done_file, "", 0, O_CREAT | O_RDWR);     // file_create
+
+    unsigned char res_buf [MAX_HCI];
+    int res_len;
+
+    logw ("chip_imp_state_sg g2 start");
+    unsigned char hci_buf [] = {0, 0, 0, 0, 0, 0, 0, 0,
+                                0xf3, 0x88, 0x01, 0x02, 0x05};          // hcitool cmd 3f 00 f3 88 01 02 05
+
+    res_len = hci_cmd (0x3f, 0x00, hci_buf, sizeof (hci_buf), res_buf, sizeof (res_buf), hci_cmd_tmo);
+
+    if (res_len < 8)
+      loge ("chip_imp_state_sg g2 hci_cmd error res_len: %d", res_len);
+    else 
+      logd ("chip_imp_state_sg g2 OK");
+
+    return (0);
+  }
+
   int chip_imp_state_sg (int state) {
     if (state == GET)
       return (curr_state);
@@ -1616,22 +1748,22 @@ void bc_reg_dump (int lo, int hi, int bytes) {
     int pwr_val = 0x01;                                                 // No RDS
     if (curr_rds_state)
       pwr_val = 0x03;
-    if (reg_set (0x00, pwr_val) < 0)                                    // Write power reg.
+    if (bc_reg_set (0x00, 1, pwr_val) < 0)                              // Write power reg.
       loge ("chip_imp_state_sg 1 error writing 0x00");
     else
       logd ("chip_imp_state_sg 1 success writing 0x00");
 
-    quiet_ms_sleep (50);//22);                                                      // We are supposed to sleep 20 milliseconds here    //#define BCM2048_DEFAULT_POWERING_DELAY	20  // Sleep 20 milliseconds after power on
+    quiet_ms_sleep (50);//22);                                          // We are supposed to sleep 20 milliseconds here    //#define BCM2048_DEFAULT_POWERING_DELAY	20  // Sleep 20 milliseconds after power on
 
     bc_reg_aud_ctl0 = 0;//0x23; //0x03;   //!! Mute for now     0x5c;   // radio-bcm2048.c also sets I2S     ROUTE_I2S_ENABLE |= 0x20 !!!! Test for Galaxy Tab etc.
 
-    ret = reg_get (0x00);
+    ret = bc_reg_get (0x00, 1);
     if (ret < 0)                                                        // Read power reg.
       loge ("chip_imp_state_sg 1 error reading 0x00  ret: %d", ret);
     else
       logd ("chip_imp_state_sg 1 success reading 0x00  ret: %d", ret);
 
-    if (reg_set (0x00, pwr_val) < 0) {                                  // Write power reg again. If this fails, the rest is useless.
+    if (bc_reg_set (0x00, 1, pwr_val) < 0) {                            // Write power reg again. If this fails, the rest is useless.
       curr_state = 0;
       loge ("chip_imp_state_sg error writing 0x00 curr_state: %d", curr_state);
       return (curr_state);
@@ -1639,99 +1771,92 @@ void bc_reg_dump (int lo, int hi, int bytes) {
     else
       logd ("chip_imp_state_sg 2 success writing 0x00");
 
-    ret = reg_get (0x00);
+    ret = bc_reg_get (0x00, 1);
     if (ret < 0)                                                        // Read power reg.
       loge ("chip_imp_state_sg 2 error reading 0x00  ret: %d", ret);
     else
       logd ("chip_imp_state_sg 2 success reading 0x00  ret: %d", ret);
 
-    reg_set (0x10 | 0x10000, 0x0000);                                   // Write an Interrupt Mask of 0x0000 so we don't get Interrupt packets such as this on the UART: 04 ff 01 08
+    bc_reg_set (0x10, 2, 0x0000);                                       // Write an Interrupt Mask of 0x0000 so we don't get Interrupt packets (we poll) such as this on the UART: 04 ff 01 08
 
     bc_reg_ctl = 4;                                                     // Set: CTL: BND_EUROPE_US + MANUAL + STEREO + BLEND write the band setting, mono/stereo blend setting.
     bc_reg_ctl |= 0x02;                                                 // Automatic Stereo/Mono (When stereo selected)
 
-    if (reg_set (0x01, bc_reg_ctl) < 0)
+    if (bc_reg_set (0x01, 1, bc_reg_ctl) < 0)
       loge ("chip_imp_state_sg error writing 0x01");
     else
       logd ("chip_imp_state_sg success writing 0x01");
 
-    if (reg_set (0x14, MAX_RDS_BLOCKS * 3) < 0)                         // 0x78 // 0x7e);  // BC_REG_RDS_WLINE, // 0x14  FIFO water line set level
-      loge ("chip_imp_state_sg error writing 0x14");                    // ?? Usually fails ??
+    if (bc_reg_set (0x14, 1, MAX_RDS_BLOCKS * 3) < 0)                   // 0x78 // 0x7e);  // BC_REG_RDS_WLINE, // 0x14  FIFO water line set level
+      loge ("chip_imp_state_sg error writing 0x14");
     else
       logd ("chip_imp_state_sg success writing 0x14");
 
     bc_reg_aud_ctl0 = 0x7c;                                 // 0x6c;    // 75 us, I2S, DAC, DAC left & right, no RF mute
 
-    int bc_rev_id = reg_get (0x28);                                     // REV_ID always 0xff
+    int bc_rev_id = bc_reg_get (0x28, 1);                               // REV_ID always 0xff
     logd ("chip_imp_state_sg bc_rev_id: %d", bc_rev_id);
 
-    //chip_imp_mute_sg (0);                                               // Unmute
+    //chip_imp_mute_sg (0);                                             // Unmute
 
-    reg_set (0xfb | 0x20000,  0x00000000);                              // Audio PCM ????       fb 00 00 00 00 00 
+    if (bc_reg_set (0xfb, 4,  0x00000000) < 0)                          // Audio PCM ????       fb 00 00 00 00 00 
+      loge ("chip_imp_state_sg error writing 0xfb");
+    else
+      logd ("chip_imp_state_sg success writing 0xfb");
+
     int inc = 100;
-    reg_set (0xfd | 0x10000, inc);
+    if (bc_reg_set (0xfd, 2, inc) < 0)
+      loge ("chip_imp_state_sg error writing 0xfd");
+    else
+      logd ("chip_imp_state_sg success writing 0xfd");
 
-    if (lg_get ()) {                                                       // If LG G2 and SHIM:   Special LG G2 stuff needed, or no audio
-      if (curr_api_mode == 0) {                                         // If LG G2 and UART:   See bt-ven.c not yet in bt-hci.c
-        unsigned char res_buf [MAX_HCI];
-        int res_len;
-        unsigned char hci_buf [] = {0, 0, 0, 0, 0, 0, 0, 0, 0xf3, 0x88, 0x01, 0x02, 0x05};  // hcitool cmd 3f 00 f3 88 01 02 05
-        res_len = hci_cmd (0x3f, 0x00, hci_buf, sizeof (hci_buf), res_buf, sizeof (res_buf), hci_cmd_tmo);
-        if (res_buf [7]) {
-          logd ("chip_imp_state_sg g2 hci error: %d %s", res_buf [7], hci_err_get (res_buf [7]));      // !!!! Always error
-        }
-        if (res_len < 1 + 8)
-          logd ("chip_imp_state_sg g2 hci_cmd error res_len: %d", res_len);                            // !!!! Always error
-        else 
-          logd ("chip_imp_state_sg g2 OK");
-      }
-    }
+   
+    //enable_g2_audio ();
 
-/*
-    int vol_val = 0x00ff;                                               // Target audio level max about 27,000
-    if (htc_get () && android_version >= 21) {                                   // For HTC One M7 Lollipop
-      vol_val = 0x0040;                                                 // Target max about 27,000
-      if (file_get ("/system/framework/htcirlibs.jar"))                 // If HTC One M7 GPE       (Stock Android 5 too ????)
-        vol_val = 0x0060;
-    }
-    if (vol_val != 0x00ff)
-      reg_set (0xf8 | 0x10000,  vol_val);                               // Vol Max              f8 00 ff 00 
-*/
+    //chip_imp_vol_sg (65535);                                            // Volume = maximum
+// !!!!!!
+    int vol_val = 0xffff;
+    if (android_version >= 21 && file_get ("/system/framework/htcirlibs.jar")) // If HTC One M7 GPE       (Stock Android 5 too ????)
+      vol_val = 0x6000;
+    //else if (version_sdk >= 21 && is_m7)      !!!!! Needed on earlier AOSP ROMs ??
+    //  vol_val = 0x0040;
 
-    chip_imp_vol_sg (65535);
+    //if (vol_val == 0xffff)
+
+    chip_imp_vol_sg (vol_val);
 
     curr_state = 1;
     logd ("chip_imp_state_sg curr_state: %d", curr_state);
     return (curr_state);
   }
 
-  int chip_imp_antenna_sg (int antenna) {
+  int chip_imp_antenna_sg (int antenna) {                               // Antenna only for QCV
     if (antenna == GET)
       return (curr_antenna);
-/*
-    if (chip_ctrl_set (V4L2_CID_PRIVATE_IRIS_ANTENNA, antenna) < 0)     // 0 = common external, 1 = Sony Z/Z1 internal
-      loge ("chip_imp_antenna_sg ANTENNA error");
-    else
-      logd ("chip_imp_antenna_sg ANTENNA success");
-*/
     curr_antenna = antenna;
     logd ("chip_imp_antenna_sg curr_antenna: %d", curr_antenna);
     return (curr_antenna);
   }
 
-  int chip_imp_band_sg (int band) {
+  int chip_imp_band_sg (int band) {                                     //  0:EU    1:US    2:UU
     if (band == GET)
       return (curr_band);
 
     logd ("chip_imp_band_sg band: %d", band);
 
-    curr_freq_lo =  87500;
+    curr_band = band;
+
     curr_freq_hi = 108000;
 
-    if (band == 0)
+    curr_freq_lo = 87500;
+    if (band == 2) {                                                    // If Wide / Japan
+      curr_freq_lo = 76000;//65000;
+      curr_freq_hi = 90000;
+    }
+
+    curr_freq_inc = 100;
+    if (band == 1)                                                      // If US
       curr_freq_inc = 200;
-    else
-      curr_freq_inc = 100;
 
     band_set (curr_freq_lo, curr_freq_hi, band);
 
@@ -1744,15 +1869,22 @@ void bc_reg_dump (int lo, int hi, int bytes) {
     return (band);
   }
 
-  int chip_imp_freq_sg (int freq) {                                        // 1 KHz resolution
+  int chip_imp_freq_sg (int freq) {                                     // 1 KHz resolution on Broadcom only
+    #ifdef  SUPPORT_RDS
+    if (g2_disable_rds)
+      return (curr_freq_int);
+    #endif
+
     if (freq == GET)
       return (freq_get ());
 
     logd ("chip_imp_freq_sg: %d", freq);
-    reg_set (0x0a | 0x10000, freq - bc_freq_lo);                        // Freq is offset from 64MHz
-    //logd ("bc_freq_sg reg 0: %d", reg_get (0x00));
-    if ( reg_set (0x09, 1) < 0){                                      // Set: SRCH_TUNE_MODE: PRESET
-      loge ("chip_imp_freq_sg error");
+    if (bc_reg_set (0x0a, 2, freq - bc_freq_lo) < 0) {                  // Freq is offset from 64MHz
+      loge ("chip_imp_freq_sg error writing 0x0a");
+    }
+
+    if (bc_reg_set (0x09, 1, 1) < 0) {                                  // Set: SRCH_TUNE_MODE: PRESET
+      loge ("chip_imp_freq_sg error writing 0x09");
       return (curr_freq_int);
     }
     curr_freq_int = freq;
@@ -1764,7 +1896,7 @@ void bc_reg_dump (int lo, int hi, int bytes) {
     if (vol == GET)
       return (curr_vol);
 
-    reg_set (0xf8 | 0x00010000, vol / 256);//63);//vol / 256);
+    bc_reg_set (0xf8, 2, vol / 256);
 
     curr_vol = vol;
     logd ("chip_imp_vol_sg curr_vol: %d", curr_vol);
@@ -1774,6 +1906,9 @@ void bc_reg_dump (int lo, int hi, int bytes) {
   int chip_imp_thresh_sg (int thresh) {
     if (thresh == GET)
       return (curr_thresh);
+
+    bc_ctl_rssi_base = thresh;
+
     curr_thresh = thresh;
     logd ("chip_imp_thresh_sg curr_thresh: %d", curr_thresh);
     return (curr_thresh);
@@ -1783,20 +1918,24 @@ void bc_reg_dump (int lo, int hi, int bytes) {
     if (mute == GET)
       return (curr_mute);
 
-    //bc_reg_aud_ctl0 &= ~0x3f;                                           // Low 6 bits = 0
-    bc_reg_aud_ctl0 &= ~0x1f;                                             // Don't turn I2S off (Or it interrupts transfer ??)
+    //bc_reg_aud_ctl0 &= ~0x3f;                                         // Low 6 bits = 0
+    bc_reg_aud_ctl0 &= ~0x1f;                                           // Don't turn I2S off (Or it interrupts transfer ??)
 
     if (mute)
-      //bc_reg_aud_ctl0 |= 0x02;//0x03;                                   // Set: AUD_CTL0: MANUAL_MUTE_ON 0x02 + RF Mute 0x01 = 0x03     No dacs, dac enable or i2s enable
-      bc_reg_aud_ctl0 |= 0x03;                                            // !! Must set FM mute bit so no blast of high volume on 4330/20780 !!  ?? RF Mute ???
+      //bc_reg_aud_ctl0 |= 0x02;//0x03;                                 // Set: AUD_CTL0: MANUAL_MUTE_ON 0x02 + RF Mute 0x01 = 0x03     No dacs, dac enable or i2s enable
+      bc_reg_aud_ctl0 |= 0x03;                                          // !! Must set FM mute bit so no blast of high volume on 4330/20780 !!  ?? RF Mute ???
     else
-      bc_reg_aud_ctl0 |= 0x1d;//0x1c;                                     // Set: AUD_CTL0: dacs on, dac enable, no mutes, no i2s         !! Now RF mute
+      bc_reg_aud_ctl0 |= 0x1d;//0x1c;                                   // Set: AUD_CTL0: dacs on, dac enable, no mutes, no i2s         !! Now RF mute
 
-    if (reg_set (0x05 | 0x10000, bc_reg_aud_ctl0) < 0)                    //
+    if (bc_reg_set (0x05, 2, bc_reg_aud_ctl0) < 0)                      //
       loge ("bc_mute_sg error writing 0x05");
 
     curr_mute = mute;
     logd ("chip_imp_mute_sg curr_mute: %d", curr_mute);
+
+    if (! mute)
+      enable_g2_audio ();
+
     return (curr_mute);
   }
 
@@ -1810,7 +1949,7 @@ void bc_reg_dump (int lo, int hi, int bytes) {
       bc_reg_aud_ctl0 |= 0x01;
     else
       bc_reg_aud_ctl0 &= 0xfffe;    //~ 0x02;
-    if (reg_set (0x05 | 0x10000, bc_reg_aud_ctl0) < 0)
+    if (bc_reg_set (0x05, 2, bc_reg_aud_ctl0) < 0)
       loge ("chip_imp_softmute_sg error writing 0x05");
     else
       logd ("chip_imp_softmute_sg success writing 0x05");
@@ -1830,26 +1969,29 @@ void bc_reg_dump (int lo, int hi, int bytes) {
 #define BC_VAL_CTL_BLEND                    0x00
 #define BC_VAL_CTL_SWITCH                   0x08    // BCM2048_STEREO_MONO_BLEND_SWITCH
 */
-  int chip_imp_stereo_sg (int stereo) {                                        //
+  int chip_imp_stereo_sg (int stereo) {                                 //
     if (stereo == GET)
       return (curr_stereo);
 
     int ret = 0;
 
-    logd ("chip_imp_stereo_sg: %d", stereo);                          // Default 0 = Blend Auto, 1 = Switch Auto, 2 = Stereo Force, 3 = Mono Force
+    logd ("chip_imp_stereo_sg: %d", stereo);                            // Default 1 = Blend Auto, 2 = Switch Auto, 3 = Stereo Force, 0 = Mono Force
     bc_reg_ctl &= ~0x0e;                                                // bits 1-3 = 0
 
-    if (stereo)
-      bc_reg_ctl |= 0x06;                                               // Set CTL: + STEREO + AUTO
-    /*else if (stereo == 1)
-      bc_reg_ctl |= 0x0e;                                               // Set CTL: + STEREO + AUTO + SWITCH
-    else if (stereo == 2)
-      bc_reg_ctl |= 0x04;//0x0c;                                        // Set CTL: + STEREO + SWITCH (? Or 4 for STEREO only ?
-    else if (stereo == 0)*/
-    else
-      bc_reg_ctl |= 0x00;                                               // Set CTL: MONO
+    int bc_reg_ctl_or_val = 0x06;                                       // Default = Blend
 
-    if (reg_set (0x01, bc_reg_ctl) < 0)
+    if (stereo == 0)
+      bc_reg_ctl_or_val = 0x00;                                         // Set CTL: MONO
+    else if (stereo == 1)
+      bc_reg_ctl_or_val = 0x06;                                         // Set CTL: + STEREO + AUTO
+    else if (stereo == 2)
+      bc_reg_ctl_or_val = 0x0e;                                         // Set CTL: + STEREO + AUTO + SWITCH
+    else if (stereo == 3)
+      bc_reg_ctl_or_val = 0x04;                                         // Set CTL: + STEREO
+
+    bc_reg_ctl |= bc_reg_ctl_or_val;
+
+    if (bc_reg_set (0x01, 1, bc_reg_ctl) < 0)
       loge ("chip_imp_stereo_sg error writing 0x01");
     else
       logd ("chip_imp_stereo_sg success writing 0x01");
@@ -1873,38 +2015,37 @@ void bc_reg_dump (int lo, int hi, int bytes) {
 
     freq_inc_set (curr_freq_inc);                                       // !! Issues ! // Does nothing without "bc/ss"
 
-    reg_set_slow (0xfc, 0x0);                                           // BC_REG_SRCH_METH Search method 0 = SRCH_METH_NORMAL normal search; 1 = preset search; 2 = rssi search.
-    //reg_get (0xfc);                                                   // Read BC_REG_SRCH_METH Search method
+    bc_reg_set (0xfc, 1, 0x0);                                          // BC_REG_SRCH_METH Search method 0 = SRCH_METH_NORMAL normal search; 1 = preset search; 2 = rssi search.
 
-    reg_set_slow (0x08, 0x0c);                                          // BC_REG_SRCH_CTL1 = 0x0c = ?? (2 bytes read as 0x020c)
-    reg_set_slow (0xfe, 0x0);                                           // BC_REG_MAX_PRESET Max Preset = 0
+    bc_reg_set (0x08, 1, 0x0c);                                         // BC_REG_SRCH_CTL1 = 0x0c = ?? (2 bytes read as 0x020c)
+    bc_reg_set (0xfe, 1, 0x0);                                          // BC_REG_MAX_PRESET Max Preset = 0
  
     if (seek_state == 1) {
-      reg_set_slow (0x07, bc_ctl_rssi_base + 0x80);                     // Direction = up
+      bc_reg_set (0x07, 1, bc_ctl_rssi_base + 0x80);                    // Direction = up
       chip_imp_freq_sg (freq_up_get (curr_freq_int));                   // Move up to next channel
     }
     else {//if (seek_state == 2) {
-      reg_set_slow (0x07, bc_ctl_rssi_base);                            // Direction = down
+      bc_reg_set (0x07, 1, bc_ctl_rssi_base);                           // Direction = down
       chip_imp_freq_sg (freq_dn_get (curr_freq_int));                   // Move dn to next channel
     }
 
-    reg_set_slow (0x09, 2);                                             // Set SRCH_TUNE_MODE: TUNE_MODE_AUTO
+    bc_reg_set (0x09, 1, 2);                                            // Set SRCH_TUNE_MODE: TUNE_MODE_AUTO
 
     int ctr = 0;
     for (ctr = 0; ctr < 40; ctr ++) {                                   // With 4 second timeout by 40 times, each 100 ms...
-      int flags = reg_get (0x12 | 0x10000);                             // Read 2 bytes event/RDS event register  For some reason, this needs to be done before
+      int flags = bc_reg_get (0x12, 2);                                 // Read 2 bytes event/RDS event register  For some reason, this needs to be done before
                                                                         //  RDS flags get and process, still fails some time
       //if (ena_log_tnr_evt)
       //  logd ("chip_imp_seek_state_sg flags: 0x%x", flags);
       if (bc_seek_handle (flags, seek_state))
         break;                                                          // Terminate loop
       else
-        ms_sleep (101);
+        quiet_ms_sleep (101);
     }
 
     curr_seek_state = 0;
     rds_init ();
-    return (curr_seek_state);
+    return (curr_freq_int);//curr_seek_state);
   }
 
   int chip_imp_rds_state_sg (int rds_state) {
@@ -1926,10 +2067,15 @@ void bc_reg_dump (int lo, int hi, int bytes) {
   }
 
   int chip_imp_rssi_sg (int fake_rssi) {
-    int rssi = reg_get (0x0f);                          // Get RSSI
+    #ifdef  SUPPORT_RDS
+    if (g2_disable_rds)
+      return (curr_rssi);
+    #endif
+
+    int rssi = bc_reg_get (0x0f, 1);                                    // Get RSSI
     rssi -= 144;
     if (ena_log_tnr_extra)
-      logd ("chip_imp_rssi_sg: %d",rssi);
+      logd ("chip_imp_rssi_sg: %d", rssi);
 
     curr_rssi = rssi;
     return (curr_rssi);
@@ -1972,12 +2118,51 @@ void bc_reg_dump (int lo, int hi, int bytes) {
     return (curr_rds_rt);
   }
 
+
+    // See gui_gui: // Codes 200 000 - 2xx xxx - 299 999 = get/set Broadcom FM Register
+
   char * chip_imp_extension_sg (char * reg) {
     if (reg == GETP)
       return (curr_extension);
+
     int ret = -1;
-    //ret = reg_set (reg);
     strlcpy (curr_extension, reg, sizeof (curr_extension));
+
+    int full_val = atoi (reg);                                          // full_val = -2^31 ... +2^31 - 1       = Over 9 digits
+    int ctrl = 0;
+    if (full_val >= 300000)                                             // If set
+      ctrl = (full_val / 1000) - 300;                                   // ctrl = hi 3 digits - 400     (control to write to)
+    else
+      ctrl = (full_val / 1000) - 200;                                   // ctrl = hi 3 digits - 200     (control to write to)
+
+    int val  = (full_val % 1000);                                       // val  = lo 3 digits           (value to write)
+
+    logd ("chip_imp_extension_sg reg: %s  full_val: %d  ctrl: %d  val: %d", reg, full_val, ctrl, val);
+
+    if (ctrl == 256) {
+      enable_g2_audio ();
+      return (curr_extension);
+    }
+
+    int size = 1;
+    if (ctrl >= 600)
+      size = 4;
+    if (ctrl >= 300)
+      size = 2;
+
+    while (ctrl >= 300)
+      ctrl -= 300;
+
+    if (ctrl >= 0 && ctrl <= 255) {
+      int ret = bc_reg_get (ctrl, size);
+      logd ("chip_imp_extension_sg get ret: %d  size: %d  ctrl: %x", ret, size, ctrl);
+
+      if (full_val >= 300000) {                                           // If set
+        ret = bc_reg_set (ctrl, size, val);
+        logd ("chip_imp_extension_sg set ret: %d  size: %d  ctrl: %x", ret, size, ctrl);
+      }
+    }
+
     return (curr_extension);
   }
 

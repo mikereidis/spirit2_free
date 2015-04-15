@@ -162,9 +162,10 @@ if (0) {
 */
 
 /*
+      errno = 0;
       int fd = open ("/dev/msm_acdb", O_RDWR);
       if (fd < 0) {
-        loge ("Open errno: %s", strerror (errno));
+        loge ("Open errno: %d (%s)", errno, strerror (errno));
         return -1;
       }
       else
@@ -178,9 +179,10 @@ if (0) {
       int i = 0;
       for (i = 0; i < arg.size; i ++)
         arg.data [i] = 0;
+      errno = 0;
       ret = ioctl (fd, AUDIO_DEREGISTER_PMEM, & arg);
       if (ret < 0)
-        loge ("Ioctl errno: %s", strerror (errno));
+        loge ("Ioctl errno: %d (%s)", errno, strerror (errno));
       else
         loge ("Ioctl success");
       close (fd);

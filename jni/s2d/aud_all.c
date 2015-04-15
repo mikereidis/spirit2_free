@@ -1221,9 +1221,30 @@ alsa_bool_set ("Headphone Playback Switch", 1);
     }
 
     alsa_bool_set ("MultiMedia1 Mixer SLIM_0_TX", 0);                   // Turn off microphone path to MM 1
-    //alsa_enum_set ("SLIM_0_TX Channels", 1);                            // 2        Set SLIMBus TX channels     to "2"
+    //alsa_enum_set ("SLIM_0_TX Channels", 1);                          // 2        Set SLIMBus TX channels     to "2"
     //alsa_enum_set ("SLIM_0_TX Channels", 0);
-    //alsa_enum_set ("SLIM_0_TX Channels", 1);                            // 2        Set SLIMBus TX channels     to "2"
+    //alsa_enum_set ("SLIM_0_TX Channels", 1);                          // 2        Set SLIMBus TX channels     to "2"
+
+                // MotoG, Z1 re-enable camcorder microphone sometimes !
+    alsa_long_set ("ADC1 Volume", 0);
+    alsa_long_set ("ADC2 Volume", 0);
+    alsa_long_set ("ADC3 Volume", 0);
+    //alsa_long_set ("ADC4 Volume", 0);                                 // ADC4 not used on MOG
+    alsa_long_set ("DEC1 Volume", 0);
+    alsa_long_set ("DEC2 Volume", 0);                                   // Xperia Z1
+    if (! msm8226_get ()) {                                             // If not MotoG msm8226 chipset...
+        alsa_long_set ("ADC4 Volume", 0);                               // Xperia Z1
+        alsa_long_set ("ADC5 Volume", 0);                               // Xperia Z1
+        //alsa_long_set ("ADC6 Volume", 0);
+        alsa_long_set ("DEC3 Volume", 0);                               // Xperia Z1
+        //alsa_long_set ("DEC4 Volume", 0);
+        alsa_long_set ("DEC5 Volume", 0);
+        //alsa_long_set ("DEC6 Volume", 0);
+        //alsa_long_set ("DEC7 Volume", 0);
+        //alsa_long_set ("DEC8 Volume", 0);
+        //alsa_long_set ("DEC9 Volume", 0);
+      }
+
 
     alsa_bool_set ("MultiMedia1 Mixer INTERNAL_FM_TX", 1);              // Internal FM audio source to MM 1
 //    alsa_bool_set ("MultiMedia1 Mixer SLIM_0_TX", 0);                   // Turn off microphone path to MM 1
@@ -1231,11 +1252,38 @@ alsa_bool_set ("Headphone Playback Switch", 1);
     //acdb_disable ();
     return (0);
   }
+/* Z1 regular mic:
+Input mic:
+    ADC2 Volume     = 8     (default 19 ?)
+    DEC5 Volume     = 99    (default 84 ?)
 
+Cam mic:
+    ADC5 Volume     = 12
+    DEC2 Volume     = ??    (default 84 ?)
+
+Output:
+    RX1 Digital Volume
+    RX2 Digital Volume
+
+a /data/local/tmp/ssd 4 0 | grep -e "ADC2 Volume" -e "DEC5 Volume" -e "RX[12] Digital Volume"
+
+*/
   int qcv_dig_audio_state_stop () {
     if (curr_tuner_mode_int) {                                          // If Transmit...
       alsa_bool_set ("SLIMBUS_0_RX Audio Mixer MultiMedia1", 1);        // Restore Wired headset audio to on, since we turned it off before
       return (0);
+    }
+
+    alsa_long_set ("ADC1 Volume", 19);
+    alsa_long_set ("ADC2 Volume", 19);
+    alsa_long_set ("ADC3 Volume", 19);
+    alsa_long_set ("DEC1 Volume", 84);
+    alsa_long_set ("DEC2 Volume", 84);
+    if (! msm8226_get ()) {
+      alsa_long_set ("ADC4 Volume", 19);
+      alsa_long_set ("ADC5 Volume", 19);
+      alsa_long_set ("DEC3 Volume", 84);
+      alsa_long_set ("DEC5 Volume", 84);
     }
 
     alsa_bool_set ("MultiMedia1 Mixer INTERNAL_FM_TX", 0);              // Internal FM audio source off
